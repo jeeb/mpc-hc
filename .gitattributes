@@ -1,1 +1,4 @@
 *.sh    eol=lf
+*.rc    diff
+*.rc*   diff
+*.h     diff
