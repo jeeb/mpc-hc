@@ -1,0 +1,16 @@
+*.cache
+*.ncb
+*.opensdf
+*.sdf
+*.suo
+*.user
+lib/*.a
+bin/*
+bin10/*
+src/filters/transform/*/bin10/*
+ipch/*
+src/thirdparty/MediaInfo/MediaInfo/*
+src/thirdparty/ZenLib/ZenLib/*
+src/apps/mplayerc/res/mpc-hc.exe.manifest
+include/Version_rev.h
+update_version.bat
