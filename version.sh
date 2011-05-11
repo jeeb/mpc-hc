@@ -16,6 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# Set CCCP-related stuff
+BUILD_YEAR=`date +"%Y"`
+BUILD_MONTH=`date +"%-m"`
+BUILD_DAY=`date +"%-d"`
+
 versionfile_fixed="./include/version.h"
 versionfile="./include/version_rev.h"
 manifestfile="./src/mpc-hc/res/mpc-hc.exe.manifest"
@@ -42,13 +47,14 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 else
   # Get information about the current version
   describe=$(git describe --long)
+  counter=$(git log --simplify-by-decoration --pretty='%H' develop -1 | xargs -n1 git describe --long --tags 2>/dev/null)
   echo "Describe:  $describe"
 
   # Get the abbreviated hash of the current changeset
   hash=${describe##*-g}
 
   # Get the number changesets since the last tag
-  ver=${describe#*-}
+  ver=${counter#*-}
   ver=${ver%-*}
 
   ver_additional=" ($hash)"
@@ -99,7 +105,12 @@ version_info+="#define MPCHC_HASH _T(\"$hash\")"$'\n'
 version_info+="#define MPC_VERSION_REV $ver"$'\n'
 version_info+="#define MPC_VERSION_ADDITIONAL _T(\"${ver_additional}\")"$'\n'
 version_info+="#define GCC32_VERSION _T(\"${gcc_version_str[0]}\")"$'\n'
-version_info+="#define GCC64_VERSION _T(\"${gcc_version_str[1]}\")"
+version_info+="#define GCC64_VERSION _T(\"${gcc_version_str[1]}\")"$'\n'
+
+# Add the CCCP-related stuff to the version header
+version_info+="#define CCCP_BUILD_YEAR  ${BUILD_YEAR}"$'\n'
+version_info+="#define CCCP_BUILD_MONTH ${BUILD_MONTH}"$'\n'
+version_info+="#define CCCP_BUILD_DAY   ${BUILD_DAY}"
 
 
 # Update version_rev.h if it does not exist, or if version information was changed.
