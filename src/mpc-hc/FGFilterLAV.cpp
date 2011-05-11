@@ -755,8 +755,12 @@ bool CFGFilterLAVVideo::Settings::SetSettings(CComQIPtr<ILAVVideoSettings> pLAVF
 
     pLAVFSettings->SetHWAccelDeintHQ(bHWDeintHQ);
 
-    // Force RV1/2 enabled, the user can control it from our own options
-    pLAVFSettings->SetFormatConfiguration(Codec_RV12, TRUE);
+    // Enable all video formats known at build time to enable
+    // enabling them in MPC-HC's UI as well as to enable
+    // low-merit mode fall-backs.
+    for (int i = 0; i < Codec_VideoNB; ++i) {
+        pLAVFSettings->SetFormatConfiguration((LAVVideoCodec)i, TRUE);
+    }
 
     // Custom interface available only in patched build, will be removed after it's upstreamed
     if (CComQIPtr<ILAVVideoSettingsMPCHCCustom> pLAVFSettingsMPCHCCustom = pLAVFSettings) {
@@ -1014,9 +1018,11 @@ bool CFGFilterLAVAudio::Settings::SetSettings(CComQIPtr<ILAVAudioSettings> pLAVF
     // The internal LAV Audio Decoder will not be registered to handle WMA formats
     // since the system decoder is preferred. However we can still enable those
     // formats internally so that they are used in low-merit mode.
-    pLAVFSettings->SetFormatConfiguration(Codec_WMA2, TRUE);
-    pLAVFSettings->SetFormatConfiguration(Codec_WMAPRO, TRUE);
-    pLAVFSettings->SetFormatConfiguration(Codec_WMALL, TRUE);
+    // This enables all audio codecs known at the point of building
+    // in LAV.
+    for (int i = 0; i < Codec_AudioNB; ++i) {
+        pLAVFSettings->SetFormatConfiguration((LAVAudioCodec)i, TRUE);
+    }
 
     // Custom interface available only in patched build, will be removed after it's upstreamed
     if (CComQIPtr<ILAVAudioSettingsMPCHCCustom> pLAVFSettingsMPCHCCustom = pLAVFSettings) {
