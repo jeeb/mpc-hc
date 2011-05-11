@@ -16,6 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# Set CCCP-related stuff
+BUILD_YEAR=`date +"%Y"`
+BUILD_MONTH=`date +"%-m"`
+BUILD_DAY=`date +"%-d"`
+
 versionfile_fixed="./include/version.h"
 versionfile="./include/version_rev.h"
 manifestfile="./src/mpc-hc/res/mpc-hc.exe.manifest"
@@ -82,7 +87,12 @@ fi
 
 version_info+="#define MPCHC_HASH _T(\"$hash\")"$'\n'
 version_info+="#define MPC_VERSION_REV $ver"$'\n'
-version_info+="#define MPC_VERSION_ADDITIONAL _T(\"${ver_additional}\")"
+version_info+="#define MPC_VERSION_ADDITIONAL _T(\"${ver_additional}\")"$'\n'
+
+# Add the CCCP-related stuff to the version header
+version_info+="#define CCCP_BUILD_YEAR  ${BUILD_YEAR}"$'\n'
+version_info+="#define CCCP_BUILD_MONTH ${BUILD_MONTH}"$'\n'
+version_info+="#define CCCP_BUILD_DAY   ${BUILD_DAY}"
 
 
 # Update version_rev.h if it does not exist, or if version information was changed.
