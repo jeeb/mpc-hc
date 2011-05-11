@@ -879,7 +879,7 @@ void CAppSettings::UpdateData(bool fSave)
 		fLoopForever = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_LOOP, 0);
 		fRewind = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_REWIND, FALSE);
 		iZoomLevel = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_ZOOM, 1);
-		iDSVideoRendererType = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_DSVIDEORENDERERTYPE, (IsVistaOrAbove() ? (CMPlayerCApp::HasEVR() ? VIDRNDT_DS_EVR_CUSTOM : VIDRNDT_DS_DEFAULT) : VIDRNDT_DS_VMR7WINDOWED) );
+		iDSVideoRendererType = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_DSVIDEORENDERERTYPE, (IsVistaOrAbove() ? (((GetRenderersData()->GetD3X9Dll() != NULL) && CMPlayerCApp::HasEVR()) ? VIDRNDT_DS_EVR_CUSTOM : VIDRNDT_DS_DEFAULT) : VIDRNDT_DS_OVERLAYMIXER) );
 		iRMVideoRendererType = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_RMVIDEORENDERERTYPE, VIDRNDT_RM_DEFAULT);
 		iQTVideoRendererType = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_QTVIDEORENDERERTYPE, VIDRNDT_QT_DEFAULT);
 
@@ -887,7 +887,7 @@ void CAppSettings::UpdateData(bool fSave)
 
 		strAudioRendererDisplayName = pApp->GetProfileString(IDS_R_SETTINGS, IDS_RS_AUDIORENDERERTYPE, _T(""));
 		fAutoloadAudio = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_AUTOLOADAUDIO, TRUE);
-		fAutoloadSubtitles = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_AUTOLOADSUBTITLES, !CMPlayerCApp::IsVSFilterInstalled() || (IsVistaOrAbove() && CMPlayerCApp::HasEVR()) );
+		fAutoloadSubtitles = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_AUTOLOADSUBTITLES, !CMPlayerCApp::IsVSFilterInstalled());
 		strSubtitlesLanguageOrder = pApp->GetProfileString(IDS_R_SETTINGS, IDS_RS_SUBTITLESLANGORDER, _T(""));
 		strAudiosLanguageOrder = pApp->GetProfileString(IDS_R_SETTINGS, IDS_RS_AUDIOSLANGORDER, _T(""));
 		fBlockVSFilter = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_BLOCKVSFILTER, TRUE);
@@ -1173,16 +1173,45 @@ void CAppSettings::UpdateData(bool fSave)
 
 		// Internal filters
 		for (int f=0; f<SRC_LAST; f++) {
-			SrcFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, SrcFiltersKeys[f], 1);
+			// In Soviet CCCP we wish to disable certain internal filters.
+			switch (f) {
+				case SRC_AVI:
+				case SRC_MATROSKA:
+				case SRC_MP4:
+				case SRC_MPA:
+				case SRC_MPEG:
+				case SRC_OGG:
+					SrcFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, SrcFiltersKeys[f], 0);
+					break;
+				default:
+					SrcFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, SrcFiltersKeys[f], 1);
+			}
 		}
 		for (int f=0; f<TRA_LAST; f++) {
-			TraFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, TraFiltersKeys[f], 1);
+			switch (f) {
+				case TRA_AAC:
+				case TRA_AC3:
+				case TRA_DTS:
+				case TRA_LPCM:
+				case TRA_MPA:
+				case TRA_VORBIS:
+				case TRA_FLAC:
+				case TRA_NELLY:
+				case TRA_AMR:
+				case TRA_MPEG1:
+					SrcFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, SrcFiltersKeys[f], 0);
+					break;
+				default:
+					TraFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, TraFiltersKeys[f], 1);
+			}
 		}
 		for (int f=0; f<TRA_DXVA_LAST; f++) {
-			DXVAFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, DXVAFiltersKeys[f], 1);
+			// In Soviet CCCP we just turn all of DXVA off.
+			DXVAFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, DXVAFiltersKeys[f], 0);
 		}
 		for (int f=0; f<FFM_LAST; f++) {
-			FFmpegFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, FFMFiltersKeys[f], 1);
+			// In Soviet CCCP we also just turn all of int. ffmpeg off.
+			FFmpegFilters[f] = !!pApp->GetProfileInt(IDS_R_INTERNAL_FILTERS, FFMFiltersKeys[f], 0);
 		}
 
 		strLogoFileName = pApp->GetProfileString(IDS_R_SETTINGS, IDS_RS_LOGOFILE, _T(""));
@@ -1320,7 +1349,7 @@ void CAppSettings::UpdateData(bool fSave)
 		fToggleShader = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_TOGGLESHADER, 0);
 		fToggleShaderScreenSpace = pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_TOGGLESHADERSSCREENSPACE, 0);
 
-		fShowOSD		= !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_SHOWOSD, 1);
+		fShowOSD		= !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_SHOWOSD, 0);
 		fEnableEDLEditor= !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_RS_ENABLEEDLEDITOR, FALSE);
 		fFastSeek = !!pApp->GetProfileInt(IDS_R_SETTINGS, IDS_FASTSEEK_KEYFRAME, FALSE);
 
