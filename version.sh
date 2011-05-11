@@ -23,6 +23,12 @@
 SVNREV=5597
 SVNHASH="f669833b77e6515dc5f0a682c5bf665f9a81b2ec"
 
+# Set CCCP-related stuff
+BUILD_YEAR=`date +"%Y"`
+BUILD_MONTH=`date +"%m"`
+BUILD_DAY=`date +"%d"`
+BUILD_TIME=`date +"%H:%M:%S"`
+
 if [ ! -d ".git" ] || ! command -v git >/dev/null 2>&1 ; then
   # If the folder ".git" doesn't exist or git isn't available we use hardcoded values
   HASH=0000000
@@ -58,7 +64,13 @@ VER_FULL="_T(\"$VER ($HASH)$VER_FULL\")"
 
 VERSION_INFO+="#define MPCHC_HASH _T(\"$HASH\")\n"
 VERSION_INFO+="#define MPC_VERSION_REV $VER\n"
-VERSION_INFO+="#define MPC_VERSION_REV_FULL $VER_FULL"
+VERSION_INFO+="#define MPC_VERSION_REV_FULL $VER_FULL\n"
+
+# Add the CCCP-related stuff to the version header
+VERSION_INFO+="#define ACTUAL_BUILD_YEAR  ${BUILD_YEAR}\n"
+VERSION_INFO+="#define ACTUAL_BUILD_MONTH ${BUILD_MONTH}\n"
+VERSION_INFO+="#define ACTUAL_BUILD_DAY   ${BUILD_DAY}\n"
+VERSION_INFO+="#define ACTUAL_BUILD_TIME  ${BUILD_TIME}"
 
 if [ "$BRANCH" ] ; then
   echo -e "On branch: $BRANCH"
