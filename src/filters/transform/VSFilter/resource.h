@@ -188,3 +188,6 @@
 #define _APS_NEXT_SYMED_VALUE           103
 #endif
 #endif
+
+#define VSFILTER_VERSION_MAJOR          2
+#define VSFILTER_VERSION_MINOR          40
