@@ -77,6 +77,7 @@ BEGIN
             VALUE "OriginalFilename", "Mpeg2DecFilter.ax"
             VALUE "ProductName", "Mpeg2Dec Filter"
             VALUE "ProductVersion", MPC_VERSION_STR_FULL
+            VALUE "SpecialBuild", "CCCP " ACTUAL_BUILD_YEAR "-" ACTUAL_BUILD_MONTH "-" ACTUAL_BUILD_DAY " " ACTUAL_BUILD_TIME "\0"
         END
     END
     BLOCK "VarFileInfo"
