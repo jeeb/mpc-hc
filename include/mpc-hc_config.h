@@ -54,6 +54,6 @@
 #define ENABLE_FULLDUMP 0
 
 // If this is enabled, the registered LAV Filters can be loaded as internal filters
-#define ENABLE_LOAD_EXTERNAL_LAVF_AS_INTERNAL 0
+#define ENABLE_LOAD_EXTERNAL_LAVF_AS_INTERNAL 1
 
 #endif // MPC_HC_CONFIG_H
