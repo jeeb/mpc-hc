@@ -21,6 +21,11 @@
 svnrev=5597
 svnhash="f669833b77e6515dc5f0a682c5bf665f9a81b2ec"
 
+# Set CCCP-related stuff
+BUILD_YEAR=`date +"%Y"`
+BUILD_MONTH=`date +"%-m"`
+BUILD_DAY=`date +"%-d"`
+
 versionfile="./include/version_rev.h"
 manifestfile="./src/mpc-hc/res/mpc-hc.exe.manifest"
 
@@ -61,7 +66,12 @@ ver_full="_T(\"$ver ($hash)$ver_full\")"
 
 version_info+="#define MPCHC_HASH _T(\"$hash\")"$'\n'
 version_info+="#define MPC_VERSION_REV $ver"$'\n'
-version_info+="#define MPC_VERSION_REV_FULL $ver_full"
+version_info+="#define MPC_VERSION_REV_FULL $ver_full"$'\n'
+
+# Add the CCCP-related stuff to the version header
+version_info+="#define CCCP_BUILD_YEAR  ${BUILD_YEAR}"$'\n'
+version_info+="#define CCCP_BUILD_MONTH ${BUILD_MONTH}"$'\n'
+version_info+="#define CCCP_BUILD_DAY   ${BUILD_DAY}"
 
 if [[ "$branch" ]]; then
   echo "On branch: $branch"
