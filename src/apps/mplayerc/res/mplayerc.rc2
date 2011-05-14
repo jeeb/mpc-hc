@@ -105,6 +105,8 @@ IDF_LOGO3                        FILE                    "res\\logo.3_x64.png"
 IDF_LOGO1                        FILE                    "res\\logo.1.png"
 IDF_LOGO2                        FILE                    "res\\logo.2.png"
 IDF_LOGO3                        FILE                    "res\\logo.3.png"
+IDF_LOGO8                        FILE                    "res\\logo.cccp.png"
+IDF_LOGO9                        FILE                    "res\\logo.cccp.2.png"
 #endif
 
 W7_TOOLBAR                       PNG                     "res\\Toolbarw7.png"
