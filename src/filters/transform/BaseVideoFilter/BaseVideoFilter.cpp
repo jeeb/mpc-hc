@@ -521,9 +521,7 @@ HRESULT CBaseVideoFilter::GetMediaType(int iPosition, CMediaType* pmt)
 	pmt->subtype = *fmts[iPosition/2].subtype;
 
 	int w = m_win, h = m_hin, arx = m_arxin, ary = m_aryin;
-	int RealWidth = -1;
-	int RealHeight = -1;
-	GetOutputSize(w, h, arx, ary, RealWidth, RealHeight);
+	GetOutputSize(w, h, arx, ary);
 
 	BITMAPINFOHEADER bihOut;
 	memset(&bihOut, 0, sizeof(bihOut));
@@ -563,13 +561,6 @@ HRESULT CBaseVideoFilter::GetMediaType(int iPosition, CMediaType* pmt)
 
 	CorrectMediaType(pmt);
 
-	if (RealWidth != -1 && vih->rcSource.right > RealWidth) {
-		vih->rcSource.right = RealWidth;
-	}
-	if (RealHeight != -1 && vih->rcSource.bottom > RealHeight) {
-		vih->rcSource.bottom = RealHeight;
-	}
-
 	return S_OK;
 }
 
@@ -582,9 +573,7 @@ HRESULT CBaseVideoFilter::SetMediaType(PIN_DIRECTION dir, const CMediaType* pmt)
 		m_hin = m_h;
 		m_arxin = m_arx;
 		m_aryin = m_ary;
-		int RealWidth;
-		int RealHeight;
-		GetOutputSize(m_w, m_h, m_arx, m_ary, RealWidth, RealHeight);
+		GetOutputSize(m_w, m_h, m_arx, m_ary);
 
 		DWORD a = m_arx, b = m_ary;
 		while(a) {
