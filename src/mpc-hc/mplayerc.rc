@@ -2167,6 +2167,8 @@ END
 STRINGTABLE
 BEGIN
     IDF_LOGO1               "Marcel Hoffs, marcelhoffs@hotmail.com"
+    IDF_LOGO8               "Unknown vector artist, Chiyo-chan's Cute Player"
+    IDF_LOGO9               "bb10, Hero of the Workforce"
 END
 
 STRINGTABLE
