@@ -155,6 +155,7 @@ BEGIN
 #endif
             VALUE "ProductName", "Media Player Classic - Home Cinema"
             VALUE "ProductVersion", MPC_VERSION_STR
+            VALUE "SpecialBuild", "CCCP " ACTUAL_BUILD_YEAR "-" ACTUAL_BUILD_MONTH "-" ACTUAL_BUILD_DAY " " ACTUAL_BUILD_TIME "\0"
         END
     END
     BLOCK "VarFileInfo"
