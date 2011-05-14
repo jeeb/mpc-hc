@@ -39,6 +39,7 @@
 #include <IFilterVersion.h>
 
 #define EPSILON 1e-4
+#define MPEG2ONLY 1
 
 #ifdef REGISTER_FILTER
 
@@ -64,7 +65,7 @@ const AMOVIESETUP_PIN sudpPins[] = {
 
 const AMOVIESETUP_FILTER sudFilter[] = {
 #ifdef MPEG2ONLY
-	{&__uuidof(CMpeg2DecFilter), L"MPC - MPEG-2 Video Decoder (Gabest)", 0x00600001, countof(sudpPins), sudpPins, CLSID_LegacyAmFilterCategory},
+	{&__uuidof(CMpeg2DecFilter), L"MPC - MPEG-2 Video Decoder (Gabest)", 0x00500001, countof(sudpPins), sudpPins, CLSID_LegacyAmFilterCategory},
 #else
 	{&__uuidof(CMpeg2DecFilter), L"MPC - MPEG Video Decoder (Gabest)", 0x00600001, countof(sudpPins), sudpPins, CLSID_LegacyAmFilterCategory},
 #endif
