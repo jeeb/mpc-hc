@@ -14,6 +14,8 @@
 #define IDF_LOGO1                       207
 #define IDF_LOGO2                       208
 #define IDF_LOGO3                       209
+#define IDF_LOGO8                       211
+#define IDF_LOGO9                       212
 #define IDF_TICKCROSS                   210
 #define IDB_STREAMTYPES                 215
 #define IDB_SHADER_UP                   216
