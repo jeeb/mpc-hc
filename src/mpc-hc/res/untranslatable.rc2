@@ -27,4 +27,6 @@ BEGIN
     IDF_LOGO1               "Marcel Hoffs, marcelhoffs@hotmail.com"
     IDF_LOGO2               "Steven W. Smith, smith78@sbcglobal.net"
     IDF_LOGO3               "Robbie Khan, email@robbiekhan.co.uk"
+    IDF_LOGO8               "Unknown vector artist, Chiyo-chan's Cute Player"
+    IDF_LOGO9               "bb10, Hero of the Workforce"
 END
