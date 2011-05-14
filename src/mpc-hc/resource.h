@@ -28,6 +28,7 @@
 #define IDI_DVD                         302
 #define IDI_AUDIOCD                     303
 #define IDI_UNKNOWN                     304
+#define IDI_CCCP_ICON                   305
 #define IDR_AVI_FILECOPY                400
 #define IDR_HTML_INFO                   500
 #define IDR_HTML_INDEX                  501
