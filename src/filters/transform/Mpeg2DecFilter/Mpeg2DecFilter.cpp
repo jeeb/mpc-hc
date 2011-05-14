@@ -19,6 +19,7 @@
  *
  */
 
+#define MPEG2ONLY 1
 #include "stdafx.h"
 #include <math.h>
 #include <atlbase.h>
@@ -67,7 +68,11 @@ const AMOVIESETUP_PIN sudpPins[] = {
 };
 
 const AMOVIESETUP_FILTER sudFilter[] = {
+#ifdef MPEG2ONLY
+    {&__uuidof(CMpeg2DecFilter), Mpeg2DecFilterName, 0x00500001, _countof(sudpPins), sudpPins, CLSID_LegacyAmFilterCategory},
+#else
     {&__uuidof(CMpeg2DecFilter), Mpeg2DecFilterName, 0x00600001, _countof(sudpPins), sudpPins, CLSID_LegacyAmFilterCategory},
+#endif
 };
 
 CFactoryTemplate g_Templates[] = {
