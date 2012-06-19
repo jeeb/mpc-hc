@@ -36,17 +36,17 @@ class __declspec(uuid("C6590B76-587E-4082-9125-680D0693A97B"))
     struct SyncPoint {
         BYTE id;
         REFERENCE_TIME rtStart, rtStop;
-        __int64 fp;
+        int64_t fp;
     };
     struct IndexedSyncPoint {
         BYTE id;
         REFERENCE_TIME rt, rtfp;
-        __int64 fp;
+        int64_t fp;
     };
     CAtlList<SyncPoint> m_sps;
     CAtlList<IndexedSyncPoint> m_isps;
     REFERENCE_TIME m_rtPrevSyncPoint;
-    void IndexSyncPoint(const MuxerPacket* p, __int64 fp);
+    void IndexSyncPoint(const MuxerPacket* p, int64_t fp);
 
     void MuxPacketHeader(IBitStream* pBS, dsmp_t type, UINT64 len);
     void MuxFileInfo(IBitStream* pBS);

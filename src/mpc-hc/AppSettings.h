@@ -558,7 +558,7 @@ private :
     CString     DXVAFiltersKeys[TRA_DXVA_LAST + !TRA_DXVA_LAST];
     CString     FFMFiltersKeys[FFM_LAST + !FFM_LAST];
 
-    __int64         ConvertTimeToMSec(CString& time) const;
+    int64_t         ConvertTimeToMSec(CString& time) const;
     void            ExtractDVDStartPos(CString& strParam);
 
     void            CreateCommands();

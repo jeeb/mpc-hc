@@ -281,7 +281,7 @@ void CMPC_Lcd::SetMediaTitle(const TCHAR* text)
 }
 
 /* set volume min/max */
-void CMPC_Lcd::SetVolumeRange(__int64 nStart, __int64 nStop)
+void CMPC_Lcd::SetVolumeRange(int64_t nStart, int64_t nStop)
 {
     EnterCriticalSection(&cs);
     m_Manager.m_ProgBar[0].SetRange(nStart, nStop);
@@ -289,7 +289,7 @@ void CMPC_Lcd::SetVolumeRange(__int64 nStart, __int64 nStop)
 }
 
 /* update volume */
-void CMPC_Lcd::SetVolume(__int64 nVol)
+void CMPC_Lcd::SetVolume(int64_t nVol)
 {
     EnterCriticalSection(&cs);
     m_Manager.m_ProgBar[0].SetPos(nVol);
@@ -297,7 +297,7 @@ void CMPC_Lcd::SetVolume(__int64 nVol)
 }
 
 /* set media min/max */
-void CMPC_Lcd::SetMediaRange(__int64 nStart, __int64 nStop)
+void CMPC_Lcd::SetMediaRange(int64_t nStart, int64_t nStop)
 {
     EnterCriticalSection(&cs);
     m_Manager.m_ProgBar[1].SetRange(nStart, nStop);
@@ -305,7 +305,7 @@ void CMPC_Lcd::SetMediaRange(__int64 nStart, __int64 nStop)
 }
 
 /* update media position */
-void CMPC_Lcd::SetMediaPos(__int64 nPos)
+void CMPC_Lcd::SetMediaPos(int64_t nPos)
 {
     EnterCriticalSection(&cs);
     m_Manager.m_ProgBar[1].SetPos(nPos);

@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <string.h>
 #include <math.h>
 #include <vector>
@@ -207,7 +213,7 @@ void Rasterizer::_EvaluateLine(int x0, int y0, int x1, int y1)
     lastp.y = y1;
 
     if (y1 > y0) {  // down
-        __int64 xacc = (__int64)x0 << 13;
+        int64_t xacc = (int64_t)x0 << 13;
 
         // prestep y0 down
 
@@ -218,7 +224,7 @@ void Rasterizer::_EvaluateLine(int x0, int y0, int x1, int y1)
         y1 = (y1 - 5) >> 3;
 
         if (iy <= y1) {
-            __int64 invslope = (__int64(x1 - x0) << 16) / dy;
+            int64_t invslope = (int64_t(x1 - x0) << 16) / dy;
 
             while (mEdgeNext + y1 + 1 - iy > mEdgeHeapSize) {
                 _ReallocEdgeBuffer(mEdgeHeapSize * 2);
@@ -239,7 +245,7 @@ void Rasterizer::_EvaluateLine(int x0, int y0, int x1, int y1)
             }
         }
     } else if (y1 < y0) { // up
-        __int64 xacc = (__int64)x1 << 13;
+        int64_t xacc = (int64_t)x1 << 13;
 
         // prestep y1 down
 
@@ -250,7 +256,7 @@ void Rasterizer::_EvaluateLine(int x0, int y0, int x1, int y1)
         y0 = (y0 - 5) >> 3;
 
         if (iy <= y0) {
-            __int64 invslope = (__int64(x0 - x1) << 16) / dy;
+            int64_t invslope = (int64_t(x0 - x1) << 16) / dy;
 
             while (mEdgeNext + y0 + 1 - iy > mEdgeHeapSize) {
                 _ReallocEdgeBuffer(mEdgeHeapSize * 2);
@@ -510,7 +516,7 @@ bool Rasterizer::ScanConvert()
 
     mOutline.reserve(mEdgeNext / 2);
 
-    __int64 y = 0;
+    int64_t y = 0;
 
     for (y = 0; y < mHeight; ++y) {
         int count = 0;
@@ -553,7 +559,7 @@ bool Rasterizer::ScanConvert()
                 x2 = (x >> 1);
 
                 if (x2 > x1) {
-                    mOutline.push_back(std::pair<__int64, __int64>((y << 32) + x1 + 0x4000000040000000i64, (y << 32) + x2 + 0x4000000040000000i64)); // G: damn Avery, this is evil! :)
+                    mOutline.push_back(std::pair<int64_t, int64_t>((y << 32) + x1 + 0x4000000040000000i64, (y << 32) + x2 + 0x4000000040000000i64)); // G: damn Avery, this is evil! :)
                 }
             }
         }
@@ -586,15 +592,15 @@ void Rasterizer::_OverlapRegion(tSpanBuffer& dst, tSpanBuffer& src, int dx, int 
 
     // Don't worry -- even if dy<0 this will still work! // G: hehe, the evil twin :)
 
-    unsigned __int64 offset1 = (((__int64)dy) << 32) - dx;
-    unsigned __int64 offset2 = (((__int64)dy) << 32) + dx;
+    uint64_t offset1 = (((int64_t)dy) << 32) - dx;
+    uint64_t offset2 = (((int64_t)dy) << 32) + dx;
 
     while (itA != itAE && itB != itBE) {
         if ((*itB).first + offset1 < (*itA).first) {
             // B span is earlier.  Use it.
 
-            unsigned __int64 x1 = (*itB).first + offset1;
-            unsigned __int64 x2 = (*itB).second + offset2;
+            uint64_t x1 = (*itB).first + offset1;
+            uint64_t x2 = (*itB).second + offset2;
 
             ++itB;
 
@@ -632,8 +638,8 @@ void Rasterizer::_OverlapRegion(tSpanBuffer& dst, tSpanBuffer& src, int dx, int 
         } else {
             // A span is earlier.  Use it.
 
-            unsigned __int64 x1 = (*itA).first;
-            unsigned __int64 x2 = (*itA).second;
+            uint64_t x1 = (*itA).first;
+            uint64_t x2 = (*itA).second;
 
             ++itA;
 
@@ -779,11 +785,11 @@ bool Rasterizer::Rasterize(int xsub, int ysub, int fBlur, double fGaussianBlur)
         tSpanBuffer::iterator itEnd = pOutline[i]->end();
 
         for (; it != itEnd; ++it) {
-            unsigned __int64 f = (*it).first;
+            uint64_t f = (*it).first;
             unsigned int y = (f >> 32) - 0x40000000 + ysub;
             unsigned int x1 = (f & 0xffffffff) - 0x40000000 + xsub;
 
-            unsigned __int64 s = (*it).second;
+            uint64_t s = (*it).second;
             unsigned int x2 = (s & 0xffffffff) - 0x40000000 + xsub;
 
             if (x2 > x1) {
@@ -1047,7 +1053,7 @@ static __forceinline DWORD safe_subtract_sse2(DWORD a, DWORD b)
     return (DWORD)_mm_cvtsi128_si32(rp);
 }
 
-static const __int64 _00ff00ff00ff00ff = 0x00ff00ff00ff00ffi64;
+static const int64_t _00ff00ff00ff00ff = 0x00ff00ff00ff00ffi64;
 
 // some helper procedures (Draw is so big)
 void Rasterizer::Draw_noAlpha_spFF_Body_0(RasterizerNfo& rnfo)

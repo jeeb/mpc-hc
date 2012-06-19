@@ -401,7 +401,7 @@ void CDSMMuxerFilter::MuxFooter(IBitStream* pBS)
     }
 }
 
-void CDSMMuxerFilter::IndexSyncPoint(const MuxerPacket* p, __int64 fp)
+void CDSMMuxerFilter::IndexSyncPoint(const MuxerPacket* p, int64_t fp)
 {
     // Yes, this is as complicated as it looks.
     // Rule #1: don't write this packet if you can't do it reliably.

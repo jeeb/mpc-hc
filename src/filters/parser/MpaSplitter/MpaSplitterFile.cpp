@@ -185,7 +185,7 @@ HRESULT CMpaSplitterFile::Init()
         // TODO: read extended header
 
         if (major <= 4) {
-            __int64 pos = GetPos();
+            int64_t pos = GetPos();
 
             while (pos < m_startpos) {
                 Seek(pos);
@@ -248,10 +248,10 @@ HRESULT CMpaSplitterFile::Init()
     }
 
     int searchlen    = 0;
-    __int64 startpos = 0;
-    __int64 syncpos  = 0;
+    int64_t startpos = 0;
+    int64_t syncpos  = 0;
 
-    __int64 startpos_mp3 = m_startpos;
+    int64_t startpos_mp3 = m_startpos;
     while (m_mode == none) {
         if (!MP3_find && GetPos() >= 2048) {
             break;
@@ -366,7 +366,7 @@ bool CMpaSplitterFile::Sync(int limit)
 
 bool CMpaSplitterFile::Sync(int& FrameSize, REFERENCE_TIME& rtDuration, int limit)
 {
-    __int64 endpos = min(m_endpos, GetPos() + limit);
+    int64_t endpos = min(m_endpos, GetPos() + limit);
 
     if (m_mode == mpa) {
         while (GetPos() <= endpos - 4) {
@@ -426,7 +426,7 @@ void CMpaSplitterFile::AdjustDuration(int nBytesPerSec)
                 return;
             }
             m_pos2bps.SetAt(GetPos(), nBytesPerSec);
-            __int64 avgbps = m_totalbps / m_pos2bps.GetCount();
+            int64_t avgbps = m_totalbps / m_pos2bps.GetCount();
             m_rtDuration = 10000000i64 * (m_endpos - m_startpos) / avgbps;
         }
     }

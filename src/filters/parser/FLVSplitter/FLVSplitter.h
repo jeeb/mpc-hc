@@ -36,7 +36,7 @@ class __declspec(uuid("47E792CF-0BBE-4F7A-859C-194B0768650A"))
     UINT32 m_DataOffset;
     bool m_IgnorePrevSizes;
 
-    bool Sync(__int64& pos);
+    bool Sync(int64_t& pos);
 
     struct VideoTweak {
         BYTE x;

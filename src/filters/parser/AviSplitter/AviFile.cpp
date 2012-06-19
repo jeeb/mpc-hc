@@ -115,7 +115,7 @@ HRESULT CAviFile::BuildAMVIndex()
     return S_OK;
 }
 
-HRESULT CAviFile::Parse(DWORD parentid, __int64 end)
+HRESULT CAviFile::Parse(DWORD parentid, int64_t end)
 {
     HRESULT hr = S_OK;
 
@@ -584,7 +584,7 @@ REFERENCE_TIME CAviFile::strm_t::GetRefTime(DWORD frame, UINT64 size)
         if (wfe->nBlockAlign == 0) {
             return 0;
         }
-        return (REFERENCE_TIME)ceil(10000000.0 * size * strh.dwScale / (unsigned __int64(strh.dwRate) * wfe->nBlockAlign));
+        return (REFERENCE_TIME)ceil(10000000.0 * size * strh.dwScale / (uint64_t(strh.dwRate) * wfe->nBlockAlign));
         // need calculate in double, because the (10000000ui64 * size * strh.dwScale) can give overflow
         // "ceil" is necessary to compensate for framenumber->reftime->framenumber conversion
     }

@@ -62,7 +62,7 @@ public:
 
     // using CBaseSplitterFile::Read;
 
-    bool NextMpegStartCode(BYTE& b, __int64 len = 65536);
+    bool NextMpegStartCode(BYTE& b, int64_t len = 65536);
 
 #pragma pack(push, 1)
 
@@ -309,10 +309,10 @@ public:
         BYTE privatedata: 1;
         BYTE extension: 1;
         // TODO: add more fields here when the flags above are set (they aren't very interesting...)
-        __int64 PCR;
+        int64_t PCR;
 
         int bytes;
-        __int64 next;
+        int64_t next;
     };
 
     struct trsechdr {
@@ -362,7 +362,7 @@ public:
         unsigned int width, height;
         unsigned int views;
         unsigned int crop_left, crop_right, crop_top, crop_bottom;
-        __int64 AvgTimePerFrame;
+        int64_t AvgTimePerFrame;
 
         struct sar {
             WORD num;

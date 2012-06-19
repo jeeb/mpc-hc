@@ -23,6 +23,12 @@
 
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "vd_asm.h"
 
 #pragma warning(disable : 4799) // no emms... blahblahblah
@@ -75,7 +81,7 @@ yuvtoyuy2row_loop:
 
 void __declspec(naked) yuvtoyuy2row_avg_MMX(BYTE* dst, BYTE* srcy, BYTE* srcu, BYTE* srcv, DWORD width, DWORD pitchuv)
 {
-    static const __int64 mask = 0x7f7f7f7f7f7f7f7fi64;
+    static const int64_t mask = 0x7f7f7f7f7f7f7f7fi64;
 
     __asm {
         push    ebp

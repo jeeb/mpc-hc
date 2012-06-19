@@ -45,10 +45,10 @@ HRESULT COggFile::Init()
 
 bool COggFile::Sync(HANDLE hBreak)
 {
-    __int64 start = GetPos();
+    int64_t start = GetPos();
 
     DWORD dw;
-    for (__int64 i = 0, j = hBreak ? GetLength() - start : 65536;
+    for (int64_t i = 0, j = hBreak ? GetLength() - start : 65536;
             i < j && S_OK == ByteRead((BYTE*)&dw, sizeof(dw))
             && ((i & 0xffff) || !hBreak || WaitForSingleObject(hBreak, 0) != WAIT_OBJECT_0);
             i++, Seek(start + i)) {

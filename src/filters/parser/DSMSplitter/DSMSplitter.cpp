@@ -235,7 +235,7 @@ bool CDSMSplitterFilter::DemuxLoop()
             continue;
         }
 
-        __int64 pos = m_pFile->GetPos();
+        int64_t pos = m_pFile->GetPos();
 
         if (type == DSMP_SAMPLE) {
             CAutoPtr<Packet> p(DNew Packet());

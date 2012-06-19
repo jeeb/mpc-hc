@@ -299,7 +299,7 @@ HRESULT CCDXAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
 
     while (pos >= 0 && pos < m_llLength && dwBytesToRead > 0) {
         UINT sector = m_nFirstSector + int(pos / RAW_DATA_SIZE);
-        __int64 offset = pos % RAW_DATA_SIZE;
+        int64_t offset = pos % RAW_DATA_SIZE;
 
         if (m_nBufferedSector != (int)sector) {
             LARGE_INTEGER FilePointer;
@@ -470,7 +470,7 @@ bool CCDXAStream::LookForMediaSubType()
                 CString p = pattern;
                 p += ',';
 
-                __int64 offset = 0;
+                int64_t offset = 0;
                 DWORD cb = 0;
                 CAtlArray<BYTE> mask, val;
 

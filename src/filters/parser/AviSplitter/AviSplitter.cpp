@@ -422,12 +422,12 @@ bool CAviSplitterFilter::DemuxInit()
     return true;
 }
 
-HRESULT CAviSplitterFilter::ReIndex(__int64 end, UINT64* pSize)
+HRESULT CAviSplitterFilter::ReIndex(int64_t end, UINT64* pSize)
 {
     HRESULT hr = S_OK;
 
     while (S_OK == hr && m_pFile->GetPos() < end && SUCCEEDED(hr) && !m_fAbort) {
-        __int64 pos = m_pFile->GetPos();
+        int64_t pos = m_pFile->GetPos();
 
         DWORD id = 0, size;
         if (S_OK != m_pFile->Read(id) || id == 0) {

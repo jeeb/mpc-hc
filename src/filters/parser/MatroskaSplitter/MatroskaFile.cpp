@@ -222,7 +222,7 @@ HRESULT Segment::ParseMinimal(CMatroskaNode* pMN0)
         return S_OK;
     }
 
-    while (MatroskaReader::QWORD pos = pMN->FindPos(0x114D9B74, pMN->GetPos())) {
+    while (uint64_t pos = pMN->FindPos(0x114D9B74, pMN->GetPos())) {
         pMN->SeekTo(pos);
         if (FAILED(pMN->Parse())) {
             break; // a broken file
@@ -744,9 +744,9 @@ HRESULT SimpleBlock::Parse(CMatroskaNode* pMN, bool fFull)
         return S_OK;
     }
 
-    CAtlList<MatroskaReader::QWORD> lens;
-    MatroskaReader::QWORD tlen = 0;
-    MatroskaReader::QWORD FrameSize;
+    CAtlList<uint64_t> lens;
+    uint64_t tlen = 0;
+    uint64_t FrameSize;
     BYTE FramesInLaceLessOne;
 
     switch ((Lacing & 0x06) >> 1) {
@@ -760,7 +760,7 @@ HRESULT SimpleBlock::Parse(CMatroskaNode* pMN, bool fFull)
             pMN->Read(n);
             while (n-- > 0) {
                 BYTE b;
-                MatroskaReader::QWORD len = 0;
+                uint64_t len = 0;
                 do {
                     pMN->Read(b);
                     len += b;
@@ -803,7 +803,7 @@ HRESULT SimpleBlock::Parse(CMatroskaNode* pMN, bool fFull)
 
     POSITION pos = lens.GetHeadPosition();
     while (pos) {
-        MatroskaReader::QWORD len = lens.GetNext(pos);
+        uint64_t len = lens.GetNext(pos);
         CAutoPtr<CBinary> p(DNew CBinary());
         p->SetCount((INT_PTR)len);
         pMN->Read(p->GetData(), len);
@@ -1103,7 +1103,7 @@ HRESULT CANSI::Parse(CMatroskaNode* pMN)
 {
     Empty();
 
-    MatroskaReader::QWORD len = pMN->m_len;
+    uint64_t len = pMN->m_len;
     CHAR c;
     while (len-- > 0 && SUCCEEDED(pMN->Read(c))) {
         *this += c;
@@ -1262,7 +1262,7 @@ HRESULT CLength::Parse(CMatroskaNode* pMN)
 
     //int nMoreBytesTmp = nMoreBytes;
 
-    MatroskaReader::QWORD UnknownSize = (1i64 << (7 * (nMoreBytes + 1))) - 1;
+    uint64_t UnknownSize = (1i64 << (7 * (nMoreBytes + 1))) - 1;
 
     while (nMoreBytes-- > 0) {
         m_val <<= 8;
@@ -1311,7 +1311,7 @@ HRESULT CSignedLength::Parse(CMatroskaNode* pMN)
 
     //int nMoreBytesTmp = nMoreBytes;
 
-    MatroskaReader::QWORD UnknownSize = (1i64<<(7*(nMoreBytes+1)))-1;
+    uint64_t UnknownSize = (1i64<<(7*(nMoreBytes+1)))-1;
 
     while (nMoreBytes-- > 0)
     {
@@ -1435,7 +1435,7 @@ bool CMatroskaNode::Next(bool fSame)
 
 bool CMatroskaNode::Find(DWORD id, bool fSearch)
 {
-    MatroskaReader::QWORD pos = m_pParent && m_pParent->m_id == 0x18538067 /*segment?*/
+    uint64_t pos = m_pParent && m_pParent->m_id == 0x18538067 /*segment?*/
                                 ? FindPos(id)
                                 : 0;
 
@@ -1451,17 +1451,17 @@ bool CMatroskaNode::Find(DWORD id, bool fSearch)
     return (m_id == id);
 }
 
-void CMatroskaNode::SeekTo(MatroskaReader::QWORD pos)
+void CMatroskaNode::SeekTo(uint64_t pos)
 {
     m_pMF->Seek(pos);
 }
 
-MatroskaReader::QWORD CMatroskaNode::GetPos()
+uint64_t CMatroskaNode::GetPos()
 {
     return m_pMF->GetPos();
 }
 
-MatroskaReader::QWORD CMatroskaNode::GetLength()
+uint64_t CMatroskaNode::GetLength()
 {
     return m_pMF->GetLength();
 }
@@ -1472,12 +1472,12 @@ HRESULT CMatroskaNode::Read(T& var)
     return m_pMF->Read(var);
 }
 
-HRESULT CMatroskaNode::Read(BYTE* pData, MatroskaReader::QWORD len)
+HRESULT CMatroskaNode::Read(BYTE* pData, uint64_t len)
 {
     return m_pMF->ByteRead(pData, len);
 }
 
-MatroskaReader::QWORD CMatroskaNode::FindPos(DWORD id, MatroskaReader::QWORD start)
+uint64_t CMatroskaNode::FindPos(DWORD id, uint64_t start)
 {
     Segment& sm = m_pMF->m_segment;
 

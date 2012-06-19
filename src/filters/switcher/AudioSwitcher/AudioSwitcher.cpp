@@ -323,7 +323,7 @@ HRESULT CAudioSwitcherFilter::Transform(IMediaSample* pIn, IMediaSample* pOut)
                     }
                 } else if (fPCM && wfe->wBitsPerSample == 32) {
                     for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix<int, __int64, INT_MIN, INT_MAX>(mask, channels, bps, src, dst);
+                        mix<int, int64_t, INT_MIN, INT_MAX>(mask, channels, bps, src, dst);
                     }
                 } else if (fFloat && wfe->wBitsPerSample == 32) {
                     for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
@@ -465,7 +465,7 @@ CMediaType CAudioSwitcherFilter::CreateNewOutputMediaType(CMediaType mt, long& c
     if (m_fCustomChannelMapping) {
         m_chs[wfe->nChannels - 1].RemoveAll();
 
-        DWORD mask = DWORD((__int64(1) << wfe->nChannels) - 1);
+        DWORD mask = DWORD((int64_t(1) << wfe->nChannels) - 1);
         for (int i = 0; i < 18; i++) {
             if (m_pSpeakerToChannelMap[wfe->nChannels - 1][i]&mask) {
                 ChMap cm = {1 << i, m_pSpeakerToChannelMap[wfe->nChannels - 1][i]};

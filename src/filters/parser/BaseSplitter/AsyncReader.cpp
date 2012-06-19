@@ -84,7 +84,7 @@ STDMETHODIMP CAsyncFileReader::SyncRead(int64_t llPosition, LONG lLength, BYTE* 
             }
 
 #if 0 // def DEBUG
-            static __int64 s_total = 0, s_laststoppos = 0;
+            static int64_t s_total = 0, s_laststoppos = 0;
             s_total += lLength;
             if (s_laststoppos > llPosition) {
                 TRACE(_T("[%I64d - %I64d] %d (%I64d)\n"), llPosition, llPosition + lLength, lLength, s_total);

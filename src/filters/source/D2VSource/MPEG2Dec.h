@@ -3,6 +3,12 @@
 #include <windows.h>
 #include <winreg.h>
 #include <stdio.h>
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <io.h>
 #include <fcntl.h>
 
@@ -221,7 +227,7 @@ protected:
   unsigned char *auxframe[3], *current_frame[3];
   unsigned char *u422, *v422, *u444, *v444, /* *rgb24,*/ *lum;
   unsigned char *dstFrame;	// replaces rgb24
-  __int64 RGB_Scale, RGB_Offset, RGB_CRV, RGB_CBU, RGB_CGX, LumOffsetMask, LumGainMask;
+  int64_t RGB_Scale, RGB_Offset, RGB_CRV, RGB_CBU, RGB_CGX, LumOffsetMask, LumGainMask;
 
   int HALF_WIDTH, PROGRESSIVE_HEIGHT, INTERLACED_HEIGHT, DOUBLE_WIDTH;
   int /*TWIDTH, SWIDTH,*/ HALF_WIDTH_D8, LUM_AREA, CLIP_AREA, HALF_CLIP_AREA, CLIP_STEP;
@@ -257,7 +263,7 @@ protected:
   typedef struct {
 	DWORD		number;
 	int			file;
-	__int64		position;
+	int64_t		position;
   }	GOPLIST;
   GOPLIST *GOPList[MAX_FRAME_NUMBER];
 

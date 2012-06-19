@@ -204,7 +204,7 @@ CFLICStream::CFLICStream(const WCHAR* wfn, CFLICSource* pParent, HRESULT* phr)
 
     // not tested (lack of test files)
     {
-        __int64 pos = m_flic.GetPosition();
+        int64_t pos = m_flic.GetPosition();
         FLIC_PREFIX fp;
         if (m_flic.Read(&fp, sizeof(fp)) != sizeof(fp) || fp.type != 0xF100) {
             m_flic.Seek(pos, CFile::begin);

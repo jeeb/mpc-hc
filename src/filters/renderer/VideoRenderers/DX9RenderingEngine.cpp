@@ -354,7 +354,7 @@ HRESULT CDX9RenderingEngine::RenderVideoDrawPath(IDirect3DSurface9* pRenderTarge
     CComPtr<IDirect3DTexture9> pVideoTexture = m_pVideoTexture[m_nCurSurface];
 
     if (bCustomPixelShaders) {
-        static __int64 counter = 0;
+        static int64_t counter = 0;
         static long start = clock();
 
         long stop = clock();
@@ -437,7 +437,7 @@ HRESULT CDX9RenderingEngine::RenderVideoDrawPath(IDirect3DSurface9* pRenderTarge
 
     // Apply the custom screen size pixel shaders
     if (bCustomScreenSpacePixelShaders) {
-        static __int64 counter = 555;
+        static int64_t counter = 555;
         static long start = clock() + 333;
 
         long stop = clock() + 333;

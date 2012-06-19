@@ -122,8 +122,8 @@ void AvgLines555(BYTE* dst, DWORD h, DWORD pitch)
         return;
     }
 
-    unsigned __int64 __0x03e003e003e003e0 = 0x03e003e003e003e0;
-    unsigned __int64 __0x001f001f001f001f = 0x001f001f001f001f;
+    uint64_t __0x03e003e003e003e0 = 0x03e003e003e003e0;
+    uint64_t __0x001f001f001f001f = 0x001f001f001f001f;
 
     BYTE* s = dst;
     BYTE* d = dst + (h - 2) * pitch;
@@ -209,8 +209,8 @@ void AvgLines565(BYTE* dst, DWORD h, DWORD pitch)
         return;
     }
 
-    unsigned __int64 __0x07e007e007e007e0 = 0x07e007e007e007e0;
-    unsigned __int64 __0x001f001f001f001f = 0x001f001f001f001f;
+    uint64_t __0x07e007e007e007e0 = 0x07e007e007e007e0;
+    uint64_t __0x001f001f001f001f = 0x001f001f001f001f;
 
     BYTE* s = dst;
     BYTE* d = dst + (h - 2) * pitch;

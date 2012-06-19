@@ -1773,7 +1773,7 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
             break;
         case TIMER_STREAMPOSPOLLER2:
             if (m_iMediaLoadState == MLS_LOADED) {
-                __int64 start, stop, pos;
+                int64_t start, stop, pos;
                 m_wndSeekBar.GetRange(start, stop);
                 pos = m_wndSeekBar.GetPosReal();
 
@@ -3422,12 +3422,12 @@ void CMainFrame::OnUpdatePlayerStatus(CCmdUI* pCmdUI)
                 }
 
                 if (m_wndCaptureBar.m_capdlg.m_pMux) {
-                    __int64 pos = 0;
+                    int64_t pos = 0;
                     CComQIPtr<IMediaSeeking> pMuxMS = m_wndCaptureBar.m_capdlg.m_pMux;
                     if (pMuxMS && SUCCEEDED(pMuxMS->GetCurrentPosition(&pos)) && pos > 0) {
                         double bytepersec = 10000000.0 * size / pos;
                         if (bytepersec > 0) {
-                            m_rtDurationOverride = __int64(10000000.0 * (FreeBytesAvailable.QuadPart + size) / bytepersec);
+                            m_rtDurationOverride = int64_t(10000000.0 * (FreeBytesAvailable.QuadPart + size) / bytepersec);
                         }
                     }
                 }
@@ -3452,7 +3452,7 @@ void CMainFrame::OnUpdatePlayerStatus(CCmdUI* pCmdUI)
                     if (SUCCEEDED(pAMNS->get_BufferingProgress(&BufferingProgress)) && BufferingProgress > 0) {
                         msg.Format(IDS_CONTROLS_BUFFERING, BufferingProgress);
 
-                        __int64 start = 0, stop = 0;
+                        int64_t start = 0, stop = 0;
                         m_wndSeekBar.GetRange(start, stop);
                         m_fLiveWM = (stop == start);
                     }
@@ -3461,7 +3461,7 @@ void CMainFrame::OnUpdatePlayerStatus(CCmdUI* pCmdUI)
             }
             EndEnumFilters;
         } else if (pAMOP) {
-            __int64 t = 0, c = 0;
+            int64_t t = 0, c = 0;
             if (SUCCEEDED(pAMOP->QueryProgress(&t, &c)) && t > 0 && c < t) {
                 msg.Format(IDS_CONTROLS_BUFFERING, c * 100 / t);
             }
@@ -5043,7 +5043,7 @@ void CMainFrame::SaveThumbnails(LPCTSTR fn)
         if (hFind != INVALID_HANDLE_VALUE) {
             FindClose(hFind);
 
-            __int64 size = (__int64(wfd.nFileSizeHigh) << 32) | wfd.nFileSizeLow;
+            int64_t size = (int64_t(wfd.nFileSizeHigh) << 32) | wfd.nFileSizeLow;
             const int MAX_FILE_SIZE_BUFFER = 65;
             WCHAR szFileSize[MAX_FILE_SIZE_BUFFER];
             StrFormatByteSizeW(size, szFileSize, MAX_FILE_SIZE_BUFFER);
@@ -5106,7 +5106,7 @@ CString CMainFrame::GetVidPos() const
 {
     CString posstr = _T("");
     if ((GetPlaybackMode() == PM_FILE) || (GetPlaybackMode() == PM_DVD)) {
-        __int64 start, stop, pos;
+        int64_t start, stop, pos;
         m_wndSeekBar.GetRange(start, stop);
         pos = m_wndSeekBar.GetPosReal();
 
@@ -7126,7 +7126,7 @@ void CMainFrame::OnPlayStop()
         MoveVideoWindow();
 
         if (m_iMediaLoadState == MLS_LOADED) {
-            __int64 start, stop;
+            int64_t start, stop;
             m_wndSeekBar.GetRange(start, stop);
             GUID tf;
             pMS->GetTimeFormat(&tf);
@@ -8304,7 +8304,7 @@ void CMainFrame::OnNavigateSkip(UINT nID)
             pDVDI->GetNumberOfChapters(Location.TitleNum, &ulNumOfChapters);
             CString m_strTitle;
             m_strTitle.Format(IDS_AG_TITLE2, Location.TitleNum, ulNumOfTitles);
-            __int64 start, stop;
+            int64_t start, stop;
             m_wndSeekBar.GetRange(start, stop);
 
             CString m_strOSD;
@@ -8567,7 +8567,7 @@ void CMainFrame::OnNavigateChapters(UINT nID)
             pDVDI->GetNumberOfChapters(Location.TitleNum, &ulNumOfChapters);
             CString m_strTitle;
             m_strTitle.Format(IDS_AG_TITLE2, Location.TitleNum, ulNumOfTitles);
-            __int64 start, stop;
+            int64_t start, stop;
             m_wndSeekBar.GetRange(start, stop);
 
             CString m_strOSD;
@@ -8668,7 +8668,7 @@ class CDVDStateStream : public CUnknown, public IStream
             CUnknown::NonDelegatingQueryInterface(riid, ppv);
     }
 
-    __int64 m_pos;
+    int64_t m_pos;
 
 public:
     CDVDStateStream() : CUnknown(NAME("CDVDStateStream"), NULL) {
@@ -8681,7 +8681,7 @@ public:
 
     // ISequentialStream
     STDMETHODIMP Read(void* pv, ULONG cb, ULONG* pcbRead) {
-        __int64 cbRead = min((__int64)(m_data.GetCount() - m_pos), (__int64)cb);
+        int64_t cbRead = min((int64_t)(m_data.GetCount() - m_pos), (int64_t)cb);
         cbRead = max(cbRead, 0);
         memcpy(pv, &m_data[(INT_PTR)m_pos], (int)cbRead);
         if (pcbRead) {
@@ -13768,7 +13768,7 @@ REFERENCE_TIME CMainFrame::GetPos() const
 
 REFERENCE_TIME CMainFrame::GetDur() const
 {
-    __int64 start, stop;
+    int64_t start, stop;
     m_wndSeekBar.GetRange(start, stop);
     return (m_iMediaLoadState == MLS_LOADED ? stop : 0);
 }
@@ -13783,7 +13783,7 @@ void CMainFrame::SeekTo(REFERENCE_TIME rtPos, bool fSeekToKeyFrame)
 
     m_nStepForwardCount = 0;
     if (GetPlaybackMode() != PM_CAPTURE) {
-        __int64 start, stop;
+        int64_t start, stop;
         m_wndSeekBar.GetRange(start, stop);
         GUID tf;
         pMS->GetTimeFormat(&tf);

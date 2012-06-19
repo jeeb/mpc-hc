@@ -154,7 +154,7 @@ BOOL CPPageFileInfoDetails::OnInitDialog()
     if (hFind != INVALID_HANDLE_VALUE) {
         FindClose(hFind);
 
-        __int64 size = (__int64(wfd.nFileSizeHigh) << 32) | wfd.nFileSizeLow;
+        int64_t size = (int64_t(wfd.nFileSizeHigh) << 32) | wfd.nFileSizeLow;
         const int MAX_FILE_SIZE_BUFFER = 65;
         WCHAR szFileSize[MAX_FILE_SIZE_BUFFER];
         StrFormatByteSizeW(size, szFileSize, MAX_FILE_SIZE_BUFFER);

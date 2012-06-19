@@ -59,9 +59,9 @@ void Scale2x_YV(int w, int h, BYTE* d, int dpitch, BYTE* s, int spitch)
 #ifdef _WIN64
 void Scale2x_YUY2_SSE2(BYTE* s1, BYTE* d1, int w)
 {
-    unsigned __int64 __0xffffffff00000000 = 0xffffffff00000000;
-    unsigned __int64 __0x00000000ffffffff = 0x00000000ffffffff;
-    unsigned __int64 __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
+    uint64_t __0xffffffff00000000 = 0xffffffff00000000;
+    uint64_t __0x00000000ffffffff = 0x00000000ffffffff;
+    uint64_t __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
 
     __m128i mm4 = _mm_cvtsi64_si128(__0x00ff00ff00ff00ff);
     __m128i mm5 = _mm_cvtsi64_si128(__0x00000000ffffffff);
@@ -103,9 +103,9 @@ void Scale2x_YUY2_SSE2(BYTE* s1, BYTE* d1, int w)
 #else
 void Scale2x_YUY2_MMX(BYTE* s1, BYTE* d1, int w)
 {
-    unsigned __int64 __0xffffffff00000000 = 0xffffffff00000000;
-    unsigned __int64 __0x00000000ffffffff = 0x00000000ffffffff;
-    unsigned __int64 __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
+    uint64_t __0xffffffff00000000 = 0xffffffff00000000;
+    uint64_t __0x00000000ffffffff = 0x00000000ffffffff;
+    uint64_t __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
 
     __asm {
         mov     esi, s1
@@ -214,9 +214,9 @@ void Scale2x_YUY2(int w, int h, BYTE* d, int dpitch, BYTE* s, int spitch)
 #endif
     //scale_func = Scale2x_YUY2_c;
 
-    //unsigned __int64 __0xffffffff00000000 = 0xffffffff00000000;
-    //unsigned __int64 __0x00000000ffffffff = 0x00000000ffffffff;
-    //unsigned __int64 __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
+    //uint64_t __0xffffffff00000000 = 0xffffffff00000000;
+    //uint64_t __0x00000000ffffffff = 0x00000000ffffffff;
+    //uint64_t __0x00ff00ff00ff00ff = 0x00ff00ff00ff00ff;
 
     BYTE* s1;
     BYTE* s2;

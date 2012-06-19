@@ -24,6 +24,12 @@
 #pragma once
 
 #include <vector>
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "../SubPic/ISubPic.h"
 
 #define PT_MOVETONC       0xfe
@@ -66,7 +72,7 @@ protected:
 private:
     int mWidth, mHeight;
 
-    typedef std::pair<unsigned __int64, unsigned __int64> tSpan;
+    typedef std::pair<uint64_t, uint64_t> tSpan;
     typedef std::vector<tSpan> tSpanBuffer;
 
     tSpanBuffer mOutline;

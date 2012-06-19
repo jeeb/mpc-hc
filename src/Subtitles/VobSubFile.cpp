@@ -251,7 +251,7 @@ bool CVobSubFile::Copy(CVobSubFile& vsf)
                 continue;
             }
 
-            if (sp.filepos != (__int64)vsf.m_sub.Seek(sp.filepos, CFile::begin)) {
+            if (sp.filepos != (int64_t)vsf.m_sub.Seek(sp.filepos, CFile::begin)) {
                 continue;
             }
 
@@ -419,7 +419,7 @@ bool CVobSubFile::ReadIdx(CString fn, int& ver)
     bool fError = false;
 
     int id = -1, delay = 0, vobid = -1, cellid = -1;
-    __int64 celltimestamp = 0;
+    int64_t celltimestamp = 0;
 
     CString str;
     for (ptrdiff_t line = 0; !fError && f.ReadString(str); line++) {
@@ -711,7 +711,7 @@ bool CVobSubFile::ReadIdx(CString fn, int& ver)
             }
 
             if (delay < 0 && m_langs[id].subpos.GetCount() > 0) {
-                __int64 ts = m_langs[id].subpos[m_langs[id].subpos.GetCount() - 1].start;
+                int64_t ts = m_langs[id].subpos[m_langs[id].subpos.GetCount() - 1].start;
 
                 if (sb.start < ts) {
                     delay += (int)(ts - sb.start);
@@ -1122,7 +1122,7 @@ BYTE* CVobSubFile::GetPacket(int idx, int& packetsize, int& datasize, int iLang)
             break;
         }
 
-        if ((__int64)m_sub.Seek(sp[idx].filepos, CFile::begin) != sp[idx].filepos) {
+        if ((int64_t)m_sub.Seek(sp[idx].filepos, CFile::begin) != sp[idx].filepos) {
             break;
         }
 
@@ -1213,12 +1213,12 @@ bool CVobSubFile::GetFrame(int idx, int iLang)
     return (m_fOnlyShowForcedSubs ? m_img.fForced : true);
 }
 
-bool CVobSubFile::GetFrameByTimeStamp(__int64 time)
+bool CVobSubFile::GetFrameByTimeStamp(int64_t time)
 {
     return GetFrame(GetFrameIdxByTimeStamp(time));
 }
 
-int CVobSubFile::GetFrameIdxByTimeStamp(__int64 time)
+int CVobSubFile::GetFrameIdxByTimeStamp(int64_t time)
 {
     if (m_iLang < 0 || m_iLang >= 32) {
         return -1;
@@ -1438,7 +1438,7 @@ static void PixelAtBiLinear(RGBQUAD& c, int x, int y, CVobSubImage& src)
     RGBQUAD c11 = ptr[y1 + x1], c12 = ptr[y1 + x2],
             c21 = ptr[y2 + x1], c22 = ptr[y2 + x2];
 
-    __int64 u2 = x & 0xffff,
+    int64_t u2 = x & 0xffff,
             v2 = y & 0xffff,
             u1 = 0x10000 - u2,
             v1 = 0x10000 - v2;

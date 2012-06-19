@@ -955,7 +955,7 @@ HRESULT CMpeg2DecFilter::CheckConnect(PIN_DIRECTION dir, IPin* pPin)
     return __super::CheckConnect(dir, pPin);
 }
 
-int NextMpegStartCode(CGolombBuffer& gb, BYTE& code, __int64 len)
+int NextMpegStartCode(CGolombBuffer& gb, BYTE& code, int64_t len)
 {
     gb.BitByteAlign();
     DWORD dw = (DWORD) - 1;

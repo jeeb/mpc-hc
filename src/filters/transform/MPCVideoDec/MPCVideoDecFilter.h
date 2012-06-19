@@ -70,7 +70,7 @@ typedef struct {
 typedef struct {
     bool    video_after_seek;
     __int32 kf_pts;     ///< timestamp of next video keyframe
-    __int64 kf_base;    ///< timestamp of the prev. video keyframe
+    int64_t kf_base;    ///< timestamp of the prev. video keyframe
 } RMDemuxContext;
 
 class __declspec(uuid("008BAC12-FBAF-497b-9670-BC6F6FBAE2C4"))
@@ -143,7 +143,7 @@ protected:
     bool m_bUseFFmpeg;
     CSize m_sar;
     SwsContext* m_pSwsContext;
-    unsigned __int64 m_nOutCsp;
+    uint64_t m_nOutCsp;
     CSize m_pOutSize;               // Picture size on output pin
     int m_nSwOutBpp;
 
@@ -185,7 +185,7 @@ protected:
     void GetOutputFormats(int& nNumber, VIDEO_OUTPUT_FORMATS** ppFormats);
     void CalcAvgTimePerFrame();
     void DetectVideoCard(HWND hWnd);
-    unsigned __int64 GetCspFromMediaType(GUID& subtype);
+    uint64_t GetCspFromMediaType(GUID& subtype);
     void InitSwscale();
 
     void SetTypeSpecificFlags(IMediaSample* pMS);

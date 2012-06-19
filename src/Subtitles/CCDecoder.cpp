@@ -78,7 +78,7 @@ void CCDecoder::PutChar(WCHAR c)
     OffsetCursor(1, 0);
 }
 
-void CCDecoder::SaveDisp(__int64 time)
+void CCDecoder::SaveDisp(int64_t time)
 {
     CStringW str;
 
@@ -109,7 +109,7 @@ void CCDecoder::SaveDisp(__int64 time)
     m_sts.Add(str, true, (int)m_time, (int)time);
 }
 
-void CCDecoder::DecodeCC(BYTE* buff, int len, __int64 time)
+void CCDecoder::DecodeCC(BYTE* buff, int len, int64_t time)
 {
     if (!m_rawfn.IsEmpty()) {
         FILE* f = NULL;
@@ -329,7 +329,7 @@ void CCDecoder::DecodeCC(BYTE* buff, int len, __int64 time)
     }
 }
 
-void CCDecoder::ExtractCC(BYTE* buff, int len, __int64 time)
+void CCDecoder::ExtractCC(BYTE* buff, int len, int64_t time)
 {
     for (ptrdiff_t i = 0; i < len - 9; i++) {
         if (*(DWORD*)&buff[i] == 0xb2010000 && *(DWORD*)&buff[i + 4] == 0xf8014343) {

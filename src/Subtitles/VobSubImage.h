@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <atlcoll.h>
 
 typedef struct {
@@ -63,7 +68,7 @@ private:
 public:
     int iLang, iIdx;
     bool fForced;
-    __int64 start, delay;
+    int64_t start, delay;
     CRect rect;
     typedef struct {
         BYTE pal: 4, tr: 4;

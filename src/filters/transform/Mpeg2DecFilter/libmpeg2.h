@@ -100,7 +100,7 @@ typedef struct {
     struct {
     int x, y;
     } display_offset[3];
-    __int64 rtStart, rtStop;
+    int64_t rtStart, rtStop;
     bool fDiscontinuity, fDelivered;
 } mpeg2_picture_t;
 

@@ -561,7 +561,7 @@ bool CVobSubFileRipper::Create()
 
     CVobDec vd;
 
-    __int64 PTS = 0, tOffset = 0, tPrevOffset = 0, tTotal = 0, tStart = 0;
+    int64_t PTS = 0, tOffset = 0, tPrevOffset = 0, tTotal = 0, tStart = 0;
     int vob = 0, cell = 0;
     bool fDiscontinuity = false, fDiscontinuityFixApplied = false, fNavpackFound = false;
 
@@ -620,13 +620,13 @@ bool CVobSubFileRipper::Create()
         chunks.Add(c);
     }
 
-    __int64 sizedone = 0, sizetotal = 0;
+    int64_t sizedone = 0, sizetotal = 0;
     for (size_t i = 0; i < chunks.GetCount(); i++) {
         sizetotal += chunks[i].end - chunks[i].start;
     }
 
     for (size_t i = 0; !m_fBreakThread && i < chunks.GetCount(); i++) {
-        __int64 curpos = chunks[i].start, endpos = chunks[i].end;
+        int64_t curpos = chunks[i].start, endpos = chunks[i].end;
 
         vcchunk curchunk = {curpos, curpos, chunks[i].vc};
 
@@ -648,10 +648,10 @@ bool CVobSubFileRipper::Create()
                 if (!vd.m_fFoundKey) {
                     Log(LOG_INFO, _T("Encrypted sector found, searching key..."));
 
-                    __int64 savepos = curpos;
+                    int64_t savepos = curpos;
 
                     m_vob.Seek(0);
-                    for (__int64 pos = 0; !m_fBreakThread && pos < endpos; pos += 2048) {
+                    for (int64_t pos = 0; !m_fBreakThread && pos < endpos; pos += 2048) {
                         if (!m_vob.Read(buff)) {
                             Log(LOG_ERROR, _T("Cannot read, either locked dvd or truncated/missing files!"));
                             return false;
@@ -689,23 +689,23 @@ bool CVobSubFileRipper::Create()
                 }
             }
 
-            /*__int64 SCR = (__int64(buff[0x04] & 0x38) >> 3) << 30
-                  | __int64(buff[0x04] & 0x03) << 28
-                  | __int64(buff[0x05]) << 20
-                  | (__int64(buff[0x06] & 0xf8) >> 3) << 15
-                  | __int64(buff[0x06] & 0x03) << 13
-                  | __int64(buff[0x07]) << 5
-                  | (__int64(buff[0x08] & 0xf8) >> 3) << 0;*/
+            /*int64_t SCR = (int64_t(buff[0x04] & 0x38) >> 3) << 30
+                  | int64_t(buff[0x04] & 0x03) << 28
+                  | int64_t(buff[0x05]) << 20
+                  | (int64_t(buff[0x06] & 0xf8) >> 3) << 15
+                  | int64_t(buff[0x06] & 0x03) << 13
+                  | int64_t(buff[0x07]) << 5
+                  | (int64_t(buff[0x08] & 0xf8) >> 3) << 0;*/
 
             bool hasPTS = false;
 
             if ((*(DWORD*)&buff[0x0e] == 0xe0010000 || *(DWORD*)&buff[0x0e] == 0xbd010000)
                     && buff[0x15] & 0x80) {
-                PTS = (__int64)(buff[0x17] & 0x0e) << 29            // 32-30 (+marker)
-                      | ((__int64)(buff[0x18]) << 22)               // 29-22
-                      | ((__int64)(buff[0x19] & 0xfe) << 14)        // 21-15 (+marker)
-                      | ((__int64)(buff[0x1a]) << 7)                // 14-07
-                      | ((__int64)(buff[0x1b]) >> 1);               // 06-00 (+marker)
+                PTS = (int64_t)(buff[0x17] & 0x0e) << 29            // 32-30 (+marker)
+                      | ((int64_t)(buff[0x18]) << 22)               // 29-22
+                      | ((int64_t)(buff[0x19] & 0xfe) << 14)        // 21-15 (+marker)
+                      | ((int64_t)(buff[0x1a]) << 7)                // 14-07
+                      | ((int64_t)(buff[0x1b]) >> 1);               // 06-00 (+marker)
 
                 hasPTS = true;
             }
@@ -725,8 +725,8 @@ bool CVobSubFileRipper::Create()
                 for (size_t i = 0; i < angle.GetCount(); i++) {
                     if (angle[i].vob == vob && angle[i].cell == cell) {
                         tPrevOffset = tOffset;
-                        tOffset = (__int64)angle[i].tOffset;
-                        tTotal = (__int64)angle[i].tTotal;
+                        tOffset = (int64_t)angle[i].tOffset;
+                        tTotal = (int64_t)angle[i].tTotal;
                         fDiscontinuity = angle[i].fDiscontinuity;
                         fDiscontinuityFixApplied = false;
                         break;
@@ -757,7 +757,7 @@ bool CVobSubFileRipper::Create()
             }
 
             if (hasPTS && fDiscontinuity && !fDiscontinuityFixApplied) {
-                __int64 tDiff = tOffset - tPrevOffset;
+                int64_t tDiff = tOffset - tPrevOffset;
                 if (tDiff > 0 && tDiff < (PTS / 90 + 1000)) {
                     CString str;
                     str.Format(_T("False discontinuity detected, correcting time by %I64dms"), -tDiff);
@@ -890,7 +890,7 @@ bool CVobSubFileRipper::LoadChunks(CAtlArray<vcchunk>& chunks)
     fn += _T(".chunks");
 
     DWORD chksum = 0, chunklen, version;
-    __int64 voblen = 0;
+    int64_t voblen = 0;
 
     if (!f.Open(fn, CFile::modeRead | CFile::typeBinary | CFile::shareDenyNone)) {
         return false;
@@ -936,7 +936,7 @@ bool CVobSubFileRipper::SaveChunks(CAtlArray<vcchunk>& chunks)
     fn += _T(".chunks");
 
     DWORD chksum = 0, chunklen = (DWORD)chunks.GetCount();
-    __int64 voblen = m_vob.GetLength();
+    int64_t voblen = m_vob.GetLength();
 
     if (!f.Open(m_infn, CFile::modeRead | CFile::typeBinary | CFile::shareDenyNone)) {
         return false;

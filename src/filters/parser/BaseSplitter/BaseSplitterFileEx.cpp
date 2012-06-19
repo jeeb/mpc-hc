@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "BaseSplitterFileEx.h"
 #include <MMReg.h>
 #include "../../../DSUtil/DSUtil.h"
@@ -47,7 +53,7 @@ CBaseSplitterFileEx::~CBaseSplitterFileEx()
 
 //
 
-bool CBaseSplitterFileEx::NextMpegStartCode(BYTE& code, __int64 len)
+bool CBaseSplitterFileEx::NextMpegStartCode(BYTE& code, int64_t len)
 {
     BitByteAlign();
     DWORD dw = (DWORD) - 1;
@@ -303,7 +309,7 @@ bool CBaseSplitterFileEx::Read(peshdr& h, BYTE code)
 
 bool CBaseSplitterFileEx::Read(seqhdr& h, int len, CMediaType* pmt)
 {
-    __int64 endpos = GetPos() + len; // - sequence header length
+    int64_t endpos = GetPos() + len; // - sequence header length
 
     BYTE id = 0;
 
@@ -317,7 +323,7 @@ bool CBaseSplitterFileEx::Read(seqhdr& h, int len, CMediaType* pmt)
         return false;
     }
 
-    __int64 shpos = GetPos() - 4;
+    int64_t shpos = GetPos() - 4;
 
     h.width = (WORD)BitRead(12);
     h.height = (WORD)BitRead(12);
@@ -341,7 +347,7 @@ bool CBaseSplitterFileEx::Read(seqhdr& h, int len, CMediaType* pmt)
             h.niqm[i] = (BYTE)BitRead(8);
         }
 
-    __int64 shlen = GetPos() - shpos;
+    int64_t shlen = GetPos() - shpos;
 
     static float ar[] = {
         1.0000f, 1.0000f, 0.6735f, 0.7031f, 0.7615f, 0.8055f, 0.8437f, 0.8935f,
@@ -353,7 +359,7 @@ bool CBaseSplitterFileEx::Read(seqhdr& h, int len, CMediaType* pmt)
 
     mpeg_t type = mpeg1;
 
-    __int64 shextpos = 0, shextlen = 0;
+    int64_t shextpos = 0, shextlen = 0;
 
     if (NextMpegStartCode(id, 8) && id == 0xb5) { // sequence header ext
         shextpos = GetPos() - 4;
@@ -614,7 +620,7 @@ bool CBaseSplitterFileEx::Read(aachdr& h, int len, CMediaType* pmt, MPEG_TYPES m
 {
     memset(&h, 0, sizeof(h));
 
-    __int64 pos = 0;
+    int64_t pos = 0;
     int found_fake_sync = m_type == mpeg_ts ? 0 : 1;
 
     for (;;) {
@@ -694,7 +700,7 @@ bool CBaseSplitterFileEx::Read(ac3hdr& h, int len, CMediaType* pmt, bool find_sy
 
     bool e_ac3 = false;
 
-    __int64 startpos = GetPos();
+    int64_t startpos = GetPos();
 
     memset(&h, 0, sizeof(h));
 
@@ -1092,7 +1098,7 @@ bool CBaseSplitterFileEx::Read(mlphdr& h, int len, CMediaType* pmt, bool find_sy
     memset(&h, 0, sizeof(h));
     if (len < 20) { return false; }
 
-    __int64 startpos = GetPos();
+    int64_t startpos = GetPos();
 
     int samplerate, channels, framelength;
     WORD bitdepth;
@@ -1216,7 +1222,7 @@ bool CBaseSplitterFileEx::Read(ps2audhdr& h, CMediaType* pmt)
         return false;
     }
 
-    __int64 pos = GetPos();
+    int64_t pos = GetPos();
 
     while (BitRead(16, true) == 'SS') {
         DWORD tag = (DWORD)BitRead(32, true);
@@ -1283,12 +1289,12 @@ bool CBaseSplitterFileEx::Read(trhdr& h, bool fSync)
     BitByteAlign();
 
     if (m_tslen == 0) {
-        __int64 pos = GetPos();
+        int64_t pos = GetPos();
         int count   = 0;
 
         for (int i = 0; i < 192; i++) {
             if (BitRead(8, true) == 0x47) {
-                __int64 pos = GetPos();
+                int64_t pos = GetPos();
                 Seek(pos + 188);
                 if (BitRead(8, true) == 0x47) {
                     if (m_tslen != 188) {
@@ -1458,7 +1464,7 @@ bool CBaseSplitterFileEx::Read(pvahdr& h, bool fSync)
         return false;
     }
 
-    __int64 pos = GetPos();
+    int64_t pos = GetPos();
 
     if (h.streamid == 1 && h.fpts) {
         h.pts = 10000 * BitRead(32) / 90 + m_rtPTSOffset;
@@ -1534,9 +1540,9 @@ void CBaseSplitterFileEx::RemoveMpegEscapeCode(BYTE* dst, BYTE* src, int length)
 
 bool CBaseSplitterFileEx::Read(avchdr& h, int len, CMediaType* pmt)
 {
-    __int64 endpos = GetPos() + len;
-    __int64 nalstartpos = GetPos();
-    //__int64 nalendpos;
+    int64_t endpos = GetPos() + len;
+    int64_t nalstartpos = GetPos();
+    //int64_t nalendpos;
     bool repeat = false;
 
     // First try search for the start code
@@ -1584,7 +1590,7 @@ bool CBaseSplitterFileEx::Read(avchdr& h, int len, CMediaType* pmt)
         //nalendpos = GetPos();
 
         // Skip start code
-        __int64 pos;
+        int64_t pos;
         if (GetPos() < endpos + 4) {
             if (dwStartCode == 0x00000001) {
                 BitRead(32);
@@ -1863,8 +1869,8 @@ bool CBaseSplitterFileEx::Read(avchdr& h, spsppsindex index)
             gb.UExpGolombRead();            // chroma_sample_loc_type_bottom_field
         }
         if (gb.BitRead(1)) {                // timing_info_present_flag
-            __int64 num_units_in_tick   = gb.BitRead(32);
-            __int64 time_scale          = gb.BitRead(32);
+            int64_t num_units_in_tick   = gb.BitRead(32);
+            int64_t time_scale          = gb.BitRead(32);
             /*long fixed_frame_rate_flag    = */
             gb.BitRead(1);
 
@@ -2020,8 +2026,8 @@ bool CBaseSplitterFileEx::Read(vc1hdr& h, int len, CMediaType* pmt, int guid_fla
 {
     memset(&h, 0, sizeof(h));
 
-    __int64 endpos = GetPos() + len; // - sequence header length
-    __int64 extrapos = 0, extralen = 0;
+    int64_t endpos = GetPos() + len; // - sequence header length
+    int64_t extrapos = 0, extralen = 0;
     int     nFrameRateNum = 0, nFrameRateDen = 1;
 
     if (GetPos() < endpos + 4 && BitRead(32, true) == 0x0000010F) {

@@ -16,6 +16,12 @@
 //  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <emmintrin.h>
 #include "vd2/system/memory.h"
 #include "vd2/system/cpuaccel.h"
@@ -113,9 +119,9 @@ xloop:
 }
 
 static void __declspec(naked) asm_blend_row_MMX(void *dst, const void *src, uint32 w, ptrdiff_t srcpitch) {
-    static const __declspec(align(8)) __int64 mask0 = 0xfcfcfcfcfcfcfcfci64;
-    static const __declspec(align(8)) __int64 mask1 = 0x7f7f7f7f7f7f7f7fi64;
-    static const __declspec(align(8)) __int64 mask2 = 0x3f3f3f3f3f3f3f3fi64;
+    static const __declspec(align(8)) int64_t mask0 = 0xfcfcfcfcfcfcfcfci64;
+    static const __declspec(align(8)) int64_t mask1 = 0x7f7f7f7f7f7f7f7fi64;
+    static const __declspec(align(8)) int64_t mask2 = 0x3f3f3f3f3f3f3f3fi64;
     __asm {
         push    ebp
         push    edi

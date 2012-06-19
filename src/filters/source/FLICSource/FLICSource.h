@@ -95,7 +95,7 @@ struct FLIC_CHUNK {
 #pragma pack(pop)
 
 struct FLIC_FRAME_ENTRY {
-    __int64 pos;
+    int64_t pos;
     bool fKeyframe;
     FLIC_FRAME hdr;
 };

@@ -53,7 +53,7 @@ class CBaseMuxerRawOutputPin : public CBaseMuxerOutputPin, public CBaseMuxerRela
 {
     struct idx_t {
         REFERENCE_TIME rt;
-        __int64 fp;
+        int64_t fp;
     };
     CAtlList<idx_t> m_idx;
 

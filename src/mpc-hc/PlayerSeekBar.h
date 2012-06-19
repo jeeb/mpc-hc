@@ -35,18 +35,18 @@ class CPlayerSeekBar : public CDialogBar
 private:
     enum tooltip_state_t { TOOLTIP_HIDDEN, TOOLTIP_TRIGGERED, TOOLTIP_VISIBLE };
 
-    __int64 m_start, m_stop, m_pos, m_posreal;
+    int64_t m_start, m_stop, m_pos, m_posreal;
     bool m_fEnabled;
     CToolTipCtrl m_tooltip;
     TOOLINFO m_ti;
     tooltip_state_t m_tooltipState;
-    __int64 m_tooltipPos, m_tooltipLastPos;
+    int64_t m_tooltipPos, m_tooltipLastPos;
     CString m_tooltipText;
     UINT_PTR m_tooltipTimer;
 
     void MoveThumb(CPoint point);
-    __int64 CalculatePosition(CPoint point);
-    void SetPosInternal(__int64 pos);
+    int64_t CalculatePosition(CPoint point);
+    void SetPosInternal(int64_t pos);
 
     void UpdateTooltip(CPoint point);
 
@@ -60,11 +60,11 @@ public:
 
     void Enable(bool fEnable);
 
-    void GetRange(__int64& start, __int64& stop) const;
-    void SetRange(__int64 start, __int64 stop);
-    __int64 GetPos() const;
-    __int64 GetPosReal() const;
-    void SetPos(__int64 pos);
+    void GetRange(int64_t& start, int64_t& stop) const;
+    void SetRange(int64_t start, int64_t stop);
+    int64_t GetPos() const;
+    int64_t GetPosReal() const;
+    void SetPos(int64_t pos);
 
     void HideToolTip();
     void UpdateToolTipPosition(CPoint& point);

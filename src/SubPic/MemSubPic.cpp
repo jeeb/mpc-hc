@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "MemSubPic.h"
 
 // For CPUID usage
@@ -282,7 +288,7 @@ void AlphaBlt_YUY2_SSE2(int w, int h, BYTE* d, int dstpitch, BYTE* s, int srcpit
 
     BYTE* s2 = s;
     BYTE* s2end = s2 + w * 4;
-    static const __int64 _8181 = 0x0080001000800010i64;
+    static const int64_t _8181 = 0x0080001000800010i64;
 
     for (ptrdiff_t j = 0; j < h; j++, s += srcpitch, d += dstpitch) {
         for (; s2 < s2end; s2 += 8, d2++) {
@@ -321,7 +327,7 @@ void AlphaBlt_YUY2_MMX(int w, int h, BYTE* d, int dstpitch, BYTE* s, int srcpitc
 
     BYTE* s2 = s;
     BYTE* s2end = s2 + w * 4;
-    static const __int64 _8181 = 0x0080001000800010i64;
+    static const int64_t _8181 = 0x0080001000800010i64;
 
 
     for (ptrdiff_t j = 0; j < h; j++, s += srcpitch, d += dstpitch) {
@@ -362,7 +368,7 @@ void AlphaBlt_YUY2_C(int w, int h, BYTE* d, int dstpitch, BYTE* s, int srcpitch)
 
     BYTE* s2 = s;
     BYTE* s2end = s2 + w * 4;
-    static const __int64 _8181 = 0x0080001000800010i64;
+    static const int64_t _8181 = 0x0080001000800010i64;
 
     for (ptrdiff_t j = 0; j < h; j++, s += srcpitch, d += dstpitch) {
         for (; s2 < s2end; s2 += 8, d2++) {

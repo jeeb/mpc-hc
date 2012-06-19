@@ -38,8 +38,8 @@ private:
     {
     public:
         BYTE* m_buff;
-        __int64 m_start, m_end;
-        packet_t(BYTE* p, __int64 start, __int64 end);
+        int64_t m_start, m_end;
+        packet_t(BYTE* p, int64_t start, int64_t end);
         virtual ~packet_t() {
             delete [] m_buff;
         }
@@ -49,7 +49,7 @@ private:
     CString m_ip;
     SOCKET m_socket;
     GUID m_subtype;
-    __int64 m_pos, m_len;
+    int64_t m_pos, m_len;
     bool m_drop;
     CAtlList<packet_t*> m_packets;
 

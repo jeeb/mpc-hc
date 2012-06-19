@@ -1662,11 +1662,11 @@ void CAppSettings::ClearDVDPositions()
     }
 }
 
-__int64 CAppSettings::ConvertTimeToMSec(CString& time) const
+int64_t CAppSettings::ConvertTimeToMSec(CString& time) const
 {
-    __int64 Sec = 0;
-    __int64 mSec = 0;
-    __int64 mult = 1;
+    int64_t Sec = 0;
+    int64_t mSec = 0;
+    int64_t mult = 1;
 
     int pos = time.GetLength() - 1;
     if (pos < 3) {

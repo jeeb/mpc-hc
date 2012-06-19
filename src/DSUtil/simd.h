@@ -11,7 +11,7 @@
 #define MMX_INSTRUCTION(instruction,function) \
   static __forceinline void instruction(__m64 &dst, const __m64   &src) {dst = function(dst,           src);} \
   static __forceinline void instruction(__m64 &dst, const void    *src) {dst = function(dst, *(__m64*) src);} \
-  static __forceinline void instruction(__m64 &dst, const __int64 &src) {dst = function(dst, *(__m64*)&src);}
+  static __forceinline void instruction(__m64 &dst, const int64_t &src) {dst = function(dst, *(__m64*)&src);}
 
 #define SSE2I_INSTRUCTION(instruction,function) \
   static __forceinline void instruction(__m128i &dst, const __m128i &src) {dst = function(dst,            src);} \
@@ -24,7 +24,7 @@
 
 static __forceinline void movq(__m64 &dst, const __m64 &src) {dst = src;}
 static __forceinline void movq(__m64 &dst, const void *src) {dst = *(__m64*)src;}
-static __forceinline void movq(__m64 &dst, const __int64 &src) {dst = *(__m64*)&src;}
+static __forceinline void movq(__m64 &dst, const int64_t &src) {dst = *(__m64*)&src;}
 static __forceinline void movq(void *dst, const __m64 &src) {*(__m64*)dst = src;}
 static __forceinline void movntq(void *dst, const __m64 &src) {_mm_stream_pi((__m64*)dst, src);}
 
@@ -240,7 +240,7 @@ struct Tmmx {
     }
     static __forceinline void pavgb(__m64 &rega, __m64 regb) {
         __m64 regr;
-        static const __int64 regfe = 0xfefefefefefefefeULL; //_mm_set1_pi8(/*0xfe*/-2);
+        static const int64_t regfe = 0xfefefefefefefefeULL; //_mm_set1_pi8(/*0xfe*/-2);
         movq(regr, rega);
         por(regr, regb);
         pxor(regb, rega);
@@ -250,7 +250,7 @@ struct Tmmx {
         rega = regr;
     }
     static __forceinline void pavgb(__m64 &rega, const void *regb) {pavgb(rega, *(__m64*)regb);}
-    static __forceinline void v_pavgb(__m64 &mmr1, const __m64 &mmr2, __m64 &mmrw, const __int64 &smask) {
+    static __forceinline void v_pavgb(__m64 &mmr1, const __m64 &mmr2, __m64 &mmrw, const int64_t &smask) {
         movq(mmrw, mmr2);
         pand(mmrw, smask);
         psrlw(mmrw, 1);
@@ -258,7 +258,7 @@ struct Tmmx {
         psrlw(mmr1, 1);
         paddusb(mmr1, mmrw);
     }
-    static __forceinline void v_pavgb(__m64 &mmr1, const void *mmr2, __m64 &mmrw, const __int64 &smask) {
+    static __forceinline void v_pavgb(__m64 &mmr1, const void *mmr2, __m64 &mmrw, const int64_t &smask) {
         v_pavgb(mmr1, *(__m64*)mmr2, mmrw, smask);
     }
     static __forceinline void sfence(void) {}
@@ -269,7 +269,7 @@ struct Tmmx {
         paddusb(mmr1, mmrw);
         psubusb(mmr1, mmrw);
     }
-    static __forceinline void v_pminub(__m64 &mmr1, const __int64 &mmr2, __m64 &mmrw) {v_pminub(mmr1, *(const __m64*)&mmr2, mmrw);}
+    static __forceinline void v_pminub(__m64 &mmr1, const int64_t &mmr2, __m64 &mmrw) {v_pminub(mmr1, *(const __m64*)&mmr2, mmrw);}
     static __forceinline void pmulhuw(__m64 &mm3, const __m64 &mm2) {
         __m64 mm5;
         movq(mm5, mm2);
@@ -282,7 +282,7 @@ struct Tmmx {
     static __forceinline void prefetcht0(const void*) {}
     static __forceinline __m64 _mm_shuffle_pi16_0(__m64 mm3) {
         __m64 mm2;
-        static const __int64 qwLowWord = 0x000000000000FFFF;
+        static const int64_t qwLowWord = 0x000000000000FFFF;
         pand(mm3, qwLowWord);            // mm3 = same limited to low word
         movq(mm2, mm3);                  // mm2 = same
         psllq(mm3, 16);                  // mm3 = moved to second word
@@ -293,22 +293,22 @@ struct Tmmx {
         return mm2;
     }
     static __forceinline __m64 _mm_shuffle_pi16_1(const __m64 &src) {
-        static const __int64 const1 = 0x00000000FFFF0000LL;
-        static const __int64 const2 = 0x000000000000FFFFLL;
+        static const int64_t const1 = 0x00000000FFFF0000LL;
+        static const int64_t const2 = 0x000000000000FFFFLL;
         __m64 w0 = _mm_srli_si64(_mm_and_si64(src, *(__m64*)&const1), 16);
         __m64 w1 = _mm_and_si64(src, *(__m64*)&const2);
         return _mm_or_si64(_mm_or_si64(_mm_or_si64(_mm_slli_si64(w1, 48), _mm_slli_si64(w1, 32)), _mm_slli_si64(w1, 16)), w0);
     }
     static __forceinline __m64 _mm_shuffle_pi16_14(const __m64 &src) {
-        static const __int64 const1 = 0x000000000000FFFFLL;
-        static const __int64 const2 = 0xffffffff00000000ULL;
+        static const int64_t const1 = 0x000000000000FFFFLL;
+        static const int64_t const2 = 0xffffffff00000000ULL;
         __m64 w34 = _mm_and_si64(src, *(__m64*)&const1);
         __m64 w12 = _mm_srli_si64(_mm_and_si64(src, *(__m64*)&const2), 32);
         return _mm_or_si64(w12, _mm_or_si64(_mm_slli_si64(w34, 32), _mm_slli_si64(w34, 48)));
     }
     static __forceinline __m64 _mm_shuffle_pi16_x50(const __m64 &src) {
-        static const __int64 const1 = 0x00000000ffff0000LL;
-        static const __int64 const2 = 0x000000000000ffffLL;
+        static const int64_t const1 = 0x00000000ffff0000LL;
+        static const int64_t const2 = 0x000000000000ffffLL;
         __m64 w3 = _mm_and_si64(src, *(__m64*)&const1);
         __m64 w4 = _mm_and_si64(src, *(__m64*)&const2);
         return _mm_or_si64(_mm_or_si64(_mm_slli_si64(w3, 32), _mm_slli_si64(w3, 16)) , _mm_or_si64(_mm_slli_si64(w4, 16), w4));
@@ -326,12 +326,12 @@ struct Tmmx {
         punpcklbw(mm0, mm7);
         punpckhbw(mm1, mm7);
         paddusw(mm0, mm1);
-        static const __int64 mmx_one = 0x0001000100010001LL;
+        static const int64_t mmx_one = 0x0001000100010001LL;
         pmaddwd(mm0, mmx_one);
         movq(mm7, mm0);
         psrlq(mm7, 32);
         paddd(mm0, mm7);
-        static const __int64 mmx_ffff = 0x00000000000fffffLL;
+        static const int64_t mmx_ffff = 0x00000000000fffffLL;
         pand(mm0, mmx_ffff);
     }
     static __forceinline __m64 min_pu8(const __m64 &mm1, const __m64 &mm2) {
@@ -375,12 +375,12 @@ struct Tmmxext {
     static __forceinline void pminsw(__m64 &mmr1, const __m64 &mmr2) {mmr1 = _mm_min_pi16(mmr1, mmr2);}
     static __forceinline void pavgb(__m64 &mmr1, const __m64 &mmr2) {mmr1 = _mm_avg_pu8(mmr1, mmr2);}
     static __forceinline void pavgb(__m64 &mmr1, const void *mmr2) {mmr1 = _mm_avg_pu8(mmr1, *(__m64*)mmr2);}
-    static __forceinline void v_pavgb(__m64 &mmr1, const __m64 &mmr2, __m64, __int64) {mmr1 = _mm_avg_pu8(mmr1, mmr2);}
-    static __forceinline void v_pavgb(__m64 &mmr1, const void *mmr2, __m64, __int64) {mmr1 = _mm_avg_pu8(mmr1, *(__m64*)mmr2);}
+    static __forceinline void v_pavgb(__m64 &mmr1, const __m64 &mmr2, __m64, int64_t) {mmr1 = _mm_avg_pu8(mmr1, mmr2);}
+    static __forceinline void v_pavgb(__m64 &mmr1, const void *mmr2, __m64, int64_t) {mmr1 = _mm_avg_pu8(mmr1, *(__m64*)mmr2);}
     static __forceinline void sfence(void) {_mm_sfence();}
     static __forceinline void movntq(void *dst, const __m64 &src) {_mm_stream_pi((__m64*)dst, src);}
     static __forceinline void v_pminub(__m64 &mmr1, const __m64 &mmr2, __m64) {mmr1 = _mm_min_pu8(mmr1, mmr2);}
-    static __forceinline void v_pminub(__m64 &mmr1, const __int64 &mmr2, __m64 &mmrw) {v_pminub(mmr1, *(const __m64*)&mmr2, mmrw);}
+    static __forceinline void v_pminub(__m64 &mmr1, const int64_t &mmr2, __m64 &mmrw) {v_pminub(mmr1, *(const __m64*)&mmr2, mmrw);}
     static __forceinline void pmulhuw(__m64 &mmr1, const __m64 &mmr2) {mmr1 = _mm_mulhi_pu16(mmr1, mmr2);}
     static __forceinline void prefetchnta(const void *ptr) {_mm_prefetch((const char*)ptr, _MM_HINT_NTA);}
     static __forceinline void prefetcht0(const void *ptr) {_mm_prefetch((const char*)ptr, _MM_HINT_T0);}

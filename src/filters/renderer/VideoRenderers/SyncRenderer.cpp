@@ -1555,7 +1555,7 @@ STDMETHODIMP_(bool) CBaseAP::Paint(bool fAll)
             CComPtr<IDirect3DTexture9> pVideoTexture = m_pVideoTexture[m_nCurSurface];
 
             if (m_pVideoTexture[m_nDXSurface] && m_pVideoTexture[m_nDXSurface + 1] && !m_pPixelShaders.IsEmpty()) {
-                static __int64 counter = 0;
+                static int64_t counter = 0;
                 static long start = clock();
 
                 long stop = clock();
@@ -1657,7 +1657,7 @@ STDMETHODIMP_(bool) CBaseAP::Paint(bool fAll)
             }
 
             if (bScreenSpacePixelShaders) {
-                static __int64 counter = 555;
+                static int64_t counter = 555;
                 static long start = clock() + 333;
 
                 long stop = clock() + 333;

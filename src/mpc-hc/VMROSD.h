@@ -65,10 +65,10 @@ public:
     void HideMessage(bool hide);
     void EnableShowMessage(bool enabled = true);
 
-    __int64 GetPos() const;
-    void SetPos(__int64 pos);
-    void SetRange(__int64 start,  __int64 stop);
-    void GetRange(__int64& start, __int64& stop);
+    int64_t GetPos() const;
+    void SetPos(int64_t pos);
+    void SetRange(int64_t start,  int64_t stop);
+    void GetRange(int64_t& start, int64_t& stop);
 
     void OnSize(UINT nType, int cx, int cy);
     bool OnMouseMove(UINT nFlags, CPoint point);
@@ -107,9 +107,9 @@ private :
     CRect   m_rectBar;
     bool    m_bCursorMoving;
     bool    m_bSeekBarVisible;
-    __int64 m_llSeekMin;
-    __int64 m_llSeekMax;
-    __int64 m_llSeekPos;
+    int64_t m_llSeekMin;
+    int64_t m_llSeekMax;
+    int64_t m_llSeekPos;
 
     bool    m_bShowMessage;
 
@@ -121,7 +121,7 @@ private :
     void UpdateBitmap();
     void CalcRect();
     void UpdateSeekBarPos(CPoint point);
-    void DrawSlider(CRect* rect, __int64 llMin, __int64 llMax, __int64 llPos);
+    void DrawSlider(CRect* rect, int64_t llMin, int64_t llMax, int64_t llPos);
     void DrawRect(CRect* rect, CBrush* pBrush = NULL, CPen* pPen = NULL);
     void Invalidate();
     void DrawMessage();

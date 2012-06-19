@@ -91,13 +91,13 @@ void CPlayerSeekBar::Enable(bool fEnable)
     Invalidate();
 }
 
-void CPlayerSeekBar::GetRange(__int64& start, __int64& stop) const
+void CPlayerSeekBar::GetRange(int64_t& start, int64_t& stop) const
 {
     start = m_start;
     stop = m_stop;
 }
 
-void CPlayerSeekBar::SetRange(__int64 start, __int64 stop)
+void CPlayerSeekBar::SetRange(int64_t start, int64_t stop)
 {
     if (start > stop) {
         start ^= stop, stop ^= start, start ^= stop;
@@ -109,17 +109,17 @@ void CPlayerSeekBar::SetRange(__int64 start, __int64 stop)
     }
 }
 
-__int64 CPlayerSeekBar::GetPos() const
+int64_t CPlayerSeekBar::GetPos() const
 {
     return m_pos;
 }
 
-__int64 CPlayerSeekBar::GetPosReal() const
+int64_t CPlayerSeekBar::GetPosReal() const
 {
     return m_posreal;
 }
 
-void CPlayerSeekBar::SetPos(__int64 pos)
+void CPlayerSeekBar::SetPos(int64_t pos)
 {
     CWnd* w = GetCapture();
     if (w && w->m_hWnd == m_hWnd) {
@@ -129,7 +129,7 @@ void CPlayerSeekBar::SetPos(__int64 pos)
     SetPosInternal(pos);
 }
 
-void CPlayerSeekBar::SetPosInternal(__int64 pos)
+void CPlayerSeekBar::SetPosInternal(int64_t pos)
 {
     if (m_pos == pos) {
         return;
@@ -165,7 +165,7 @@ CRect CPlayerSeekBar::GetThumbRect() const
 
     CRect r = GetChannelRect();
 
-    int x = r.left + (int)((m_start < m_stop /*&& fEnabled*/) ? (__int64)r.Width() * (m_pos - m_start) / (m_stop - m_start) : 0);
+    int x = r.left + (int)((m_start < m_stop /*&& fEnabled*/) ? (int64_t)r.Width() * (m_pos - m_start) / (m_stop - m_start) : 0);
     int y = r.CenterPoint().y;
 
     r.SetRect(x, y, x, y);
@@ -184,9 +184,9 @@ CRect CPlayerSeekBar::GetInnerThumbRect() const
     return r;
 }
 
-__int64 CPlayerSeekBar::CalculatePosition(CPoint point)
+int64_t CPlayerSeekBar::CalculatePosition(CPoint point)
 {
-    __int64 pos = -1;
+    int64_t pos = -1;
     CRect r = GetChannelRect();
 
     if (r.left >= r.right) {
@@ -196,7 +196,7 @@ __int64 CPlayerSeekBar::CalculatePosition(CPoint point)
     } else if (point.x >= r.right) {
         pos = m_stop;
     } else {
-        __int64 w = r.right - r.left;
+        int64_t w = r.right - r.left;
         if (m_start < m_stop) {
             pos = m_start + ((m_stop - m_start) * (point.x - r.left) + (w / 2)) / w;
         }
@@ -207,7 +207,7 @@ __int64 CPlayerSeekBar::CalculatePosition(CPoint point)
 
 void CPlayerSeekBar::MoveThumb(CPoint point)
 {
-    __int64 pos = CalculatePosition(point);
+    int64_t pos = CalculatePosition(point);
 
     if (pos >= 0) {
         SetPosInternal(pos);

@@ -446,7 +446,7 @@ HRESULT CCDDAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
         rawreadinfo.TrackMode = CDDA;
 
         UINT sector = m_nStartSector + int(pos / RAW_SECTOR_SIZE);
-        __int64 offset = pos % RAW_SECTOR_SIZE;
+        int64_t offset = pos % RAW_SECTOR_SIZE;
 
         rawreadinfo.DiskOffset.QuadPart = sector * 2048;
         DWORD BytesReturned = 0;

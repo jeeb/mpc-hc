@@ -57,7 +57,7 @@ public:
     MPEG_TYPES m_type;
 
     REFERENCE_TIME m_rtMin, m_rtMax;
-    __int64 m_posMin, m_posMax;
+    int64_t m_posMin, m_posMax;
     int m_rate; // byte/sec
 
     int m_nVC1_GuidFlag, m_AC3CoreOnly;
@@ -152,7 +152,7 @@ public:
 
     } m_streams[unknown];
 
-    HRESULT SearchStreams(__int64 start, __int64 stop, IAsyncReader* pAsyncReader, BOOL CalcDuration = FALSE);
+    HRESULT SearchStreams(int64_t start, int64_t stop, IAsyncReader* pAsyncReader, BOOL CalcDuration = FALSE);
     DWORD AddStream(WORD pid, BYTE pesid, BYTE ps1id, DWORD len);
     void  AddHdmvPGStream(WORD pid, const char* language_code);
     CAtlList<stream>* GetMasterStream();
@@ -176,7 +176,7 @@ public:
 
     CAtlMap<WORD, program> m_programs;
 
-    void SearchPrograms(__int64 start, __int64 stop);
+    void SearchPrograms(int64_t start, int64_t stop);
     void UpdatePrograms(const trhdr& h, bool UpdateLang = true);
     void UpdatePrograms(CGolombBuffer gb, WORD pid, bool UpdateLang = true);
     const program* FindProgram(WORD pid, int& iStream, const CHdmvClipInfo::Stream*& _pClipInfo);

@@ -39,7 +39,7 @@ public:
 
     struct SyncPoint {
         REFERENCE_TIME rt;
-        __int64 fp;
+        int64_t fp;
     };
     CAtlArray<SyncPoint> m_sps;
 
@@ -47,15 +47,15 @@ public:
     CStreamInfoMap m_fim;
     CAtlMap<BYTE, CStreamInfoMap> m_sim;
 
-    bool Sync(dsmp_t& type, UINT64& len, __int64 limit = 65536);
-    bool Sync(UINT64& syncpos, dsmp_t& type, UINT64& len, __int64 limit = 65536);
-    bool Read(__int64 len, BYTE& id, CMediaType& mt);
-    bool Read(__int64 len, Packet* p, bool fData = true);
-    bool Read(__int64 len, CAtlArray<SyncPoint>& sps);
-    bool Read(__int64 len, CStreamInfoMap& im);
-    bool Read(__int64 len, IDSMResourceBagImpl& res);
-    bool Read(__int64 len, IDSMChapterBagImpl& chap);
-    __int64 Read(__int64 len, CStringW& str);
+    bool Sync(dsmp_t& type, UINT64& len, int64_t limit = 65536);
+    bool Sync(UINT64& syncpos, dsmp_t& type, UINT64& len, int64_t limit = 65536);
+    bool Read(int64_t len, BYTE& id, CMediaType& mt);
+    bool Read(int64_t len, Packet* p, bool fData = true);
+    bool Read(int64_t len, CAtlArray<SyncPoint>& sps);
+    bool Read(int64_t len, CStreamInfoMap& im);
+    bool Read(int64_t len, IDSMResourceBagImpl& res);
+    bool Read(int64_t len, IDSMChapterBagImpl& chap);
+    int64_t Read(int64_t len, CStringW& str);
 
-    __int64 FindSyncPoint(REFERENCE_TIME rt);
+    int64_t FindSyncPoint(REFERENCE_TIME rt);
 };

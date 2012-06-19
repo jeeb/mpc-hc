@@ -1358,7 +1358,7 @@ void CMPEG2Dec::macroblock_modes(int *pmacroblock_type, int *pmotion_type,
 */
 void CMPEG2Dec::Add_Block(int count, int bx, int by, int dct_type, int addflag)
 {
-	static const __int64 mmmask_128 = 0x0080008000800080;
+	static const int64_t mmmask_128 = 0x0080008000800080;
 
 	int comp, cc, iincr, bxh, byh;
 	unsigned char *rfp;
@@ -2373,10 +2373,10 @@ void CMPEG2Dec::form_component_prediction(unsigned char *src, unsigned char *dst
 										  int lx, int lx2, int w, int h, int x, int y,
 										  int dx, int dy, int average_flag)
 {
-	static const __int64 mmmask_0001 = 0x0001000100010001;
-	static const __int64 mmmask_0002 = 0x0002000200020002;
-	static const __int64 mmmask_0003 = 0x0003000300030003;
-	static const __int64 mmmask_0006 = 0x0006000600060006;
+	static const int64_t mmmask_0001 = 0x0001000100010001;
+	static const int64_t mmmask_0002 = 0x0002000200020002;
+	static const int64_t mmmask_0003 = 0x0003000300030003;
+	static const int64_t mmmask_0006 = 0x0006000600060006;
 
 	unsigned char *s = src + lx * (y + (dy>>1)) + x + (dx>>1);
 	unsigned char *d = dst + lx * y + x;
@@ -3031,15 +3031,15 @@ int CMPEG2Dec::Get_dmvector()
 // store
 //
 
-static const __int64 mmmask_0001 = 0x0001000100010001;
-static const __int64 mmmask_0002 = 0x0002000200020002;
-static const __int64 mmmask_0003 = 0x0003000300030003;
-static const __int64 mmmask_0004 = 0x0004000400040004;
-static const __int64 mmmask_0005 = 0x0005000500050005;
-static const __int64 mmmask_0007 = 0x0007000700070007;
-static const __int64 mmmask_0016 = 0x0010001000100010;
-static const __int64 mmmask_0040 = 0x0040004000400040;
-static const __int64 mmmask_0128 = 0x0080008000800080;
+static const int64_t mmmask_0001 = 0x0001000100010001;
+static const int64_t mmmask_0002 = 0x0002000200020002;
+static const int64_t mmmask_0003 = 0x0003000300030003;
+static const int64_t mmmask_0004 = 0x0004000400040004;
+static const int64_t mmmask_0005 = 0x0005000500050005;
+static const int64_t mmmask_0007 = 0x0007000700070007;
+static const int64_t mmmask_0016 = 0x0010001000100010;
+static const int64_t mmmask_0040 = 0x0040004000400040;
+static const int64_t mmmask_0128 = 0x0080008000800080;
 
 void CMPEG2Dec::assembleFrame(unsigned char *src[], int pf, unsigned char *dst, int pitch)
 {
@@ -3520,11 +3520,11 @@ void CMPEG2Dec::conv444toRGB24(unsigned char *py, unsigned char *pu, unsigned ch
 	pv += CLIP_STEP;
 
 	int Clip_Height = this->Clip_Height;
-	__int64 RGB_Offset = this->RGB_Offset;
-	__int64 RGB_Scale = this->RGB_Scale;
-	__int64 RGB_CBU = this->RGB_CBU;
-	__int64 RGB_CRV = this->RGB_CRV;
-	__int64 RGB_CGX = this->RGB_CGX;
+	int64_t RGB_Offset = this->RGB_Offset;
+	int64_t RGB_Scale = this->RGB_Scale;
+	int64_t RGB_CBU = this->RGB_CBU;
+	int64_t RGB_CRV = this->RGB_CRV;
+	int64_t RGB_CGX = this->RGB_CGX;
 	int Clip_Width = this->Clip_Width;
 	int Coded_Picture_Width = this->Coded_Picture_Width;
 
@@ -3929,8 +3929,8 @@ int CMPEG2Dec::Open(LPCTSTR path, DstFormat dstFormat)
 	else
 	{
 		Luminance_Flag = 1;
-		LumGainMask = ((__int64)i<<48) + ((__int64)i<<32) + ((__int64)i<<16) + (__int64)i;
-		LumOffsetMask = ((__int64)j<<48) + ((__int64)j<<32) + ((__int64)j<<16) + (__int64)j;
+		LumGainMask = ((int64_t)i<<48) + ((int64_t)i<<32) + ((int64_t)i<<16) + (int64_t)i;
+		LumOffsetMask = ((int64_t)j<<48) + ((int64_t)j<<32) + ((int64_t)j<<16) + (int64_t)j;
 
 		lum = DNew unsigned char[Coded_Picture_Width * Coded_Picture_Height];
 	}
@@ -3996,7 +3996,7 @@ int CMPEG2Dec::Open(LPCTSTR path, DstFormat dstFormat)
 			if(2 != fscanf_s(out->VF_File, "%d %X", &(GOPList[gop]->file), &j))
 				break;
 
-			GOPList[gop]->position = (__int64)j*BUFFER_SIZE;
+			GOPList[gop]->position = (int64_t)j*BUFFER_SIZE;
 			gop ++;
 
 			if(1 != fscanf_s(out->VF_File, "%d", &j))

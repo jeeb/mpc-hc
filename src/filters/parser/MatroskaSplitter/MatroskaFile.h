@@ -31,8 +31,6 @@ namespace MatroskaReader
 {
     class CMatroskaNode;
 
-    typedef unsigned __int64 QWORD;
-
     class CANSI : public CStringA
     {
     public:
@@ -450,7 +448,7 @@ namespace MatroskaReader
         CUTF8 FileDescription;
         CUTF8 FileName;
         CANSI FileMimeType;
-        QWORD FileDataPos, FileDataLen; // BYTE* FileData
+        uint64_t FileDataPos, FileDataLen; // BYTE* FileData
         CUInt FileUID;
 
         AttachedFile() { FileDataPos = FileDataLen = 0; }
@@ -511,7 +509,7 @@ namespace MatroskaReader
     class Segment
     {
     public:
-        QWORD pos, len;
+        uint64_t pos, len;
         Info SegmentInfo;
         CNode<Seek> MetaSeekInfo;
         CNode<Cluster> Clusters;
@@ -561,7 +559,7 @@ namespace MatroskaReader
     public:
         CID m_id;
         CLength m_len;
-        QWORD m_filepos, m_start;
+        uint64_t m_filepos, m_start;
 
         HRESULT Parse();
 
@@ -574,12 +572,12 @@ namespace MatroskaReader
         bool Next(bool fSame = false);
         bool Find(DWORD id, bool fSearch = true);
 
-        QWORD FindPos(DWORD id, QWORD start = 0);
+        uint64_t FindPos(DWORD id, uint64_t start = 0);
 
-        void SeekTo(QWORD pos);
-        QWORD GetPos(), GetLength();
+        void SeekTo(uint64_t pos);
+        uint64_t GetPos(), GetLength();
         template <class T> HRESULT Read(T& var);
-        HRESULT Read(BYTE* pData, QWORD len);
+        HRESULT Read(BYTE* pData, uint64_t len);
 
         CAutoPtr<CMatroskaNode> Copy();
 

@@ -69,7 +69,7 @@ public:
 
     HRESULT UnpackPage(OggPage& page);
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len) = 0;
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position) = 0;
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position) = 0;
     CAutoPtr<OggPacket> GetPacket();
 
     HRESULT DeliverEndFlush();
@@ -85,7 +85,7 @@ class COggVorbisOutputPin : public COggSplitterOutputPin
     CAtlArray<bool> m_blockflags;
 
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len);
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position);
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position);
 
     HRESULT DeliverPacket(CAutoPtr<OggPacket> p);
     HRESULT DeliverNewSegment(REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate);
@@ -110,7 +110,7 @@ class COggFlacOutputPin : public COggSplitterOutputPin
     CAtlArray<bool> m_blockflags;
 
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len);
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position);
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position);
 
     HRESULT DeliverPacket(CAutoPtr<OggPacket> p);
     HRESULT DeliverNewSegment(REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate);
@@ -124,7 +124,7 @@ public:
 class COggDirectShowOutputPin : public COggSplitterOutputPin
 {
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len);
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position);
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position);
 
 public:
     COggDirectShowOutputPin(AM_MEDIA_TYPE* pmt, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr);
@@ -132,11 +132,11 @@ public:
 
 class COggStreamOutputPin : public COggSplitterOutputPin
 {
-    __int64 m_time_unit, m_samples_per_unit;
+    int64_t m_time_unit, m_samples_per_unit;
     DWORD m_default_len;
 
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len);
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position);
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position);
 
 public:
     COggStreamOutputPin(OggStreamHeader* h, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr);
@@ -170,7 +170,7 @@ class COggTheoraOutputPin : public COggSplitterOutputPin
     REFERENCE_TIME          m_rtAvgTimePerFrame;
 
     virtual HRESULT UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, int len);
-    virtual REFERENCE_TIME GetRefTime(__int64 granule_position);
+    virtual REFERENCE_TIME GetRefTime(int64_t granule_position);
 
 public:
     COggTheoraOutputPin(BYTE* p, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr);

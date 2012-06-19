@@ -182,14 +182,14 @@ bool CMpaSplitterFilter::DemuxInit()
 
 void CMpaSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
 {
-    __int64 startpos = m_pFile->GetStartPos();
-    __int64 endpos = m_pFile->GetEndPos();
+    int64_t startpos = m_pFile->GetStartPos();
+    int64_t endpos = m_pFile->GetEndPos();
 
     if (rt <= 0 || m_pFile->GetDuration() <= 0) {
         m_pFile->Seek(startpos);
         m_rtStart = 0;
     } else {
-        m_pFile->Seek(startpos + (__int64)((1.0 * rt / m_pFile->GetDuration()) * (endpos - startpos)));
+        m_pFile->Seek(startpos + (int64_t)((1.0 * rt / m_pFile->GetDuration()) * (endpos - startpos)));
         m_rtStart = rt;
     }
 

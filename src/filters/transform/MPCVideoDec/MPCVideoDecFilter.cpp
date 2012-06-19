@@ -1558,7 +1558,7 @@ void CMPCVideoDecFilter::SetTypeSpecificFlags(IMediaSample* pMS)
 }
 
 #if HAS_FFMPEG_VIDEO_DECODERS
-unsigned __int64 CMPCVideoDecFilter::GetCspFromMediaType(GUID& subtype)
+uint64_t CMPCVideoDecFilter::GetCspFromMediaType(GUID& subtype)
 {
     if (subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV || subtype == MEDIASUBTYPE_YV12) {
         return (FF_CSP_420P | FF_CSP_FLAGS_YUV_ADJ);

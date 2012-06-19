@@ -32,7 +32,7 @@ struct OggPageHeader {
     BYTE stream_structure_version;
     BYTE header_type_flag;
     enum {continued = 1, first = 2, last = 4};
-    __int64 granule_position;
+    int64_t granule_position;
     DWORD bitstream_serial_number;
     DWORD page_sequence_number;
     DWORD CRC_checksum;
@@ -63,7 +63,7 @@ struct OggAudioHeader {
 struct OggStreamHeader {
     char streamtype[8], subtype[4];
     DWORD size;
-    __int64 time_unit, samples_per_unit;
+    int64_t time_unit, samples_per_unit;
     DWORD default_len;
     DWORD buffersize;
     WORD bps;

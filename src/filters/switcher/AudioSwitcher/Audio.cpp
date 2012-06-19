@@ -250,7 +250,7 @@ long AudioStreamResampler::Downsample(void* input, long samplesin, void* output,
         // Truncate that, and add the filter width.  Then subtract however many
         // samples are sitting at the bottom of the buffer.
 
-        srcSamples = (long)(((__int64)samp_frac * (samplesout - 1) + accum) >> 19) + filter_width - holdover;
+        srcSamples = (long)(((int64_t)samp_frac * (samplesout - 1) + accum) >> 19) + filter_width - holdover;
 
         // Don't exceed the buffer (BUFFER_SIZE - holdover).
 
@@ -273,7 +273,7 @@ long AudioStreamResampler::Downsample(void* input, long samplesin, void* output,
         // fixed-pt accumulator we can hit is
         // (srcSamples+holdover-filter_width)<<16 + 0xffff.
 
-        dstSamples = (((__int64)(srcSamples + holdover - filter_width) << 19) + 0x7ffff - accum) / samp_frac + 1;
+        dstSamples = (((int64_t)(srcSamples + holdover - filter_width) << 19) + 0x7ffff - accum) / samp_frac + 1;
 
         if (dstSamples > samplesout) {
             dstSamples = samplesout;

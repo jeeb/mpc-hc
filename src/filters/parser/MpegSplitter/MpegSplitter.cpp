@@ -676,7 +676,7 @@ HRESULT CMpegSplitterFilter::DemuxNextPacket(REFERENCE_TIME rtStartOffset)
                 return E_FAIL;
             }
 
-            __int64 pos = m_pFile->GetPos();
+            int64_t pos = m_pFile->GetPos();
 
             DWORD TrackNumber = m_pFile->AddStream(0, b, h.id_ext, h.len);
 
@@ -704,7 +704,7 @@ HRESULT CMpegSplitterFilter::DemuxNextPacket(REFERENCE_TIME rtStartOffset)
         }
 
 
-        __int64 pos = m_pFile->GetPos();
+        int64_t pos = m_pFile->GetPos();
 
         m_pFile->UpdatePrograms(h, false);
 
@@ -754,7 +754,7 @@ HRESULT CMpegSplitterFilter::DemuxNextPacket(REFERENCE_TIME rtStartOffset)
 
         DWORD TrackNumber = h.streamid;
 
-        __int64 pos = m_pFile->GetPos();
+        int64_t pos = m_pFile->GetPos();
 
         if (GetOutputPin(TrackNumber)) {
             CAutoPtr<Packet> p(DNew Packet());
@@ -1035,9 +1035,9 @@ void CMpegSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
     if (rt <= rtPreroll || m_rtDuration <= 0) {
         m_pFile->Seek(0);
     } else {
-        __int64 len = m_pFile->GetLength();
-        __int64 seekpos = (__int64)(1.0 * rt / m_rtDuration * len);
-        __int64 minseekpos = _I64_MAX;
+        int64_t len = m_pFile->GetLength();
+        int64_t seekpos = (int64_t)(1.0 * rt / m_rtDuration * len);
+        int64_t minseekpos = _I64_MAX;
 
         REFERENCE_TIME rtmax = rt - rtPreroll;
         REFERENCE_TIME rtmin = rtmax - 5000000;
@@ -1052,7 +1052,7 @@ void CMpegSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                     if (pPin && pPin->IsConnected()) {
                         m_pFile->Seek(seekpos);
 
-                        __int64 curpos = seekpos;
+                        int64_t curpos = seekpos;
                         REFERENCE_TIME pdt = _I64_MIN;
 
                         for (int j = 0; j < 10; j++) {
@@ -1073,7 +1073,7 @@ void CMpegSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                                 break;
                             }
 
-                            curpos -= (__int64)(1.0 * dt / m_rtDuration * len);
+                            curpos -= (int64_t)(1.0 * dt / m_rtDuration * len);
                             m_pFile->Seek(curpos);
 
                             //pdt = dt;
@@ -1088,7 +1088,7 @@ void CMpegSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
             // this file is probably screwed up, try plan B, seek simply by bitrate
 
             rt -= rtPreroll;
-            seekpos = (__int64)(1.0 * rt / m_rtDuration * len);
+            seekpos = (int64_t)(1.0 * rt / m_rtDuration * len);
             m_pFile->Seek(seekpos);
             m_rtStartOffset = m_pFile->m_rtMin + m_pFile->NextPTS(pMasterStream->GetHead()) - rt;
         }
@@ -1219,7 +1219,7 @@ STDMETHODIMP CMpegSplitterFilter::Enable(long lIndex, DWORD dwFlags)
 int64_t GetMediaTypeQuality(const CMediaType* _pMediaType, int _PresentationFormat)
 {
     if (_pMediaType->formattype == FORMAT_WaveFormatEx) {
-        __int64 Ret = 0;
+        int64_t Ret = 0;
 
         const WAVEFORMATEX* pInfo = GetFormatHelper(pInfo, _pMediaType);
         int TypePriority = 0;
@@ -1271,12 +1271,12 @@ int64_t GetMediaTypeQuality(const CMediaType* _pMediaType, int _PresentationForm
             }
         }
 
-        Ret += __int64(TypePriority) * 100000000i64 * 1000000000i64;
+        Ret += int64_t(TypePriority) * 100000000i64 * 1000000000i64;
 
-        Ret += __int64(pInfo->nChannels) * 1000000i64 * 1000000000i64;
-        Ret += __int64(pInfo->nSamplesPerSec) * 10i64  * 1000000000i64;
-        Ret += __int64(pInfo->wBitsPerSample)  * 10000000i64;
-        Ret += __int64(pInfo->nAvgBytesPerSec);
+        Ret += int64_t(pInfo->nChannels) * 1000000i64 * 1000000000i64;
+        Ret += int64_t(pInfo->nSamplesPerSec) * 10i64  * 1000000000i64;
+        Ret += int64_t(pInfo->wBitsPerSample)  * 10000000i64;
+        Ret += int64_t(pInfo->nAvgBytesPerSec);
 
         return Ret;
     }

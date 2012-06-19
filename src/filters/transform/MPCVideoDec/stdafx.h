@@ -27,6 +27,11 @@
 #include "../../../../include/stdafx_common_afx.h"
 #include "../../../../include/stdafx_common_dshow.h"
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <d3dx9.h>
 #include <evr.h>
 #include <mfapi.h>

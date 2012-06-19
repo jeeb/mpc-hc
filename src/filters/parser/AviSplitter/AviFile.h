@@ -29,7 +29,7 @@
 class CAviFile : public CBaseSplitterFile
 {
     HRESULT Init();
-    HRESULT Parse(DWORD parentid, __int64 end);
+    HRESULT Parse(DWORD parentid, int64_t end);
     HRESULT BuildAMVIndex();
 
 public:

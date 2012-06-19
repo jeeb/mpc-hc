@@ -445,7 +445,7 @@ avcsuccess:
                     m_pSegment = Root.Child(0x18538067);
                     m_pCluster = m_pSegment->Child(0x1F43B675);
 
-                    MatroskaReader::QWORD lastCueClusterPosition = (MatroskaReader::QWORD) - 1;
+                    uint64_t lastCueClusterPosition = (uint64_t) - 1;
                     UINT64 timecode1 = -1;
                     UINT64 timecode2 = -1;
                     unsigned int framecount = 0;
@@ -1136,7 +1136,7 @@ void CMatroskaSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
     if (rt > 0) {
         rt += m_pFile->m_rtOffset;
 
-        MatroskaReader::QWORD lastCueClusterPosition = (MatroskaReader::QWORD) - 1;
+        uint64_t lastCueClusterPosition = (uint64_t) - 1;
 
         Segment& s = m_pFile->m_segment;
 
@@ -1299,7 +1299,7 @@ bool CMatroskaSplitterFilter::DemuxLoop()
         } while (m_pBlock->NextBlock() && SUCCEEDED(hr) && !CheckRequest(NULL));
 
         m_pBlock.Free();
-    } while (m_pFile->GetPos() < (__int64)(m_pFile->m_segment.pos + m_pFile->m_segment.len)
+    } while (m_pFile->GetPos() < (int64_t)(m_pFile->m_segment.pos + m_pFile->m_segment.len)
              && m_pCluster->Next(true) && SUCCEEDED(hr) && !CheckRequest(NULL));
 
     m_pCluster.Free();

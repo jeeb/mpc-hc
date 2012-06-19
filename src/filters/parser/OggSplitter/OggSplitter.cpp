@@ -379,14 +379,14 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
     } else if (m_rtDuration > 0) {
         // oh, the horror...
 
-        __int64 len = m_pFile->GetLength();
-        __int64 startpos = len * rt / m_rtDuration;
-        //__int64 diff = 0;
+        int64_t len = m_pFile->GetLength();
+        int64_t startpos = len * rt / m_rtDuration;
+        //int64_t diff = 0;
 
         REFERENCE_TIME rtMinDiff = _I64_MAX;
 
         for (;;) {
-            __int64 endpos = startpos;
+            int64_t endpos = startpos;
             REFERENCE_TIME rtPos = -1;
 
             OggPage page;
@@ -408,7 +408,7 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                 break;
             }
 
-            __int64 rtDiff = rtPos - rt;
+            int64_t rtDiff = rtPos - rt;
 
             if (rtDiff < 0) {
                 rtDiff = -rtDiff;
@@ -421,15 +421,15 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                 rtMinDiff = rtDiff;
             }
 
-            __int64 newpos = startpos;
+            int64_t newpos = startpos;
 
             if (rtPos < rt && rtPos < m_rtDuration) {
-                newpos = startpos + (__int64)((1.0 * (rt - rtPos) / (m_rtDuration - rtPos)) * (len - startpos)) + 1024;
+                newpos = startpos + (int64_t)((1.0 * (rt - rtPos) / (m_rtDuration - rtPos)) * (len - startpos)) + 1024;
                 if (newpos < endpos) {
                     newpos = endpos + 1024;
                 }
             } else if (rtPos > rt && rtPos > 0) {
-                newpos = startpos - (__int64)((1.0 * (rtPos - rt) / (rtPos - 0)) * (startpos - 0)) - 1024;
+                newpos = startpos - (int64_t)((1.0 * (rtPos - rt) / (rtPos - 0)) * (startpos - 0)) - 1024;
                 if (newpos >= startpos) {
                     newpos = startpos - 1024;
                 }
@@ -458,7 +458,7 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
             }
 
             bool fKeyFrameFound = false, fSkipKeyFrame = true;
-            __int64 endpos = _I64_MAX;
+            int64_t endpos = _I64_MAX;
 
             while (!(fKeyFrameFound && !fSkipKeyFrame) && startpos > 0) {
                 OggPage page;
@@ -867,7 +867,7 @@ HRESULT COggVorbisOutputPin::UnpackInitPage(OggPage& page)
     return hr;
 }
 
-REFERENCE_TIME COggVorbisOutputPin::GetRefTime(__int64 granule_position)
+REFERENCE_TIME COggVorbisOutputPin::GetRefTime(int64_t granule_position)
 {
     REFERENCE_TIME rt = granule_position * 10000000 / m_audio_sample_rate;
     return rt;
@@ -978,7 +978,7 @@ COggFlacOutputPin::COggFlacOutputPin(BYTE* h, int nCount, LPCWSTR pName, CBaseFi
     *phr = S_OK;
 }
 
-REFERENCE_TIME COggFlacOutputPin::GetRefTime(__int64 granule_position)
+REFERENCE_TIME COggFlacOutputPin::GetRefTime(int64_t granule_position)
 {
     REFERENCE_TIME rt = (granule_position * UNITS) / m_nSamplesPerSec;
     return rt;
@@ -1044,7 +1044,7 @@ COggDirectShowOutputPin::COggDirectShowOutputPin(AM_MEDIA_TYPE* pmt, LPCWSTR pNa
     }
 }
 
-REFERENCE_TIME COggDirectShowOutputPin::GetRefTime(__int64 granule_position)
+REFERENCE_TIME COggDirectShowOutputPin::GetRefTime(int64_t granule_position)
 {
     REFERENCE_TIME rt = 0;
 
@@ -1066,9 +1066,9 @@ HRESULT COggDirectShowOutputPin::UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pDat
     if (!(hdr & 1)) {
         // TODO: verify if this was still present in the old format (haven't found one sample yet)
         BYTE nLenBytes = (hdr >> 6) | ((hdr & 2) << 1);
-        __int64 Length = 0;
+        int64_t Length = 0;
         for (int j = 0; j < nLenBytes; j++) {
-            Length |= (__int64)pData[i++] << (j << 3);
+            Length |= (int64_t)pData[i++] << (j << 3);
         }
 
         if (len < i) {
@@ -1099,7 +1099,7 @@ COggStreamOutputPin::COggStreamOutputPin(OggStreamHeader* h, LPCWSTR pName, CBas
     m_default_len = h->default_len;
 }
 
-REFERENCE_TIME COggStreamOutputPin::GetRefTime(__int64 granule_position)
+REFERENCE_TIME COggStreamOutputPin::GetRefTime(int64_t granule_position)
 {
     return granule_position * m_time_unit / m_samples_per_unit;
 }
@@ -1112,9 +1112,9 @@ HRESULT COggStreamOutputPin::UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pData, i
 
     if (!(hdr & 1)) {
         BYTE nLenBytes = (hdr >> 6) | ((hdr & 2) << 1);
-        __int64 Length = 0;
+        int64_t Length = 0;
         for (int j = 0; j < nLenBytes; j++) {
-            Length |= (__int64)pData[i++] << (j << 3);
+            Length |= (int64_t)pData[i++] << (j << 3);
         }
 
         if (len < i) {
@@ -1282,7 +1282,7 @@ HRESULT COggTheoraOutputPin::UnpackInitPage(OggPage& page)
     return hr;
 }
 
-REFERENCE_TIME COggTheoraOutputPin::GetRefTime(__int64 granule_position)
+REFERENCE_TIME COggTheoraOutputPin::GetRefTime(int64_t granule_position)
 {
     int64_t    iframe;
     int64_t    pframe;

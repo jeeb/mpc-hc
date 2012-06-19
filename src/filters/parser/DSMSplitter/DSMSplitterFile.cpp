@@ -62,7 +62,7 @@ HRESULT CDSMSplitterFile::Init(IDSMResourceBagImpl& res, IDSMChapterBagImpl& cha
     // examine the beginning of the file ...
 
     while (Sync(type, len, 0)) {
-        __int64 pos = GetPos();
+        int64_t pos = GetPos();
 
         if (type == DSMP_MEDIATYPE) {
             BYTE id;
@@ -102,11 +102,11 @@ HRESULT CDSMSplitterFile::Init(IDSMResourceBagImpl& res, IDSMChapterBagImpl& cha
 
     if (IsRandomAccess())
         for (int i = 1, j = (int)((GetLength() + limit / 2) / limit); i <= j; i++) {
-            __int64 seekpos = max(0, (__int64)GetLength() - i * limit);
+            int64_t seekpos = max(0, (int64_t)GetLength() - i * limit);
             Seek(seekpos);
 
             while (Sync(type, len, limit) && GetPos() < seekpos + limit) {
-                __int64 pos = GetPos();
+                int64_t pos = GetPos();
 
                 if (type == DSMP_SAMPLE) {
                     Packet p;
@@ -134,13 +134,13 @@ HRESULT CDSMSplitterFile::Init(IDSMResourceBagImpl& res, IDSMChapterBagImpl& cha
     return m_mts.GetCount() > 0 ? S_OK : E_FAIL;
 }
 
-bool CDSMSplitterFile::Sync(dsmp_t& type, UINT64& len, __int64 limit)
+bool CDSMSplitterFile::Sync(dsmp_t& type, UINT64& len, int64_t limit)
 {
     UINT64 pos;
     return Sync(pos, type, len, limit);
 }
 
-bool CDSMSplitterFile::Sync(UINT64& syncpos, dsmp_t& type, UINT64& len, __int64 limit)
+bool CDSMSplitterFile::Sync(UINT64& syncpos, dsmp_t& type, UINT64& len, int64_t limit)
 {
     BitByteAlign();
 
@@ -159,7 +159,7 @@ bool CDSMSplitterFile::Sync(UINT64& syncpos, dsmp_t& type, UINT64& len, __int64 
     return true;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, BYTE& id, CMediaType& mt)
+bool CDSMSplitterFile::Read(int64_t len, BYTE& id, CMediaType& mt)
 {
     id = (BYTE)BitRead(8);
     ByteRead((BYTE*)&mt.majortype, sizeof(mt.majortype));
@@ -179,7 +179,7 @@ bool CDSMSplitterFile::Read(__int64 len, BYTE& id, CMediaType& mt)
     return true;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, Packet* p, bool fData)
+bool CDSMSplitterFile::Read(int64_t len, Packet* p, bool fData)
 {
     if (!p) {
         return false;
@@ -208,7 +208,7 @@ bool CDSMSplitterFile::Read(__int64 len, Packet* p, bool fData)
     return true;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, CAtlArray<SyncPoint>& sps)
+bool CDSMSplitterFile::Read(int64_t len, CAtlArray<SyncPoint>& sps)
 {
     SyncPoint sp = {0, 0};
     sps.RemoveAll();
@@ -236,7 +236,7 @@ bool CDSMSplitterFile::Read(__int64 len, CAtlArray<SyncPoint>& sps)
     return true;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, CStreamInfoMap& im)
+bool CDSMSplitterFile::Read(int64_t len, CStreamInfoMap& im)
 {
     while (len >= 5) {
         CStringA key;
@@ -248,7 +248,7 @@ bool CDSMSplitterFile::Read(__int64 len, CStreamInfoMap& im)
     return len == 0;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, IDSMResourceBagImpl& res)
+bool CDSMSplitterFile::Read(int64_t len, IDSMResourceBagImpl& res)
 {
     BYTE compression = (BYTE)BitRead(2);
     BYTE reserved = (BYTE)BitRead(6);
@@ -272,7 +272,7 @@ bool CDSMSplitterFile::Read(__int64 len, IDSMResourceBagImpl& res)
     return true;
 }
 
-bool CDSMSplitterFile::Read(__int64 len, IDSMChapterBagImpl& chap)
+bool CDSMSplitterFile::Read(int64_t len, IDSMChapterBagImpl& chap)
 {
     CDSMChapter c(0, L"");
 
@@ -294,11 +294,11 @@ bool CDSMSplitterFile::Read(__int64 len, IDSMChapterBagImpl& chap)
     return len == 0;
 }
 
-__int64 CDSMSplitterFile::Read(__int64 len, CStringW& str)
+int64_t CDSMSplitterFile::Read(int64_t len, CStringW& str)
 {
     char c;
     CStringA s;
-    __int64 i = 0;
+    int64_t i = 0;
     while (i++ < len && (c = (char)BitRead(8)) != 0) {
         s += c;
     }
@@ -306,7 +306,7 @@ __int64 CDSMSplitterFile::Read(__int64 len, CStringW& str)
     return i;
 }
 
-__int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
+int64_t CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
 {
     if (/*!m_sps.IsEmpty()*/ m_sps.GetCount() > 1) {
         size_t i = range_bsearch(m_sps, m_rtFirst + rt);
@@ -324,7 +324,7 @@ __int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
 
     // 1. find some boundaries close to rt's position (minpos, maxpos)
 
-    __int64 minpos = 0, maxpos = GetLength();
+    int64_t minpos = 0, maxpos = GetLength();
 
     for (int i = 0; i < 10 && (maxpos - minpos) >= 1024 * 1024; i++) {
         Seek((minpos + maxpos) / 2);
@@ -334,14 +334,14 @@ __int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
                 continue;
             }
 
-            __int64 pos = GetPos();
+            int64_t pos = GetPos();
 
             if (type == DSMP_SAMPLE) {
                 Packet p;
                 if (Read(len, &p, false) && p.rtStart != Packet::INVALID_TIME) {
                     REFERENCE_TIME dt = (p.rtStart -= m_rtFirst) - rt;
                     if (dt >= 0) {
-                        maxpos = max((__int64)syncpos - 65536, minpos);
+                        maxpos = max((int64_t)syncpos - 65536, minpos);
                     } else {
                         minpos = syncpos;
                     }
@@ -362,14 +362,14 @@ __int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
             continue;
         }
 
-        __int64 pos = GetPos();
+        int64_t pos = GetPos();
 
         if (type == DSMP_SAMPLE) {
             Packet p;
             if (Read(len, &p, false) && p.rtStart != Packet::INVALID_TIME) {
                 REFERENCE_TIME dt = (p.rtStart -= m_rtFirst) - rt;
                 if (dt >= 0) {
-                    maxpos = (__int64)syncpos;
+                    maxpos = (int64_t)syncpos;
                     break;
                 }
             }
@@ -394,7 +394,7 @@ __int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
         }
     }
 
-    __int64 ret = maxpos;
+    int64_t ret = maxpos;
 
     while (maxpos > 0 && !ids.IsEmpty()) {
         minpos = max(0, maxpos - 65536);
@@ -410,7 +410,7 @@ __int64 CDSMSplitterFile::FindSyncPoint(REFERENCE_TIME rt)
                     BYTE id = (BYTE)p.TrackNumber, tmp;
                     if (ids.Lookup(id, tmp)) {
                         ids.RemoveKey((BYTE)p.TrackNumber);
-                        ret = min(ret, (__int64)syncpos);
+                        ret = min(ret, (int64_t)syncpos);
                     }
                 }
             }

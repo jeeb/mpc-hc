@@ -148,16 +148,16 @@ HRESULT CMpegSplitterFile::Init(IAsyncReader* pAsyncReader)
 
         SearchPrograms(0, min(GetLength(), MEGABYTE * 5)); // max 5Mb for search a valid Program Map Table
 
-        CAtlList<__int64> fps;
+        CAtlList<int64_t> fps;
         for (int i = 0, j = 5; i <= j; i++) {
             fps.AddTail(i * GetLength() / j);
         }
 
-        for (__int64 pfp = 0; fps.GetCount();) {
-            __int64 fp = fps.RemoveHead();
+        for (int64_t pfp = 0; fps.GetCount();) {
+            int64_t fp = fps.RemoveHead();
             fp = min(GetLength() - MEGABYTE / 8, fp);
             fp = max(pfp, fp);
-            __int64 nfp = fp + (pfp == 0 ? 10 * MEGABYTE : MEGABYTE / 8);
+            int64_t nfp = fp + (pfp == 0 ? 10 * MEGABYTE : MEGABYTE / 8);
             if (FAILED(hr = SearchStreams(fp, nfp, pAsyncReader))) {
                 return hr;
             }
@@ -177,16 +177,16 @@ HRESULT CMpegSplitterFile::Init(IAsyncReader* pAsyncReader)
                 }
             }
 
-            CAtlList<__int64> fps;
+            CAtlList<int64_t> fps;
             for (int i = 0, j = 5; i <= j; i++) {
                 fps.AddTail(i * GetLength() / j);
             }
 
-            for (__int64 pfp = 0; fps.GetCount();) {
-                __int64 fp = fps.RemoveHead();
+            for (int64_t pfp = 0; fps.GetCount();) {
+                int64_t fp = fps.RemoveHead();
                 fp = min(GetLength() - MEGABYTE / 8, fp);
                 fp = max(pfp, fp);
-                __int64 nfp = fp + (pfp == 0 ? 10 * MEGABYTE : MEGABYTE / 8);
+                int64_t nfp = fp + (pfp == 0 ? 10 * MEGABYTE : MEGABYTE / 8);
                 if (FAILED(hr = SearchStreams(fp, nfp, pAsyncReader, TRUE))) {
                     return hr;
                 }
@@ -251,7 +251,7 @@ HRESULT CMpegSplitterFile::Init(IAsyncReader* pAsyncReader)
 
 void CMpegSplitterFile::OnComplete(IAsyncReader* pAsyncReader)
 {
-    __int64 pos = GetPos();
+    int64_t pos = GetPos();
 
     if (SUCCEEDED(SearchStreams(GetLength() - 500 * 1024, GetLength(), pAsyncReader, TRUE))) {
         int indicated_rate = m_rate;
@@ -275,7 +275,7 @@ void CMpegSplitterFile::OnComplete(IAsyncReader* pAsyncReader)
 REFERENCE_TIME CMpegSplitterFile::NextPTS(DWORD TrackNum)
 {
     REFERENCE_TIME rt = -1;
-    __int64 rtpos = -1;
+    int64_t rtpos = -1;
 
     BYTE b;
 
@@ -294,7 +294,7 @@ REFERENCE_TIME CMpegSplitterFile::NextPTS(DWORD TrackNum)
                     continue;
                 }
 
-                __int64 pos = GetPos();
+                int64_t pos = GetPos();
 
                 if (h.fpts && AddStream(0, b, h.id_ext, h.len) == TrackNum) {
                     //ASSERT(h.pts >= m_rtMin && h.pts <= m_rtMax);
@@ -347,7 +347,7 @@ REFERENCE_TIME CMpegSplitterFile::NextPTS(DWORD TrackNum)
     return rt;
 }
 
-void CMpegSplitterFile::SearchPrograms(__int64 start, __int64 stop)
+void CMpegSplitterFile::SearchPrograms(int64_t start, int64_t stop)
 {
     if (m_type != mpeg_ts) {
         return;
@@ -367,7 +367,7 @@ void CMpegSplitterFile::SearchPrograms(__int64 start, __int64 stop)
     }
 }
 
-HRESULT CMpegSplitterFile::SearchStreams(__int64 start, __int64 stop, IAsyncReader* pAsyncReader, BOOL CalcDuration)
+HRESULT CMpegSplitterFile::SearchStreams(int64_t start, int64_t stop, IAsyncReader* pAsyncReader, BOOL CalcDuration)
 {
     Seek(start);
     stop = min(stop, GetLength());
@@ -415,7 +415,7 @@ HRESULT CMpegSplitterFile::SearchStreams(__int64 start, __int64 stop, IAsyncRead
                     }
                 }
 
-                __int64 pos = GetPos();
+                int64_t pos = GetPos();
                 AddStream(0, b, h.id_ext, h.len);
                 if (h.len) {
                     Seek(pos + h.len);
@@ -427,7 +427,7 @@ HRESULT CMpegSplitterFile::SearchStreams(__int64 start, __int64 stop, IAsyncRead
                 continue;
             }
 
-            __int64 pos = GetPos();
+            int64_t pos = GetPos();
 
             //UpdatePrograms(h);
 
@@ -497,7 +497,7 @@ HRESULT CMpegSplitterFile::SearchStreams(__int64 start, __int64 stop, IAsyncRead
                 }
             }
 
-            __int64 pos = GetPos();
+            int64_t pos = GetPos();
 
             if (h.streamid == 1) {
                 AddStream(h.streamid, 0xe0, 0, h.length);
@@ -539,7 +539,7 @@ DWORD CMpegSplitterFile::AddStream(WORD pid, BYTE pesid, BYTE ps1id, DWORD len)
     s.pesid = pesid;
     s.ps1id = ps1id;
 
-    const __int64 start = GetPos();
+    const int64_t start = GetPos();
     int type = unknown;
 
     if (pesid >= 0xe0 && pesid < 0xf0) { // mpeg video

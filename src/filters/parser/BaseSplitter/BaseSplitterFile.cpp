@@ -81,19 +81,19 @@ bool CBaseSplitterFile::SetCacheSize(int cachelen)
     return true;
 }
 
-__int64 CBaseSplitterFile::GetPos()
+int64_t CBaseSplitterFile::GetPos()
 {
     return m_pos - (m_bitlen >> 3);
 }
 
-__int64 CBaseSplitterFile::GetAvailable()
+int64_t CBaseSplitterFile::GetAvailable()
 {
     int64_t total, available = 0;
     m_pAsyncReader->Length(&total, &available);
     return available;
 }
 
-__int64 CBaseSplitterFile::GetLength(bool fUpdate)
+int64_t CBaseSplitterFile::GetLength(bool fUpdate)
 {
     if (m_fStreaming) {
         m_len = GetAvailable();
@@ -106,14 +106,14 @@ __int64 CBaseSplitterFile::GetLength(bool fUpdate)
     return m_len;
 }
 
-void CBaseSplitterFile::Seek(__int64 pos)
+void CBaseSplitterFile::Seek(int64_t pos)
 {
-    __int64 len = GetLength();
+    int64_t len = GetLength();
     m_pos = min(max(pos, 0), len);
     BitFlush();
 }
 
-HRESULT CBaseSplitterFile::Read(BYTE* pData, __int64 len)
+HRESULT CBaseSplitterFile::Read(BYTE* pData, int64_t len)
 {
     CheckPointer(m_pAsyncReader, E_NOINTERFACE);
 
@@ -137,7 +137,7 @@ HRESULT CBaseSplitterFile::Read(BYTE* pData, __int64 len)
     BYTE* pCache = m_pCache;
 
     if (m_cachepos <= m_pos && m_pos < m_cachepos + m_cachelen) {
-        __int64 minlen = min(len, m_cachelen - (m_pos - m_cachepos));
+        int64_t minlen = min(len, m_cachelen - (m_pos - m_cachepos));
 
         memcpy(pData, &pCache[m_pos - m_cachepos], (size_t)minlen);
 
@@ -158,9 +158,9 @@ HRESULT CBaseSplitterFile::Read(BYTE* pData, __int64 len)
     }
 
     while (len > 0) {
-        __int64 tmplen = GetLength();
-        __int64 maxlen = min(tmplen - m_pos, m_cachetotal);
-        __int64 minlen = min(len, maxlen);
+        int64_t tmplen = GetLength();
+        int64_t maxlen = min(tmplen - m_pos, m_cachetotal);
+        int64_t minlen = min(len, maxlen);
         if (minlen <= 0) {
             return S_FALSE;
         }
@@ -217,7 +217,7 @@ void CBaseSplitterFile::BitFlush()
     m_bitlen = 0;
 }
 
-HRESULT CBaseSplitterFile::ByteRead(BYTE* pData, __int64 len)
+HRESULT CBaseSplitterFile::ByteRead(BYTE* pData, int64_t len)
 {
     Seek(GetPos());
     return Read(pData, len);
@@ -238,9 +238,9 @@ INT64 CBaseSplitterFile::SExpGolombRead()
     return ((k & 1) ? 1 : -1) * ((k + 1) >> 1);
 }
 
-HRESULT CBaseSplitterFile::HasMoreData(__int64 len, DWORD ms)
+HRESULT CBaseSplitterFile::HasMoreData(int64_t len, DWORD ms)
 {
-    __int64 available = GetLength() - GetPos();
+    int64_t available = GetLength() - GetPos();
 
     if (!m_fStreaming) {
         return available < 1 ? E_FAIL : S_OK;

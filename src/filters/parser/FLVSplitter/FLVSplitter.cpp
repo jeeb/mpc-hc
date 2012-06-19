@@ -190,12 +190,12 @@ bool CFLVSplitterFilter::ReadTag(VideoTweak& vt)
 }
 #endif
 
-bool CFLVSplitterFilter::Sync(__int64& pos)
+bool CFLVSplitterFilter::Sync(int64_t& pos)
 {
     m_pFile->Seek(pos);
 
     while (m_pFile->GetRemaining() >= 15) {
-        __int64 limit = m_pFile->GetRemaining();
+        int64_t limit = m_pFile->GetRemaining();
         while (true) {
             BYTE b = (BYTE)m_pFile->BitRead(8);
             if (b == FLV_AUDIODATA || b == FLV_VIDEODATA) {
@@ -211,7 +211,7 @@ bool CFLVSplitterFilter::Sync(__int64& pos)
 
         Tag ct;
         if (ReadTag(ct)) {
-            __int64 next = m_pFile->GetPos() + ct.DataSize;
+            int64_t next = m_pFile->GetPos() + ct.DataSize;
             if (next == m_pFile->GetLength() - 4) {
                 m_pFile->Seek(pos);
                 return true;
@@ -363,7 +363,7 @@ HRESULT CFLVSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
                             0, 1, 2, 3, 4, 5, 6, 8
                         };
 
-                        __int64 configOffset = m_pFile->GetPos();
+                        int64_t configOffset = m_pFile->GetPos();
                         UINT32 configSize = dataSize - 1;
                         if (configSize < 2) {
                             break;
@@ -525,7 +525,7 @@ HRESULT CFLVSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
                         }
                         m_pFile->BitRead(24); // composition time
 
-                        __int64 headerOffset = m_pFile->GetPos();
+                        int64_t headerOffset = m_pFile->GetPos();
                         UINT32 headerSize = dataSize - 4;
                         BYTE* headerData = DNew BYTE[headerSize];
 
@@ -702,7 +702,7 @@ HRESULT CFLVSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
     }
 
     if (m_pFile->IsRandomAccess()) {
-        __int64 pos = max(m_DataOffset, m_pFile->GetLength() - 256 * 1024);
+        int64_t pos = max(m_DataOffset, m_pFile->GetLength() - 256 * 1024);
 
         if (Sync(pos)) {
             Tag t;
@@ -748,7 +748,7 @@ void CFLVSplitterFilter::NormalSeek(REFERENCE_TIME rt)
     bool fAudio = !!GetOutputPin(FLV_AUDIODATA);
     bool fVideo = !!GetOutputPin(FLV_VIDEODATA);
 
-    __int64 pos = m_DataOffset + (__int64)(double(m_pFile->GetLength() - m_DataOffset) * rt / m_rtDuration);
+    int64_t pos = m_DataOffset + (int64_t)(double(m_pFile->GetLength() - m_DataOffset) * rt / m_rtDuration);
 
     if (!Sync(pos)) {
         ASSERT(0);
@@ -794,7 +794,7 @@ void CFLVSplitterFilter::AlternateSeek(REFERENCE_TIME rt)
     bool hasAudio = !!GetOutputPin(FLV_AUDIODATA);
     bool hasVideo = !!GetOutputPin(FLV_VIDEODATA);
 
-    __int64 estimPos = m_DataOffset + (__int64)(double(m_pFile->GetLength() - m_DataOffset) * rt / m_rtDuration);
+    int64_t estimPos = m_DataOffset + (int64_t)(double(m_pFile->GetLength() - m_DataOffset) * rt / m_rtDuration);
 
     while (true) {
         estimPos -= 256 * 1024;
@@ -802,7 +802,7 @@ void CFLVSplitterFilter::AlternateSeek(REFERENCE_TIME rt)
 
         bool foundAudio = !hasAudio;
         bool foundVideo = !hasVideo;
-        __int64 bestPos = estimPos;
+        int64_t bestPos = estimPos;
 
         if (Sync(bestPos)) {
             Tag t;
@@ -810,8 +810,8 @@ void CFLVSplitterFilter::AlternateSeek(REFERENCE_TIME rt)
             VideoTag vt;
 
             while (ReadTag(t) && t.TimeStamp * 10000i64 < rt) {
-                __int64 cur = m_pFile->GetPos() - 15;
-                __int64 next = cur + 15 + t.DataSize;
+                int64_t cur = m_pFile->GetPos() - 15;
+                int64_t next = cur + 15 + t.DataSize;
 
                 if (hasAudio && t.TagType == FLV_AUDIODATA && ReadTag(at)) {
                     foundAudio = true;
@@ -853,7 +853,7 @@ bool CFLVSplitterFilter::DemuxLoop()
             break;
         }
 
-        __int64 next = m_pFile->GetPos() + t.DataSize;
+        int64_t next = m_pFile->GetPos() + t.DataSize;
 
         if ((t.DataSize > 0) && (t.TagType == FLV_AUDIODATA && ReadTag(at) || t.TagType == FLV_VIDEODATA && ReadTag(vt))) {
             UINT32 tsOffset = 0;
@@ -879,7 +879,7 @@ bool CFLVSplitterFilter::DemuxLoop()
                     goto NextTag;
                 }
             }
-            __int64 dataSize = next - m_pFile->GetPos();
+            int64_t dataSize = next - m_pFile->GetPos();
             if (dataSize <= 0) {
                 goto NextTag;
             }

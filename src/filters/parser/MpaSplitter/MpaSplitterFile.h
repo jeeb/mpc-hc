@@ -34,10 +34,10 @@ class CMpaSplitterFile : public CBaseSplitterFileEx
 
     mpahdr m_mpahdr;
     aachdr m_aachdr;
-    __int64 m_startpos, m_endpos;
+    int64_t m_startpos, m_endpos;
 
-    __int64 m_totalbps;
-    CRBMap<__int64, int> m_pos2bps;
+    int64_t m_totalbps;
+    CRBMap<int64_t, int> m_pos2bps;
 
     HRESULT Init();
     void AdjustDuration(int nBytesPerSec);
@@ -52,8 +52,8 @@ public:
     const CMediaType& GetMediaType() { return m_mt; }
     REFERENCE_TIME GetDuration() { return IsRandomAccess() ? m_rtDuration : 0; }
 
-    __int64 GetStartPos() { return m_startpos; }
-    __int64 GetEndPos() { return m_endpos; }
+    int64_t GetStartPos() { return m_startpos; }
+    int64_t GetEndPos() { return m_endpos; }
 
     bool Sync(int limit = 0x2000);
     bool Sync(int& FrameSize, REFERENCE_TIME& rtDuration, int limit = 0x2000);

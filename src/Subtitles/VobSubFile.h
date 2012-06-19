@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <atlcoll.h>
 #include "VobSubImage.h"
 #include "../SubPic/SubPicProviderImpl.h"
@@ -80,8 +85,8 @@ protected:
 
     BYTE* GetPacket(int idx, int& packetsize, int& datasize, int iLang = -1);
     bool GetFrame(int idx, int iLang = -1);
-    bool GetFrameByTimeStamp(__int64 time);
-    int GetFrameIdxByTimeStamp(__int64 time);
+    bool GetFrameByTimeStamp(int64_t time);
+    int GetFrameIdxByTimeStamp(int64_t time);
 
     bool SaveVobSub(CString fn);
     bool SaveWinSubMux(CString fn);
@@ -90,11 +95,11 @@ protected:
 
 public:
     typedef struct {
-        __int64 filepos;
-        __int64 start, stop;
+        int64_t filepos;
+        int64_t start, stop;
         bool fForced;
         char vobid, cellid;
-        __int64 celltimestamp;
+        int64_t celltimestamp;
         bool fValid;
     } SubPos;
 

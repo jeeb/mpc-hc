@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <atlcoll.h>
 
 #define DEFAULT_CACHE_LENGTH 64*1024    // Beliyaal: Changed the default cache length to allow Bluray playback over network
@@ -31,12 +36,12 @@ class CBaseSplitterFile
 {
     CComPtr<IAsyncReader> m_pAsyncReader;
     CAutoVectorPtr<BYTE> m_pCache;
-    __int64 m_cachepos, m_cachelen, m_cachetotal;
+    int64_t m_cachepos, m_cachelen, m_cachetotal;
 
     bool m_fStreaming, m_fRandomAccess;
-    __int64 m_pos, m_len;
+    int64_t m_pos, m_len;
 
-    virtual HRESULT Read(BYTE* pData, __int64 len); // use ByteRead
+    virtual HRESULT Read(BYTE* pData, int64_t len); // use ByteRead
 
 protected:
     UINT64 m_bitbuff;
@@ -50,21 +55,21 @@ public:
 
     bool SetCacheSize(int cachelen = DEFAULT_CACHE_LENGTH);
 
-    __int64 GetPos();
-    __int64 GetAvailable();
-    __int64 GetLength(bool fUpdate = false);
-    __int64 GetRemaining() {return max(0, GetLength() - GetPos());}
-    virtual void Seek(__int64 pos);
+    int64_t GetPos();
+    int64_t GetAvailable();
+    int64_t GetLength(bool fUpdate = false);
+    int64_t GetRemaining() {return max(0, GetLength() - GetPos());}
+    virtual void Seek(int64_t pos);
 
     UINT64 UExpGolombRead();
     INT64 SExpGolombRead();
 
     UINT64 BitRead(int nBits, bool fPeek = false);
     void BitByteAlign(), BitFlush();
-    HRESULT ByteRead(BYTE* pData, __int64 len);
+    HRESULT ByteRead(BYTE* pData, int64_t len);
 
     bool IsStreaming() const {return m_fStreaming;}
     bool IsRandomAccess() const {return m_fRandomAccess;}
 
-    HRESULT HasMoreData(__int64 len = 1, DWORD ms = 1);
+    HRESULT HasMoreData(int64_t len = 1, DWORD ms = 1);
 };

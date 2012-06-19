@@ -78,7 +78,7 @@ typedef struct VSFRipperData_t {
 } VSFRipperData;
 
 typedef struct {
-    __int64 start, end;
+    int64_t start, end;
     DWORD vc;
 } vcchunk;
 

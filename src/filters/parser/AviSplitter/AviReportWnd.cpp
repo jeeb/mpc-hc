@@ -129,7 +129,7 @@ void CAviReportWnd::OnMouseMove(UINT nFlags, CPoint p)
         int y = r.bottom - p.y;
 
         REFERENCE_TIME rt = m_rtDur * x / r.Width();
-        int chunk = (int)(__int64(m_nChunks) * y / r.Height());
+        int chunk = (int)(int64_t(m_nChunks) * y / r.Height());
 
         rt /= 10000;
         int ms = (int)(rt % 1000);

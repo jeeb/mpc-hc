@@ -53,7 +53,7 @@ protected:
     void DemuxSeek(REFERENCE_TIME rt);
     bool DemuxLoop();
 
-    HRESULT ReIndex(__int64 end, UINT64* pSize);
+    HRESULT ReIndex(int64_t end, UINT64* pSize);
 
     REFERENCE_TIME m_maxTimeStamp;
 public:

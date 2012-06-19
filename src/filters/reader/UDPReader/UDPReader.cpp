@@ -170,7 +170,7 @@ void CUDPStream::Append(BYTE* buff, int len)
     CAutoLock cAutoLock(&m_csLock);
 
     if (m_packets.GetCount() > 1) {
-        __int64 size = m_packets.GetTail()->m_end - m_packets.GetHead()->m_start;
+        int64_t size = m_packets.GetTail()->m_end - m_packets.GetHead()->m_start;
 
         if (!m_drop && (m_pos >= BUFF_SIZE_FIRST && size >= BUFF_SIZE_FIRST || size >= 2 * BUFF_SIZE_FIRST)) {
             m_drop = true;
@@ -456,7 +456,7 @@ DWORD CUDPStream::ThreadProc()
     return (DWORD) - 1;
 }
 
-CUDPStream::packet_t::packet_t(BYTE* p, __int64 start, __int64 end)
+CUDPStream::packet_t::packet_t(BYTE* p, int64_t start, int64_t end)
     : m_start(start)
     , m_end(end)
 {

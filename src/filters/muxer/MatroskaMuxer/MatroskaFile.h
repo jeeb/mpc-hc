@@ -28,13 +28,11 @@
 
 namespace MatroskaWriter
 {
-    typedef unsigned __int64 QWORD;
-
     class CID
     {
     protected:
         DWORD m_id;
-        QWORD HeaderSize(QWORD len);
+        uint64_t HeaderSize(uint64_t len);
         HRESULT HeaderWrite(IStream* pStream);
 
     public:
@@ -42,7 +40,7 @@ namespace MatroskaWriter
         DWORD GetID() const {
             return m_id;
         }
-        virtual QWORD Size(bool fWithHeader = true);
+        virtual uint64_t Size(bool fWithHeader = true);
         virtual HRESULT Write(IStream* pStream);
     };
 
@@ -54,7 +52,7 @@ namespace MatroskaWriter
         operator UINT64() {
             return m_len;
         }
-        QWORD Size(bool fWithHeader = false);
+        uint64_t Size(bool fWithHeader = false);
         HRESULT Write(IStream* pStream);
     };
 
@@ -75,7 +73,7 @@ namespace MatroskaWriter
             return *this;
         }
         //      CBinary& Set(CStringA str) {SetCount(str.GetLength()); memcpy((char*)GetData(), str, str.GetLength()); return *this;}
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -87,7 +85,7 @@ namespace MatroskaWriter
             CStringA::operator = (str);
             return *this;
         }
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -99,7 +97,7 @@ namespace MatroskaWriter
             CStringW::operator = (str);
             return *this;
         }
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -124,7 +122,7 @@ namespace MatroskaWriter
         void UnSet() {
             m_fSet = false;
         }
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -132,7 +130,7 @@ namespace MatroskaWriter
     {
     public:
         explicit CUInt(DWORD id, UINT64 val = 0) : CSimpleVar<UINT64, CUInt>(id, val) {}
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -140,7 +138,7 @@ namespace MatroskaWriter
     {
     public:
         explicit CInt(DWORD id, INT64 val = 0) : CSimpleVar<INT64, CInt>(id, val) {}
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -166,8 +164,8 @@ namespace MatroskaWriter
     class CNode : public CAutoPtrList<T>
     {
     public:
-        QWORD Size(bool fWithHeader = true) {
-            QWORD len = 0;
+        uint64_t Size(bool fWithHeader = true) {
+            uint64_t len = 0;
             POSITION pos = GetHeadPosition();
             while (pos) {
                 len += GetNext(pos)->Size(fWithHeader);
@@ -193,7 +191,7 @@ namespace MatroskaWriter
         CUInt DocTypeVersion, DocTypeReadVersion;
 
         EBML(DWORD id = 0x1A45DFA3);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -208,7 +206,7 @@ namespace MatroskaWriter
         CUTF8 Title, MuxingApp, WritingApp;
 
         Info(DWORD id = 0x1549A966);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -223,7 +221,7 @@ namespace MatroskaWriter
         CFloat FramePerSec;
 
         Video(DWORD id = 0xE0);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -237,7 +235,7 @@ namespace MatroskaWriter
         CUInt BitDepth;
 
         Audio(DWORD id = 0xE1);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -265,7 +263,7 @@ namespace MatroskaWriter
         Audio a;
 
         TrackEntry(DWORD id = 0xAE);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -275,7 +273,7 @@ namespace MatroskaWriter
         CNode<TrackEntry> TrackEntries;
 
         Track(DWORD id = 0x1654AE6B);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -287,7 +285,7 @@ namespace MatroskaWriter
         CNode<CBinary> BlockData;
 
         CBlock(DWORD id = 0xA1);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -303,7 +301,7 @@ namespace MatroskaWriter
         //              CNode<TimeSlice> TimeSlices;
 
         BlockGroup(DWORD id = 0xA0);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -314,7 +312,7 @@ namespace MatroskaWriter
         CNode<BlockGroup> BlockGroups;
 
         Cluster(DWORD id = 0x1F43B675);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -324,7 +322,7 @@ namespace MatroskaWriter
                             CUInt CueRefTime, CueRefCluster, CueRefNumber, CueRefCodecState;
 
                             CueReference(DWORD id = 0xDB);
-                            QWORD Size(bool fWithHeader = true);
+                            uint64_t Size(bool fWithHeader = true);
                             HRESULT Write(IStream* pStream);
                         };
     */
@@ -335,7 +333,7 @@ namespace MatroskaWriter
         //                  CNode<CueReference> CueReferences;
 
         CueTrackPosition(DWORD id = 0xB7);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -346,7 +344,7 @@ namespace MatroskaWriter
         CNode<CueTrackPosition> CueTrackPositions;
 
         CuePoint(DWORD id = 0xBB);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -356,7 +354,7 @@ namespace MatroskaWriter
         CNode<CuePoint> CuePoints;
 
         Cue(DWORD id = 0x1C53BB6B);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -368,7 +366,7 @@ namespace MatroskaWriter
         void Set(DWORD id) {
             m_id = id;
         }
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -379,7 +377,7 @@ namespace MatroskaWriter
         CUInt Position;
 
         SeekHead(DWORD id = 0x4DBB);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -389,7 +387,7 @@ namespace MatroskaWriter
         CNode<SeekHead> SeekHeads;
 
         Seek(DWORD id = 0x114D9B74);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -397,7 +395,7 @@ namespace MatroskaWriter
     {
     public:
         Segment(DWORD id = 0x18538067);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
@@ -407,16 +405,16 @@ namespace MatroskaWriter
         // TODO
 
         Tags(DWORD id = 0x1254C367);
-        QWORD Size(bool fWithHeader = true);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 
     class Void : public CID
     {
-        QWORD m_len;
+        uint64_t m_len;
     public:
-        Void(QWORD len, DWORD id = 0xEC);
-        QWORD Size(bool fWithHeader = true);
+        Void(uint64_t len, DWORD id = 0xEC);
+        uint64_t Size(bool fWithHeader = true);
         HRESULT Write(IStream* pStream);
     };
 }

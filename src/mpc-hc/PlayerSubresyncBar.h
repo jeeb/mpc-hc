@@ -45,7 +45,7 @@ private:
     CComPtr<ISubStream> m_pSubStream;
 
     int m_lastSegment;
-    __int64 m_rt;
+    int64_t m_rt;
 
     enum {
         // TEXTSUB
@@ -89,14 +89,14 @@ public:
 
     BOOL Create(CWnd* pParentWnd, UINT defDockBarID, CCritSec* pSubLock);
 
-    void SetTime(__int64 rt);
+    void SetTime(int64_t rt);
 
     void SetSubtitle(ISubStream* pSubStream, double fps);
     void ResetSubtitle();
     void SaveSubtitle();
 
-    int FindNearestSub(__int64& rtPos, bool bForward);
-    bool ShiftSubtitle(int nItem, long lValue, __int64& rtPos);
+    int FindNearestSub(int64_t& rtPos, bool bForward);
+    bool ShiftSubtitle(int nItem, long lValue, int64_t& rtPos);
     bool SaveToDisk();
 
 

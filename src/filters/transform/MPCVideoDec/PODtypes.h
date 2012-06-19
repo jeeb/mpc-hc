@@ -10,13 +10,13 @@ template<> struct isPOD<signed char> {enum {is = true};};
 template<> struct isPOD<short int> {enum {is = true};};
 template<> struct isPOD<int> {enum {is = true};};
 template<> struct isPOD<long int> {enum {is = true};};
-template<> struct isPOD<__int64> {enum {is = true};};
+template<> struct isPOD<int64_t> {enum {is = true};};
 
 template<> struct isPOD<unsigned char> {enum {is = true};};
 template<> struct isPOD<unsigned short int> {enum {is = true};};
 template<> struct isPOD<unsigned int> {enum {is = true};};
 template<> struct isPOD<unsigned long int> {enum {is = true};};
-template<> struct isPOD<unsigned __int64> {enum {is = true};};
+template<> struct isPOD<uint64_t> {enum {is = true};};
 
 template<> struct isPOD<float> {enum {is = true};};
 template<> struct isPOD<double> {enum {is = true};};

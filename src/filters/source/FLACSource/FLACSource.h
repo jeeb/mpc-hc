@@ -52,7 +52,7 @@ class CFLACStream : public CBaseStream
     int m_nSamplesPerSec;
     int m_nChannels;
     WORD m_wBitsPerSample;
-    __int64 m_i64TotalNumSamples;
+    int64_t m_i64TotalNumSamples;
     int m_nAvgBytesPerSec;
 
     uint64_t m_llOffset;             // Position of first frame in file

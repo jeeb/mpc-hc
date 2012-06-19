@@ -575,7 +575,7 @@ bool CRealMediaSplitterFilter::DemuxInit()
                     break;
                 }
 
-                m_rtDuration = max((__int64)(10000i64 * mph.tStart), m_rtDuration);
+                m_rtDuration = max((int64_t)(10000i64 * mph.tStart), m_rtDuration);
 
                 if (mph.stream == stream && (mph.flags & MediaPacketHeader::PN_KEYFRAME_FLAG) && tLastStart != mph.tStart) {
                     CAutoPtr<IndexRecord> pir(DNew IndexRecord);
@@ -1125,7 +1125,7 @@ HRESULT CRMFile::Init()
 
     ChunkHdr hdr;
     while (GetRemaining() && S_OK == (hr = Read(hdr))) {
-        __int64 pos = GetPos() - sizeof(hdr);
+        int64_t pos = GetPos() - sizeof(hdr);
 
         if (fFirstChunk && hdr.object_id != '.RMF') {
             return E_FAIL;

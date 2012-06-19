@@ -209,7 +209,7 @@ void CVMROSD::DrawRect(CRect* rect, CBrush* pBrush, CPen* pPen)
     m_MemDC.Rectangle(rect);
 }
 
-void CVMROSD::DrawSlider(CRect* rect, __int64 llMin, __int64 llMax, __int64 llPos)
+void CVMROSD::DrawSlider(CRect* rect, int64_t llMin, int64_t llMax, int64_t llPos)
 {
     m_rectBar.left      = rect->left  + 10;
     m_rectBar.right     = rect->right - 10;
@@ -380,23 +380,23 @@ bool CVMROSD::OnLButtonUp(UINT nFlags, CPoint point)
     return bRet;
 }
 
-__int64 CVMROSD::GetPos() const
+int64_t CVMROSD::GetPos() const
 {
     return m_llSeekPos;
 }
 
-void CVMROSD::SetPos(__int64 pos)
+void CVMROSD::SetPos(int64_t pos)
 {
     m_llSeekPos = pos;
 }
 
-void CVMROSD::SetRange(__int64 start,  __int64 stop)
+void CVMROSD::SetRange(int64_t start,  int64_t stop)
 {
     m_llSeekMin = start;
     m_llSeekMax = stop;
 }
 
-void CVMROSD::GetRange(__int64& start, __int64& stop)
+void CVMROSD::GetRange(int64_t& start, int64_t& stop)
 {
     start   = m_llSeekMin;
     stop    = m_llSeekMax;

@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "../../../DSUtil/SharedInclude.h"
 #include "../../../../include/stdafx_common.h"
 #include "../../../../include/stdafx_common_afx.h"

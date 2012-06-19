@@ -36,7 +36,7 @@ class __declspec(uuid("61F47056-E400-43d3-AF1E-AB7DFFD4C4AD"))
 {
     struct trackpos {
         DWORD /*AP4_Ordinal*/ index;
-        unsigned __int64 /*AP4_TimeStamp*/ ts;
+        uint64_t /*AP4_TimeStamp*/ ts;
     };
     CAtlMap<DWORD, trackpos> m_trackpos;
     CSize m_framesize;
@@ -74,7 +74,7 @@ public:
 class __declspec(uuid("D3D9D58B-45B5-48AB-B199-B8C40560AEC7"))
     CMPEG4VideoSplitterFilter : public CBaseSplitterFilter
 {
-    __int64 m_seqhdrsize;
+    int64_t m_seqhdrsize;
     int NextStartCode();
     void SkipUserData();
 

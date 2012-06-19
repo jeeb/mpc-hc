@@ -29,12 +29,12 @@ class CCDecoder
 {
     CSimpleTextSubtitle m_sts;
     CString m_fn, m_rawfn;
-    __int64 m_time;
+    int64_t m_time;
     bool m_fEndOfCaption;
     WCHAR m_buff[16][33], m_disp[16][33];
     CPoint m_cursor;
 
-    void SaveDisp(__int64 time);
+    void SaveDisp(int64_t time);
     void MoveCursor(int x, int y);
     void OffsetCursor(int x, int y);
     void PutChar(WCHAR c);
@@ -42,7 +42,7 @@ class CCDecoder
 public:
     CCDecoder(CString fn = _T(""), CString rawfn = _T(""));
     virtual ~CCDecoder();
-    void DecodeCC(BYTE* buff, int len, __int64 time);
-    void ExtractCC(BYTE* buff, int len, __int64 time);
+    void DecodeCC(BYTE* buff, int len, int64_t time);
+    void ExtractCC(BYTE* buff, int len, int64_t time);
     CSimpleTextSubtitle& GetSTS() { return m_sts; }
 };
