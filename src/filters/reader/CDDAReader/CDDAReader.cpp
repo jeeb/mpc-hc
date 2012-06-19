@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #ifdef STANDALONE_FILTER
 #include <InitGuid.h>
 #endif
@@ -405,7 +411,7 @@ bool CCDDAStream::Load(const WCHAR* fnw)
     return true;
 }
 
-HRESULT CCDDAStream::SetPointer(LONGLONG llPos)
+HRESULT CCDDAStream::SetPointer(int64_t llPos)
 {
     if (llPos < 0 || llPos > m_llLength) {
         return S_FALSE;
@@ -421,7 +427,7 @@ HRESULT CCDDAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
     BYTE buff[RAW_SECTOR_SIZE];
 
     PBYTE pbBufferOrg = pbBuffer;
-    LONGLONG pos = m_llPosition;
+    int64_t pos = m_llPosition;
     size_t len = (size_t)dwBytesToRead;
 
     if (pos < sizeof(m_header) && len > 0) {
@@ -467,9 +473,9 @@ HRESULT CCDDAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
     return S_OK;
 }
 
-LONGLONG CCDDAStream::Size(LONGLONG* pSizeAvailable)
+int64_t CCDDAStream::Size(int64_t* pSizeAvailable)
 {
-    LONGLONG size = sizeof(m_header) + m_llLength;
+    int64_t size = sizeof(m_header) + m_llLength;
     if (pSizeAvailable) {
         *pSizeAvailable = size;
     }

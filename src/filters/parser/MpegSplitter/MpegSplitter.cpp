@@ -1216,7 +1216,7 @@ STDMETHODIMP CMpegSplitterFilter::Enable(long lIndex, DWORD dwFlags)
     return S_FALSE;
 }
 
-LONGLONG GetMediaTypeQuality(const CMediaType* _pMediaType, int _PresentationFormat)
+int64_t GetMediaTypeQuality(const CMediaType* _pMediaType, int _PresentationFormat)
 {
     if (_pMediaType->formattype == FORMAT_WaveFormatEx) {
         __int64 Ret = 0;
@@ -1304,8 +1304,8 @@ bool CMpegSplitterFile::stream::operator < (const stream& _Other) const
             return false;
         }
 
-        LONGLONG Quality0 = GetMediaTypeQuality(&mt, StreamType0);
-        LONGLONG Quality1 = GetMediaTypeQuality(&_Other.mt, StreamType1);
+        int64_t Quality0 = GetMediaTypeQuality(&mt, StreamType0);
+        int64_t Quality1 = GetMediaTypeQuality(&_Other.mt, StreamType1);
         if (Quality0 > Quality1) {
             return true;
         }

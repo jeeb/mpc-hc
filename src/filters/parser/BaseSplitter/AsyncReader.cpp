@@ -34,7 +34,7 @@
 
 CAsyncFileReader::CAsyncFileReader(CString fn, HRESULT& hr)
     : CUnknown(NAME("CAsyncFileReader"), NULL, &hr)
-    , m_len((ULONGLONG) - 1)
+    , m_len((uint64_t) - 1)
     , m_hBreakEvent(NULL)
     , m_lOsError(0)
 {
@@ -46,7 +46,7 @@ CAsyncFileReader::CAsyncFileReader(CString fn, HRESULT& hr)
 
 CAsyncFileReader::CAsyncFileReader(CAtlList<CHdmvClipInfo::PlaylistItem>& Items, HRESULT& hr)
     : CUnknown(NAME("CAsyncFileReader"), NULL, &hr)
-    , m_len((ULONGLONG) - 1)
+    , m_len((uint64_t) - 1)
     , m_hBreakEvent(NULL)
     , m_lOsError(0)
 {
@@ -69,14 +69,14 @@ STDMETHODIMP CAsyncFileReader::NonDelegatingQueryInterface(REFIID riid, void** p
 
 // IAsyncReader
 
-STDMETHODIMP CAsyncFileReader::SyncRead(LONGLONG llPosition, LONG lLength, BYTE* pBuffer)
+STDMETHODIMP CAsyncFileReader::SyncRead(int64_t llPosition, LONG lLength, BYTE* pBuffer)
 {
     do {
         try {
-            if ((ULONGLONG)llPosition + lLength > GetLength()) {
+            if ((uint64_t)llPosition + lLength > GetLength()) {
                 return E_FAIL;    // strange, but the Seek below can return llPosition even if the file is not that big (?)
             }
-            if ((ULONGLONG)llPosition != Seek(llPosition, begin)) {
+            if ((uint64_t)llPosition != Seek(llPosition, begin)) {
                 return E_FAIL;
             }
             if ((UINT)lLength < Read(pBuffer, lLength)) {
@@ -115,9 +115,9 @@ STDMETHODIMP CAsyncFileReader::SyncRead(LONGLONG llPosition, LONG lLength, BYTE*
     return E_FAIL;
 }
 
-STDMETHODIMP CAsyncFileReader::Length(LONGLONG* pTotal, LONGLONG* pAvailable)
+STDMETHODIMP CAsyncFileReader::Length(int64_t* pTotal, int64_t* pAvailable)
 {
-    LONGLONG len = m_len >= 0 ? m_len : GetLength();
+    int64_t len = m_len >= 0 ? m_len : GetLength();
     if (pTotal) {
         *pTotal = len;
     }
@@ -157,7 +157,7 @@ CAsyncUrlReader::CAsyncUrlReader(CString url, HRESULT& hr)
     }
 
     hr = Open(m_fn, modeRead | shareDenyRead | typeBinary | osSequentialScan) ? S_OK : E_FAIL;
-    m_len = (ULONGLONG) - 1; // force GetLength() return actual length always
+    m_len = (uint64_t) - 1; // force GetLength() return actual length always
 }
 
 CAsyncUrlReader::~CAsyncUrlReader()
@@ -174,7 +174,7 @@ CAsyncUrlReader::~CAsyncUrlReader()
 
 // IAsyncReader
 
-STDMETHODIMP CAsyncUrlReader::Length(LONGLONG* pTotal, LONGLONG* pAvailable)
+STDMETHODIMP CAsyncUrlReader::Length(int64_t* pTotal, int64_t* pAvailable)
 {
     if (pTotal) {
         *pTotal = 0;

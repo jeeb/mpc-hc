@@ -144,16 +144,16 @@ public:
     STDMETHODIMP GetTimeFormat(GUID* pFormat);
     STDMETHODIMP IsUsingTimeFormat(const GUID* pFormat);
     STDMETHODIMP SetTimeFormat(const GUID* pFormat);
-    STDMETHODIMP GetDuration(LONGLONG* pDuration);
-    STDMETHODIMP GetStopPosition(LONGLONG* pStop);
-    STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent);
-    STDMETHODIMP ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat);
-    STDMETHODIMP SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
-    STDMETHODIMP GetPositions(LONGLONG* pCurrent, LONGLONG* pStop);
-    STDMETHODIMP GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest);
+    STDMETHODIMP GetDuration(int64_t* pDuration);
+    STDMETHODIMP GetStopPosition(int64_t* pStop);
+    STDMETHODIMP GetCurrentPosition(int64_t* pCurrent);
+    STDMETHODIMP ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat);
+    STDMETHODIMP SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
+    STDMETHODIMP GetPositions(int64_t* pCurrent, int64_t* pStop);
+    STDMETHODIMP GetAvailable(int64_t* pEarliest, int64_t* pLatest);
     STDMETHODIMP SetRate(double dRate);
     STDMETHODIMP GetRate(double* pdRate);
-    STDMETHODIMP GetPreroll(LONGLONG* pllPreroll);
+    STDMETHODIMP GetPreroll(int64_t* pllPreroll);
 
     // IMatroskaMuxer
 

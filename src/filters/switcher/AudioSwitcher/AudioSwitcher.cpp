@@ -23,6 +23,11 @@
 
 #include "stdafx.h"
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <shlwapi.h>
 #include <math.h>
 #include <atlpath.h>

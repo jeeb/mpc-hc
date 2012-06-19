@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <MMReg.h>
 #include "MatroskaMuxer.h"
 #include "../../../DSUtil/DSUtil.h"
@@ -264,7 +270,7 @@ STDMETHODIMP CMatroskaMuxerFilter::SetTimeFormat(const GUID* pFormat)
     return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CMatroskaMuxerFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     *pDuration = 0;
@@ -278,34 +284,34 @@ STDMETHODIMP CMatroskaMuxerFilter::GetDuration(LONGLONG* pDuration)
     return S_OK;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CMatroskaMuxerFilter::GetStopPosition(int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CMatroskaMuxerFilter::GetCurrentPosition(int64_t* pCurrent)
 {
     CheckPointer(pCurrent, E_POINTER);
     *pCurrent = m_rtCurrent;
     return S_OK;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CMatroskaMuxerFilter::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CMatroskaMuxerFilter::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CMatroskaMuxerFilter::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CMatroskaMuxerFilter::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     return E_NOTIMPL;
 }
@@ -320,7 +326,7 @@ STDMETHODIMP CMatroskaMuxerFilter::GetRate(double* pdRate)
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CMatroskaMuxerFilter::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CMatroskaMuxerFilter::GetPreroll(int64_t* pllPreroll)
 {
     return E_NOTIMPL;
 }
@@ -336,14 +342,14 @@ STDMETHODIMP CMatroskaMuxerFilter::CorrectTimeOffset(bool fNegative, bool fPosit
 
 //
 
-ULONGLONG GetStreamPosition(IStream* pStream)
+uint64_t GetStreamPosition(IStream* pStream)
 {
     ULARGE_INTEGER pos = {0, 0};
     pStream->Seek(*(LARGE_INTEGER*)&pos, STREAM_SEEK_CUR, &pos);
     return pos.QuadPart;
 }
 
-ULONGLONG SetStreamPosition(IStream* pStream, ULONGLONG seekpos)
+uint64_t SetStreamPosition(IStream* pStream, uint64_t seekpos)
 {
     LARGE_INTEGER pos;
     pos.QuadPart = seekpos;
@@ -385,7 +391,7 @@ DWORD CMatroskaMuxerFilter::ThreadProc()
     hdr.Write(pStream);
 
     Segment().Write(pStream);
-    ULONGLONG segpos = GetStreamPosition(pStream);
+    uint64_t segpos = GetStreamPosition(pStream);
 
     // TODO
     MatroskaWriter::QWORD voidlen = 100;
@@ -394,7 +400,7 @@ DWORD CMatroskaMuxerFilter::ThreadProc()
     } else {
         voidlen += int(1.0 * 1000 * 60 * 60 * 24 / MAXCLUSTERTIME + 0.5) * 20; // when no duration is known, allocate for 24 hours (~340k)
     }
-    ULONGLONG voidpos = GetStreamPosition(pStream);
+    uint64_t voidpos = GetStreamPosition(pStream);
     {
         Void v(voidlen);
         voidlen = v.Size();
@@ -413,7 +419,7 @@ DWORD CMatroskaMuxerFilter::ThreadProc()
     sh->Position.Set(GetStreamPosition(pStream) - segpos);
     seek.SeekHeads.AddTail(sh);
 
-    ULONGLONG infopos = GetStreamPosition(pStream);
+    uint64_t infopos = GetStreamPosition(pStream);
     Info info;
     info.MuxingApp.Set(L"DirectShow Matroska Muxer");
     info.TimeCodeScale.Set(1000000);
@@ -484,7 +490,7 @@ DWORD CMatroskaMuxerFilter::ThreadProc()
                 Reply(S_OK);
 
                 Cue cue;
-                ULONGLONG lastcueclusterpos = (ULONGLONG) - 1;
+                uint64_t lastcueclusterpos = (uint64_t) - 1;
                 INT64 lastcuetimecode = (INT64) - 1;
                 UINT64 nBlocksInCueTrack = 0;
 
@@ -613,7 +619,7 @@ DWORD CMatroskaMuxerFilter::ThreadProc()
                         }
 
                         if (b->ReferenceBlock == 0 && b->Block.TrackNumber == TrackNumber) {
-                            ULONGLONG clusterpos = GetStreamPosition(pStream) - segpos;
+                            uint64_t clusterpos = GetStreamPosition(pStream) - segpos;
                             if (lastcueclusterpos != clusterpos || lastcuetimecode + 1000 < b->Block.TimeCode) {
                                 CAutoPtr<CueTrackPosition> ctp(DNew CueTrackPosition());
                                 ctp->CueTrack.Set(b->Block.TrackNumber);

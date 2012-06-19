@@ -224,16 +224,16 @@ protected:
     STDMETHODIMP GetTimeFormat(GUID* pFormat);
     STDMETHODIMP IsUsingTimeFormat(const GUID* pFormat);
     STDMETHODIMP SetTimeFormat(const GUID* pFormat);
-    STDMETHODIMP GetDuration(LONGLONG* pDuration);
-    STDMETHODIMP GetStopPosition(LONGLONG* pStop);
-    STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent);
-    STDMETHODIMP ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat);
-    STDMETHODIMP SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
-    STDMETHODIMP GetPositions(LONGLONG* pCurrent, LONGLONG* pStop);
-    STDMETHODIMP GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest);
+    STDMETHODIMP GetDuration(int64_t* pDuration);
+    STDMETHODIMP GetStopPosition(int64_t* pStop);
+    STDMETHODIMP GetCurrentPosition(int64_t* pCurrent);
+    STDMETHODIMP ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat);
+    STDMETHODIMP SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
+    STDMETHODIMP GetPositions(int64_t* pCurrent, int64_t* pStop);
+    STDMETHODIMP GetAvailable(int64_t* pEarliest, int64_t* pLatest);
     STDMETHODIMP SetRate(double dRate);
     STDMETHODIMP GetRate(double* pdRate);
-    STDMETHODIMP GetPreroll(LONGLONG* pllPreroll);
+    STDMETHODIMP GetPreroll(int64_t* pllPreroll);
 
 public:
     CBaseSplitterOutputPin(CAtlArray<CMediaType>& mts, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr, int nBuffers = 0, int QueueMaxPackets = MAXPACKETS);
@@ -327,7 +327,7 @@ protected:
     virtual HRESULT CreateOutputs(IAsyncReader* pAsyncReader) = 0; // override this ...
     virtual LPCTSTR GetPartFilename(IAsyncReader* pAsyncReader);
 
-    LONGLONG m_nOpenProgress;
+    int64_t m_nOpenProgress;
     bool m_fAbort;
 
     REFERENCE_TIME m_rtDuration; // derived filter should set this at the end of CreateOutputs
@@ -394,20 +394,20 @@ public:
     STDMETHODIMP GetTimeFormat(GUID* pFormat);
     STDMETHODIMP IsUsingTimeFormat(const GUID* pFormat);
     STDMETHODIMP SetTimeFormat(const GUID* pFormat);
-    STDMETHODIMP GetDuration(LONGLONG* pDuration);
-    STDMETHODIMP GetStopPosition(LONGLONG* pStop);
-    STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent);
-    STDMETHODIMP ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat);
-    STDMETHODIMP SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
-    STDMETHODIMP GetPositions(LONGLONG* pCurrent, LONGLONG* pStop);
-    STDMETHODIMP GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest);
+    STDMETHODIMP GetDuration(int64_t* pDuration);
+    STDMETHODIMP GetStopPosition(int64_t* pStop);
+    STDMETHODIMP GetCurrentPosition(int64_t* pCurrent);
+    STDMETHODIMP ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat);
+    STDMETHODIMP SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
+    STDMETHODIMP GetPositions(int64_t* pCurrent, int64_t* pStop);
+    STDMETHODIMP GetAvailable(int64_t* pEarliest, int64_t* pLatest);
     STDMETHODIMP SetRate(double dRate);
     STDMETHODIMP GetRate(double* pdRate);
-    STDMETHODIMP GetPreroll(LONGLONG* pllPreroll);
+    STDMETHODIMP GetPreroll(int64_t* pllPreroll);
 
 protected:
     friend class CBaseSplitterOutputPin;
-    virtual HRESULT SetPositionsInternal(void* id, LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
+    virtual HRESULT SetPositionsInternal(void* id, int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
 
 private:
     REFERENCE_TIME m_rtLastStart, m_rtLastStop;
@@ -416,7 +416,7 @@ private:
 public:
     // IAMOpenProgress
 
-    STDMETHODIMP QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent);
+    STDMETHODIMP QueryProgress(int64_t* pllTotal, int64_t* pllCurrent);
     STDMETHODIMP AbortOperation();
 
     // IDispatch

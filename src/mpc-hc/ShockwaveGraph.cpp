@@ -146,7 +146,7 @@ STDMETHODIMP CShockwaveGraph::GetTimeFormat(GUID* pFormat)
     return pFormat ? *pFormat = TIME_FORMAT_FRAME, S_OK : E_POINTER;
 }
 
-STDMETHODIMP CShockwaveGraph::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CShockwaveGraph::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     *pDuration = 0;
@@ -161,7 +161,7 @@ STDMETHODIMP CShockwaveGraph::GetDuration(LONGLONG* pDuration)
     return S_OK;
 }
 
-STDMETHODIMP CShockwaveGraph::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CShockwaveGraph::GetCurrentPosition(int64_t* pCurrent)
 {
     CheckPointer(pCurrent, E_POINTER);
     *pCurrent = 0;
@@ -176,7 +176,7 @@ STDMETHODIMP CShockwaveGraph::GetCurrentPosition(LONGLONG* pCurrent)
     return S_OK;
 }
 
-STDMETHODIMP CShockwaveGraph::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CShockwaveGraph::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     if (dwCurrentFlags & AM_SEEKING_AbsolutePositioning) {
         m_wndDestFrame.put_FrameNum(*pCurrent);
@@ -277,7 +277,7 @@ STDMETHODIMP CShockwaveGraph::get_Volume(long* plVolume)
 }
 
 // IAMOpenProgress
-STDMETHODIMP CShockwaveGraph::QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent)
+STDMETHODIMP CShockwaveGraph::QueryProgress(int64_t* pllTotal, int64_t* pllCurrent)
 {
     *pllTotal = 100;
     *pllCurrent = m_wndDestFrame.PercentLoaded();

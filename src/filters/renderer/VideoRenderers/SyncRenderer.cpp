@@ -1421,20 +1421,20 @@ HRESULT CBaseAP::AlphaBlt(RECT* pSrc, RECT* pDst, IDirect3DTexture9* pTexture)
 }
 
 // Update the array m_pllJitter with a new vsync period. Calculate min, max and stddev.
-void CBaseAP::SyncStats(LONGLONG syncTime)
+void CBaseAP::SyncStats(int64_t syncTime)
 {
     m_nNextJitter = (m_nNextJitter + 1) % NB_JITTER;
-    LONGLONG jitter = syncTime - m_llLastSyncTime;
+    int64_t jitter = syncTime - m_llLastSyncTime;
     m_pllJitter[m_nNextJitter] = jitter;
     double syncDeviation = ((double)m_pllJitter[m_nNextJitter] - m_fJitterMean) / 10000.0;
     if (abs(syncDeviation) > (GetDisplayCycle() / 2)) {
         m_uSyncGlitches++;
     }
 
-    LONGLONG llJitterSum = 0;
-    LONGLONG llJitterSumAvg = 0;
+    int64_t llJitterSum = 0;
+    int64_t llJitterSumAvg = 0;
     for (int i = 0; i < NB_JITTER; i++) {
-        LONGLONG Jitter = m_pllJitter[i];
+        int64_t Jitter = m_pllJitter[i];
         llJitterSum += Jitter;
         llJitterSumAvg += Jitter;
     }
@@ -1442,7 +1442,7 @@ void CBaseAP::SyncStats(LONGLONG syncTime)
     double DeviationSum = 0;
 
     for (int i = 0; i < NB_JITTER; i++) {
-        LONGLONG DevInt = m_pllJitter[i] - (LONGLONG)m_fJitterMean;
+        int64_t DevInt = m_pllJitter[i] - (int64_t)m_fJitterMean;
         double Deviation = (double)DevInt;
         DeviationSum += Deviation * Deviation;
         m_MaxJitter = max(m_MaxJitter, DevInt);
@@ -1455,14 +1455,14 @@ void CBaseAP::SyncStats(LONGLONG syncTime)
 }
 
 // Collect the difference between periodEnd and periodStart in an array, calculate mean and stddev.
-void CBaseAP::SyncOffsetStats(LONGLONG syncOffset)
+void CBaseAP::SyncOffsetStats(int64_t syncOffset)
 {
     m_nNextSyncOffset = (m_nNextSyncOffset + 1) % NB_JITTER;
     m_pllSyncOffset[m_nNextSyncOffset] = syncOffset;
 
-    LONGLONG AvrageSum = 0;
+    int64_t AvrageSum = 0;
     for (int i = 0; i < NB_JITTER; i++) {
-        LONGLONG Offset = m_pllSyncOffset[i];
+        int64_t Offset = m_pllSyncOffset[i];
         AvrageSum += Offset;
         m_MaxSyncOffset = max(m_MaxSyncOffset, Offset);
         m_MinSyncOffset = min(m_MinSyncOffset, Offset);
@@ -1835,7 +1835,7 @@ STDMETHODIMP_(bool) CBaseAP::Paint(bool fAll)
     }
 
     if (s.fResetDevice) {
-        LONGLONG time = GetRenderersData()->GetPerfCounter();
+        int64_t time = GetRenderersData()->GetPerfCounter();
         if (time > m_LastAdapterCheck + 20000000) { // check every 2 sec.
             m_LastAdapterCheck = time;
 #ifdef _DEBUG
@@ -1946,8 +1946,8 @@ void CBaseAP::DrawStats()
     CRenderersSettings& s = GetRenderersSettings();
     CRenderersData* pApp = GetRenderersData();
 
-    LONGLONG llMaxJitter = m_MaxJitter;
-    LONGLONG llMinJitter = m_MinJitter;
+    int64_t llMaxJitter = m_MaxJitter;
+    int64_t llMinJitter = m_MinJitter;
 
     RECT rc = {20, 20, 520, 520 };
     // pApp->m_fDisplayStats = 1 for full stats, 2 for little less, 3 for basic, 0 for no stats
@@ -2224,10 +2224,10 @@ void CBaseAP::EstimateRefreshTimings()
             m_pD3DDev->GetRasterStatus(0, &rasterStatus);
         }
         m_pD3DDev->GetRasterStatus(0, &rasterStatus);
-        LONGLONG startTime = pApp->GetPerfCounter();
+        int64_t startTime = pApp->GetPerfCounter();
         UINT startLine = rasterStatus.ScanLine;
-        LONGLONG endTime = 0;
-        LONGLONG time = 0;
+        int64_t endTime = 0;
+        int64_t time = 0;
         UINT endLine = 0;
         UINT line = 0;
         bool done = false;
@@ -2635,7 +2635,7 @@ STDMETHODIMP CSyncAP::NonDelegatingQueryInterface(REFIID riid, void** ppv)
 }
 
 // IMFClockStateSink
-STDMETHODIMP CSyncAP::OnClockStart(MFTIME hnsSystemTime,  LONGLONG llClockStartOffset)
+STDMETHODIMP CSyncAP::OnClockStart(MFTIME hnsSystemTime,  int64_t llClockStartOffset)
 {
     m_nRenderState = Started;
     return S_OK;
@@ -2986,7 +2986,7 @@ typedef struct {
     const LPCTSTR Description;
 } D3DFORMAT_TYPE;
 
-LONGLONG CSyncAP::GetMediaTypeMerit(IMFMediaType* pMediaType)
+int64_t CSyncAP::GetMediaTypeMerit(IMFMediaType* pMediaType)
 {
     AM_MEDIA_TYPE* pAMMedia = NULL;
     MFVIDEOFORMAT* VideoFormat;
@@ -2995,7 +2995,7 @@ LONGLONG CSyncAP::GetMediaTypeMerit(IMFMediaType* pMediaType)
     CheckHR(pMediaType->GetRepresentation(FORMAT_MFVideoFormat, (void**)&pAMMedia));
     VideoFormat = (MFVIDEOFORMAT*)pAMMedia->pbFormat;
 
-    LONGLONG Merit = 0;
+    int64_t Merit = 0;
     switch (VideoFormat->surfaceInfo.Format) {
         case FCC('NV12'):
             Merit = 90000000;
@@ -3060,12 +3060,12 @@ HRESULT CSyncAP::RenegotiateMediaType()
             hr = m_pMixer->SetOutputType(0, pType, MFT_SET_TYPE_TEST_ONLY);
         }
         if (SUCCEEDED(hr)) {
-            LONGLONG Merit = GetMediaTypeMerit(pType);
+            int64_t Merit = GetMediaTypeMerit(pType);
 
             size_t nTypes = ValidMixerTypes.GetCount();
             size_t iInsertPos = 0;
             for (size_t i = 0; i < nTypes; ++i) {
-                LONGLONG ThisMerit = GetMediaTypeMerit(ValidMixerTypes[i]);
+                int64_t ThisMerit = GetMediaTypeMerit(ValidMixerTypes[i]);
                 if (Merit > ThisMerit) {
                     iInsertPos = i;
                     break;
@@ -3106,9 +3106,9 @@ bool CSyncAP::GetSampleFromMixer()
     MFT_OUTPUT_DATA_BUFFER Buffer;
     HRESULT hr = S_OK;
     DWORD dwStatus;
-    LONGLONG llClockBefore = 0;
-    LONGLONG llClockAfter  = 0;
-    LONGLONG llMixerLatency;
+    int64_t llClockBefore = 0;
+    int64_t llClockAfter  = 0;
+    int64_t llMixerLatency;
 
     UINT dwSurface;
     bool newSample = false;
@@ -3310,7 +3310,7 @@ STDMETHODIMP CSyncAP::RepaintVideo()
     return S_OK;
 }
 
-STDMETHODIMP CSyncAP::GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, LONGLONG* pTimeStamp)
+STDMETHODIMP CSyncAP::GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, int64_t* pTimeStamp)
 {
     ASSERT(FALSE);
     return E_NOTIMPL;
@@ -3541,7 +3541,7 @@ void CSyncAP::RenderThread()
     bool bQuit = false;
     TIMECAPS tc;
     DWORD dwResolution;
-    LONGLONG llRefClockTime;
+    int64_t llRefClockTime;
     double dTargetSyncOffset;
     MFTIME llSystemTime;
     DWORD dwUser = 0;
@@ -3606,9 +3606,9 @@ void CSyncAP::RenderThread()
                                 lLastVsyncTime = - lDisplayCycle;    // To even out glitches in the beginning
                             }
 
-                            LONGLONG llNextSampleWait = (LONGLONG)(((double)lLastVsyncTime + GetDisplayCycle() - dTargetSyncOffset) * 10000); // Time from now util next safe time to Paint()
+                            int64_t llNextSampleWait = (int64_t)(((double)lLastVsyncTime + GetDisplayCycle() - dTargetSyncOffset) * 10000); // Time from now util next safe time to Paint()
                             while ((llRefClockTime + llNextSampleWait) < (m_llSampleTime + m_llHysteresis)) { // While the proposed time is in the past of sample presentation time
-                                llNextSampleWait = llNextSampleWait + (LONGLONG)(GetDisplayCycle() * 10000); // Try the next possible time, one display cycle ahead
+                                llNextSampleWait = llNextSampleWait + (int64_t)(GetDisplayCycle() * 10000); // Try the next possible time, one display cycle ahead
                             }
                             m_lNextSampleWait = (LONG)(llNextSampleWait / 10000);
                             m_lShiftToNearestPrev = m_lShiftToNearest;
@@ -3629,10 +3629,10 @@ void CSyncAP::RenderThread()
 
                                 if ((m_lShiftToNearestPrev - m_lShiftToNearest) > lDisplayCycle2) { // If a step down in the m_lShiftToNearest function. Display slower than video.
                                     m_bVideoSlowerThanDisplay = false;
-                                    m_llHysteresis = -(LONGLONG)(10000 * lDisplayCycle4);
+                                    m_llHysteresis = -(int64_t)(10000 * lDisplayCycle4);
                                 } else if ((m_lShiftToNearest - m_lShiftToNearestPrev) > lDisplayCycle2) { // If a step up
                                     m_bVideoSlowerThanDisplay = true;
-                                    m_llHysteresis = (LONGLONG)(10000 * lDisplayCycle4);
+                                    m_llHysteresis = (int64_t)(10000 * lDisplayCycle4);
                                 } else if ((m_lShiftToNearest < (3 * lDisplayCycle4)) && (m_lShiftToNearest > lDisplayCycle4)) {
                                     m_llHysteresis = 0;    // Reset when between 1/4 and 3/4 of the way either way
                                 }

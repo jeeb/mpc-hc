@@ -41,7 +41,7 @@ public:
 
 private:
     REFERENCE_TIME m_rtPrivateTime;
-    LONGLONG m_llPerfFrequency;
+    int64_t m_llPerfFrequency;
     REFERENCE_TIME m_rtPrevTime;
     CCritSec m_csClock;
     IReferenceClock* m_pCurrentRefClock;

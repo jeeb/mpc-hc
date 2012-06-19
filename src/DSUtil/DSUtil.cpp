@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <Vfw.h>
 #include "winddk/devioctl.h"
 #include "winddk/ntddcdrm.h"
@@ -2538,7 +2544,7 @@ void DumpBuffer(BYTE* pBuffer, int nSize)
 CString ReftimeToString(const REFERENCE_TIME& rtVal)
 {
     CString     strTemp;
-    LONGLONG    llTotalMs =  ConvertToMilliseconds(rtVal);
+    int64_t    llTotalMs =  ConvertToMilliseconds(rtVal);
     int         lHour     = (int)(llTotalMs  / (1000 * 60 * 60));
     int         lMinute   = (llTotalMs / (1000 * 60)) % 60;
     int         lSecond   = (llTotalMs /  1000) % 60;
@@ -2552,7 +2558,7 @@ CString ReftimeToString(const REFERENCE_TIME& rtVal)
 CString ReftimeToString2(const REFERENCE_TIME& rtVal)
 {
     CString     strTemp;
-    LONGLONG    seconds = (rtVal + 5000000) / 10000000;
+    int64_t    seconds = (rtVal + 5000000) / 10000000;
     int         lHour     = (int)(seconds / 3600);
     int         lMinute   = (int)(seconds / 60 % 60);
     int         lSecond   = (int)(seconds % 60);

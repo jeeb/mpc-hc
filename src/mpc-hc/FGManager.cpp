@@ -2385,7 +2385,7 @@ CFGManagerCustom::CFGManagerCustom(LPCTSTR pName, LPUNKNOWN pUnk)
             continue;
         }
 
-        ULONGLONG merit =
+        uint64_t merit =
             fo->iLoadType == FilterOverride::PREFERRED ? MERIT64_ABOVE_DSHOW :
             fo->iLoadType == FilterOverride::MERIT ? MERIT64(fo->dwMerit) :
             MERIT64_DO_NOT_USE; // fo->iLoadType == FilterOverride::BLOCKED

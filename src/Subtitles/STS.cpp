@@ -1107,7 +1107,7 @@ static bool OpenSami(CTextFile* file, CSimpleTextSubtitle& ret, int CharSet)
 {
     CStringW buff, caption;
 
-    ULONGLONG pos = file->GetPosition();
+    uint64_t pos = file->GetPosition();
 
     bool fSAMI = false;
 
@@ -2613,7 +2613,7 @@ bool CSimpleTextSubtitle::Open(CString fn, int CharSet, CString name)
     return Open(&f, CharSet, name);
 }
 
-static int CountLines(CTextFile* f, ULONGLONG from, ULONGLONG to)
+static int CountLines(CTextFile* f, uint64_t from, uint64_t to)
 {
     int n = 0;
     CString s;
@@ -2628,7 +2628,7 @@ bool CSimpleTextSubtitle::Open(CTextFile* f, int CharSet, CString name)
 {
     Empty();
 
-    ULONGLONG pos = f->GetPosition();
+    uint64_t pos = f->GetPosition();
 
     for (ptrdiff_t i = 0; i < nOpenFuncts; i++) {
         if (!OpenFuncts[i].open(f, *this, CharSet) /*|| !GetCount()*/) {

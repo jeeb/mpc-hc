@@ -123,20 +123,20 @@ CString CTextFile::GetFilePath() const
 
 // CStdioFile
 
-ULONGLONG CTextFile::GetPosition() const
+uint64_t CTextFile::GetPosition() const
 {
     return (CStdioFile::GetPosition() - m_offset);
 }
 
-ULONGLONG CTextFile::GetLength() const
+uint64_t CTextFile::GetLength() const
 {
     return (CStdioFile::GetLength() - m_offset);
 }
 
-ULONGLONG CTextFile::Seek(LONGLONG lOff, UINT nFrom)
+uint64_t CTextFile::Seek(int64_t lOff, UINT nFrom)
 {
-    ULONGLONG pos = GetPosition();
-    ULONGLONG len = GetLength();
+    uint64_t pos = GetPosition();
+    uint64_t len = GetLength();
 
     switch (nFrom) {
         default:
@@ -150,7 +150,7 @@ ULONGLONG CTextFile::Seek(LONGLONG lOff, UINT nFrom)
             break;
     }
 
-    lOff = max(min((ULONGLONG)lOff, len), 0) + m_offset;
+    lOff = max(min((uint64_t)lOff, len), 0) + m_offset;
 
     pos = CStdioFile::Seek(lOff, begin) - m_offset;
 
@@ -394,7 +394,7 @@ BOOL CTextFile::ReadString(CStringW& str)
 // CWebTextFile
 //
 
-CWebTextFile::CWebTextFile(LONGLONG llMaxSize)
+CWebTextFile::CWebTextFile(int64_t llMaxSize)
     : m_llMaxSize(llMaxSize)
 {
 }

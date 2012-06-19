@@ -23,6 +23,12 @@
 #pragma once
 
 #include <atlcoll.h>
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "../../../DSUtil/DSUtil.h"
 
 class CMultiFiles : public CObject
@@ -73,8 +79,8 @@ public:
     virtual BOOL OpenFiles(CAtlList<CHdmvClipInfo::PlaylistItem>& files, UINT nOpenFlags);
 
 
-    virtual ULONGLONG Seek(LONGLONG lOff, UINT nFrom);
-    virtual ULONGLONG GetLength() const;
+    virtual uint64_t Seek(int64_t lOff, UINT nFrom);
+    virtual uint64_t GetLength() const;
 
     virtual UINT Read(void* lpBuf, UINT nCount);
     virtual void Close();
@@ -86,14 +92,14 @@ public:
 protected:
     REFERENCE_TIME*             m_pCurrentPTSOffset;
     CAtlArray<CString>          m_strFiles;
-    CAtlArray<ULONGLONG>        m_FilesSize;
+    CAtlArray<uint64_t>        m_FilesSize;
     CAtlArray<REFERENCE_TIME>   m_rtPtsOffsets;
     HANDLE                      m_hFile;
     int                         m_nCurPart;
-    ULONGLONG                   m_llTotalLength;
+    uint64_t                   m_llTotalLength;
 
     BOOL                        OpenPart(int nPart);
     void                        ClosePart();
-    ULONGLONG                   GetAbsolutePosition(LONGLONG lOff, UINT nFrom);
+    uint64_t                   GetAbsolutePosition(int64_t lOff, UINT nFrom);
     void                        Reset();
 };

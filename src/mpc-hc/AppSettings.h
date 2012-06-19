@@ -156,7 +156,7 @@ typedef enum {
 
 #define MAX_DVD_POSITION 20
 typedef struct {
-    ULONGLONG           llDVDGuid;
+    uint64_t           llDVDGuid;
     ULONG               lTitle;
     DVD_HMSF_TIMECODE   Timecode;
 } DVD_POSITION;
@@ -164,7 +164,7 @@ typedef struct {
 #define MAX_FILE_POSITION 20
 typedef struct {
     CString             strFile;
-    LONGLONG            llPosition;
+    int64_t            llPosition;
 } FILE_POSITION;
 
 enum {
@@ -535,7 +535,7 @@ public:
     CString         SelectedAudioRenderer() const;
     void            ResetPositions();
     DVD_POSITION*   CurrentDVDPosition();
-    bool            NewDvd(ULONGLONG llDVDGuid);
+    bool            NewDvd(uint64_t llDVDGuid);
     FILE_POSITION*  CurrentFilePosition();
     bool            NewFile(LPCTSTR strFileName);
 

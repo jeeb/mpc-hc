@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "UDPReader.h"
 #include "../../../DSUtil/DSUtil.h"
 
@@ -224,7 +230,7 @@ bool CUDPStream::Load(const WCHAR* fnw)
     return true;
 }
 
-HRESULT CUDPStream::SetPointer(LONGLONG llPos)
+HRESULT CUDPStream::SetPointer(int64_t llPos)
 {
     CAutoLock cAutoLock(&m_csLock);
 
@@ -286,7 +292,7 @@ HRESULT CUDPStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDWO
     return S_OK;
 }
 
-LONGLONG CUDPStream::Size(LONGLONG* pSizeAvailable)
+int64_t CUDPStream::Size(int64_t* pSizeAvailable)
 {
     CAutoLock cAutoLock(&m_csLock);
     if (pSizeAvailable) {

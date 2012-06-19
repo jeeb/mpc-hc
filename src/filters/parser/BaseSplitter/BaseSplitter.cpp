@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "../../../DSUtil/DSUtil.h"
 #include <InitGuid.h>
 #include "moreuuids.h"
@@ -718,37 +724,37 @@ STDMETHODIMP CBaseSplitterOutputPin::SetTimeFormat(const GUID* pFormat)
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->SetTimeFormat(pFormat);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CBaseSplitterOutputPin::GetDuration(int64_t* pDuration)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetDuration(pDuration);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CBaseSplitterOutputPin::GetStopPosition(int64_t* pStop)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetStopPosition(pStop);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CBaseSplitterOutputPin::GetCurrentPosition(int64_t* pCurrent)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetCurrentPosition(pCurrent);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CBaseSplitterOutputPin::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->ConvertTimeFormat(pTarget, pTargetFormat, Source, pSourceFormat);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CBaseSplitterOutputPin::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->SetPositionsInternal(this, pCurrent, dwCurrentFlags, pStop, dwStopFlags);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CBaseSplitterOutputPin::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetPositions(pCurrent, pStop);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CBaseSplitterOutputPin::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetAvailable(pEarliest, pLatest);
 }
@@ -763,7 +769,7 @@ STDMETHODIMP CBaseSplitterOutputPin::GetRate(double* pdRate)
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetRate(pdRate);
 }
 
-STDMETHODIMP CBaseSplitterOutputPin::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CBaseSplitterOutputPin::GetPreroll(int64_t* pllPreroll)
 {
     return (static_cast<CBaseSplitterFilter*>(m_pFilter))->GetPreroll(pllPreroll);
 }
@@ -1345,34 +1351,34 @@ STDMETHODIMP CBaseSplitterFilter::SetTimeFormat(const GUID* pFormat)
     return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CBaseSplitterFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     *pDuration = m_rtDuration;
     return S_OK;
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CBaseSplitterFilter::GetStopPosition(int64_t* pStop)
 {
     return GetDuration(pStop);
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CBaseSplitterFilter::GetCurrentPosition(int64_t* pCurrent)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseSplitterFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CBaseSplitterFilter::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseSplitterFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CBaseSplitterFilter::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return SetPositionsInternal(this, pCurrent, dwCurrentFlags, pStop, dwStopFlags);
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CBaseSplitterFilter::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     if (pCurrent) {
         *pCurrent = m_rtCurrent;
@@ -1383,7 +1389,7 @@ STDMETHODIMP CBaseSplitterFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pSt
     return S_OK;
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CBaseSplitterFilter::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     if (pEarliest) {
         *pEarliest = 0;
@@ -1401,12 +1407,12 @@ STDMETHODIMP CBaseSplitterFilter::GetRate(double* pdRate)
     return pdRate ? *pdRate = m_dRate, S_OK : E_POINTER;
 }
 
-STDMETHODIMP CBaseSplitterFilter::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CBaseSplitterFilter::GetPreroll(int64_t* pllPreroll)
 {
     return pllPreroll ? *pllPreroll = 0, S_OK : E_POINTER;
 }
 
-HRESULT CBaseSplitterFilter::SetPositionsInternal(void* id, LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+HRESULT CBaseSplitterFilter::SetPositionsInternal(void* id, int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     CAutoLock cAutoLock(this);
 
@@ -1482,7 +1488,7 @@ HRESULT CBaseSplitterFilter::SetPositionsInternal(void* id, LONGLONG* pCurrent, 
 
 // IAMOpenProgress
 
-STDMETHODIMP CBaseSplitterFilter::QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent)
+STDMETHODIMP CBaseSplitterFilter::QueryProgress(int64_t* pllTotal, int64_t* pllCurrent)
 {
     CheckPointer(pllTotal, E_POINTER);
     CheckPointer(pllCurrent, E_POINTER);

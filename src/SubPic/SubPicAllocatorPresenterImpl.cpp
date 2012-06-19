@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "SubPicAllocatorPresenterImpl.h"
 #include "../DSUtil/DSUtil.h"
 
@@ -98,7 +104,7 @@ STDMETHODIMP_(SIZE) CSubPicAllocatorPresenterImpl::GetVideoSize(bool fCorrectAR)
     CSize VideoSize(GetVisibleVideoSize());
 
     if (fCorrectAR && m_AspectRatio.cx > 0 && m_AspectRatio.cy > 0) {
-        VideoSize.cx = (LONGLONG(VideoSize.cy) * LONGLONG(m_AspectRatio.cx)) / LONGLONG(m_AspectRatio.cy);
+        VideoSize.cx = (int64_t(VideoSize.cy) * int64_t(m_AspectRatio.cx)) / int64_t(m_AspectRatio.cy);
     }
 
     return VideoSize;

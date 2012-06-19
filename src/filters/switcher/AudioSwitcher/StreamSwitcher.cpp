@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "StreamSwitcher.h"
 
 #include <shlwapi.h>
@@ -168,42 +174,42 @@ STDMETHODIMP CStreamSwitcherPassThru::IsUsingTimeFormat(const GUID* pFormat)
     CallPeerSeeking(IsUsingTimeFormat(pFormat));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CStreamSwitcherPassThru::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     CallPeerSeeking(ConvertTimeFormat(pTarget, pTargetFormat, Source, pSourceFormat));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::SetPositions(LONGLONG* pCurrent, DWORD CurrentFlags, LONGLONG* pStop, DWORD StopFlags)
+STDMETHODIMP CStreamSwitcherPassThru::SetPositions(int64_t* pCurrent, DWORD CurrentFlags, int64_t* pStop, DWORD StopFlags)
 {
     CallPeerSeekingAll(SetPositions(pCurrent, CurrentFlags, pStop, StopFlags));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CStreamSwitcherPassThru::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     CallPeerSeeking(GetPositions(pCurrent, pStop));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CStreamSwitcherPassThru::GetCurrentPosition(int64_t* pCurrent)
 {
     CallPeerSeeking(GetCurrentPosition(pCurrent));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CStreamSwitcherPassThru::GetStopPosition(int64_t* pStop)
 {
     CallPeerSeeking(GetStopPosition(pStop));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CStreamSwitcherPassThru::GetDuration(int64_t* pDuration)
 {
     CallPeerSeeking(GetDuration(pDuration));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CStreamSwitcherPassThru::GetPreroll(int64_t* pllPreroll)
 {
     CallPeerSeeking(GetPreroll(pllPreroll));
 }
 
-STDMETHODIMP CStreamSwitcherPassThru::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CStreamSwitcherPassThru::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     CallPeerSeeking(GetAvailable(pEarliest, pLatest));
 }
@@ -534,7 +540,7 @@ HRESULT CStreamSwitcherInputPin::InitializeOutputSample(IMediaSample* pInSample,
             m_bSampleSkipped = FALSE;
         }
 
-        LONGLONG MediaStart, MediaEnd;
+        int64_t MediaStart, MediaEnd;
         if (pInSample->GetMediaTime(&MediaStart, &MediaEnd) == NOERROR) {
             pOutSample->SetMediaTime(&MediaStart, &MediaEnd);
         }

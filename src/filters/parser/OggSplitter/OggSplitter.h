@@ -163,7 +163,7 @@ public:
 class COggTheoraOutputPin : public COggSplitterOutputPin
 {
     CAutoPtrList<OggPacket> m_initpackets;
-    LONGLONG                m_KfgShift;
+    int64_t                m_KfgShift;
     int                     m_nIndexOffset;
     int                     m_nFpsNum;
     int                     m_nFpsDenum;

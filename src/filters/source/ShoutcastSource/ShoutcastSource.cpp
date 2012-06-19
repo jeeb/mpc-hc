@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #ifdef STANDALONE_FILTER
 #include <InitGuid.h>
 #endif
@@ -210,7 +216,7 @@ ULONG CShoutcastSource::GetMiscFlags()
 
 // IAMOpenProgress
 
-STDMETHODIMP CShoutcastSource::QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent)
+STDMETHODIMP CShoutcastSource::QueryProgress(int64_t* pllTotal, int64_t* pllCurrent)
 {
     if (m_iPins == 1) {
         if (pllTotal) {
@@ -308,7 +314,7 @@ void CShoutcastStream::EmptyBuffer()
     m_queue.RemoveAll();
 }
 
-LONGLONG CShoutcastStream::GetBufferFullness()
+int64_t CShoutcastStream::GetBufferFullness()
 {
     CAutoLock cAutoLock(&m_queue);
     if (!m_fBuffering) {
@@ -317,7 +323,7 @@ LONGLONG CShoutcastStream::GetBufferFullness()
     if (m_queue.IsEmpty()) {
         return 0;
     }
-    LONGLONG ret = 100i64 * (m_queue.GetTail().rtStart - m_queue.GetHead().rtStart) / AVGBUFFERLENGTH;
+    int64_t ret = 100i64 * (m_queue.GetTail().rtStart - m_queue.GetHead().rtStart) / AVGBUFFERLENGTH;
     return min(ret, 100);
 }
 

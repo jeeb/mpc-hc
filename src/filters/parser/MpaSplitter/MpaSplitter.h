@@ -38,7 +38,7 @@ protected:
     CAutoPtr<CMpaSplitterFile> m_pFile;
     HRESULT CreateOutputs(IAsyncReader* pAsyncReader);
 
-    STDMETHODIMP GetDuration(LONGLONG* pDuration);
+    STDMETHODIMP GetDuration(int64_t* pDuration);
 
     bool DemuxInit();
     void DemuxSeek(REFERENCE_TIME rt);

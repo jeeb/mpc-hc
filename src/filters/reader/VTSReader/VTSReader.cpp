@@ -214,7 +214,7 @@ bool CVTSStream::Load(const WCHAR* fnw)
     return (m_vob && m_vob->Open(CString(fnw), sl) /*&& m_vob->IsDVD()*/);
 }
 
-HRESULT CVTSStream::SetPointer(LONGLONG llPos)
+HRESULT CVTSStream::SetPointer(int64_t llPos)
 {
     m_off = (int)(llPos & 2047);
     int lba = (int)(llPos / 2048);
@@ -256,9 +256,9 @@ HRESULT CVTSStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDWO
     return S_OK;
 }
 
-LONGLONG CVTSStream::Size(LONGLONG* pSizeAvailable)
+int64_t CVTSStream::Size(int64_t* pSizeAvailable)
 {
-    LONGLONG len = 2048i64 * m_vob->GetLength();
+    int64_t len = 2048i64 * m_vob->GetLength();
     if (pSizeAvailable) {
         *pSizeAvailable = len;
     }

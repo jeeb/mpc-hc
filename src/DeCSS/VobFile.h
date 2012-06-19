@@ -1,5 +1,10 @@
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <atlbase.h>
 #include <atlcoll.h>
 #include "winddk/ntddcdvd.h"
@@ -72,7 +77,7 @@ class CVobFile : public CDVDSession
     CAtlMap<DWORD, CString> m_pStream_Lang;
 
     int m_ChaptersCount;
-    CAtlMap<BYTE, LONGLONG> m_pChapters;
+    CAtlMap<BYTE, int64_t> m_pChapters;
 public:
     CVobFile();
     virtual ~CVobFile();
@@ -93,7 +98,7 @@ public:
     BSTR GetTrackName(UINT aTrackIdx);
 
     int GetChaptersCount() {return m_ChaptersCount;}
-    LONGLONG GetChapterOffset(UINT ChapterNumber);
+    int64_t GetChapterOffset(UINT ChapterNumber);
 
 private:
     CFile   m_ifoFile;

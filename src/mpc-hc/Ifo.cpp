@@ -42,7 +42,7 @@
 
 #define bswap_64(x)                                       \
     (__extension__                                        \
-    ({ union { __extension__ unsigned long long int __ll; \
+    ({ union { __extension__ uint64_t __ll; \
                 unsigned long int __l[2]; } __w, __r;     \
         __w.__ll = (x);                                   \
         __r.__l[0] = bswap_32 (__w.__l[1]);               \

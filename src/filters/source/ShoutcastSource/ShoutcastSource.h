@@ -56,7 +56,7 @@ public:
     STDMETHODIMP_(ULONG) GetMiscFlags();
 
     // IAMOpenProgress
-    STDMETHODIMP QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent);
+    STDMETHODIMP QueryProgress(int64_t* pllTotal, int64_t* pllCurrent);
     STDMETHODIMP AbortOperation();
 
     // IAMMediaContent
@@ -146,7 +146,7 @@ public:
     UINT SocketThreadProc();
 
     void EmptyBuffer();
-    LONGLONG GetBufferFullness();
+    int64_t GetBufferFullness();
     CString GetTitle();
 
     HRESULT DecideBufferSize(IMemAllocator* pIMemAlloc, ALLOCATOR_PROPERTIES* pProperties);

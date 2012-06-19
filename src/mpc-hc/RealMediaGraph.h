@@ -207,9 +207,9 @@ namespace DSObjects
         STDMETHODIMP GetState(LONG msTimeout, OAFilterState* pfs);
 
         // IMediaSeeking
-        STDMETHODIMP GetDuration(LONGLONG* pDuration);
-        STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent);
-        STDMETHODIMP SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
+        STDMETHODIMP GetDuration(int64_t* pDuration);
+        STDMETHODIMP GetCurrentPosition(int64_t* pCurrent);
+        STDMETHODIMP SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
 
         // IVideoWindow
         STDMETHODIMP SetWindowPosition(long Left, long Top, long Width, long Height);
@@ -223,7 +223,7 @@ namespace DSObjects
         STDMETHODIMP get_Volume(long* plVolume);
 
         // IAMOpenProgress
-        STDMETHODIMP QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent);
+        STDMETHODIMP QueryProgress(int64_t* pllTotal, int64_t* pllCurrent);
 
         // IGraphEngine
         STDMETHODIMP_(engine_t) GetEngine();

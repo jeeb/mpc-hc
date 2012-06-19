@@ -44,7 +44,7 @@ public IUnknown {
 class CAsyncFileReader : public CUnknown, public CMultiFiles, public IAsyncReader, public ISyncReader, public IFileHandle
 {
 protected:
-    ULONGLONG m_len;
+    uint64_t m_len;
     HANDLE m_hBreakEvent;
     LONG m_lOsError; // CFileException::m_lOsError
 
@@ -69,8 +69,8 @@ public:
     STDMETHODIMP SyncReadAligned(IMediaSample* pSample) {
         return E_NOTIMPL;
     }
-    STDMETHODIMP SyncRead(LONGLONG llPosition, LONG lLength, BYTE* pBuffer);
-    STDMETHODIMP Length(LONGLONG* pTotal, LONGLONG* pAvailable);
+    STDMETHODIMP SyncRead(int64_t llPosition, LONG lLength, BYTE* pBuffer);
+    STDMETHODIMP Length(int64_t* pTotal, int64_t* pAvailable);
     STDMETHODIMP BeginFlush() {
         return E_NOTIMPL;
     }
@@ -114,5 +114,5 @@ public:
 
     // IAsyncReader
 
-    STDMETHODIMP Length(LONGLONG* pTotal, LONGLONG* pAvailable);
+    STDMETHODIMP Length(int64_t* pTotal, int64_t* pAvailable);
 };

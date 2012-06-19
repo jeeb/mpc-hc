@@ -44,7 +44,7 @@ public:
 class CDTSAC3Stream : public CBaseStream
 {
     CFile m_file;
-    LONGLONG m_dataOffset;
+    int64_t m_dataOffset;
 
     GUID m_subtype;
     WORD m_wFormatTag;

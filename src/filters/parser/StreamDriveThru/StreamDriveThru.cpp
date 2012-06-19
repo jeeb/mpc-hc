@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "StreamDriveThru.h"
 #include "../../../DSUtil/DSUtil.h"
 
@@ -159,7 +165,7 @@ DWORD CStreamDriveThruFilter::ThreadProc()
                         while (!CheckRequest(&cmd)) {
                             CAutoLock csAutoLock(&m_csLock);
 
-                            LONGLONG total = 0, available = 0;
+                            int64_t total = 0, available = 0;
                             if (FAILED(pAsyncReader->Length(&total, &available)) || m_position >= total) {
                                 cmd = CMD_STOP;
                                 break;
@@ -311,13 +317,13 @@ STDMETHODIMP CStreamDriveThruFilter::SetTimeFormat(const GUID* pFormat)
     return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CStreamDriveThruFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     CheckPointer(m_pInput, VFW_E_NOT_CONNECTED);
 
     if (CComQIPtr<IAsyncReader> pAsyncReader = m_pInput->GetConnected()) {
-        LONGLONG total, available;
+        int64_t total, available;
         if (SUCCEEDED(pAsyncReader->Length(&total, &available))) {
             *pDuration = total;
             return S_OK;
@@ -327,32 +333,32 @@ STDMETHODIMP CStreamDriveThruFilter::GetDuration(LONGLONG* pDuration)
     return E_NOINTERFACE;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CStreamDriveThruFilter::GetStopPosition(int64_t* pStop)
 {
     return GetDuration(pStop);
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CStreamDriveThruFilter::GetCurrentPosition(int64_t* pCurrent)
 {
     return pCurrent ? *pCurrent = m_position, S_OK : E_POINTER;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CStreamDriveThruFilter::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CStreamDriveThruFilter::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CStreamDriveThruFilter::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CStreamDriveThruFilter::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     return E_NOTIMPL;
 }
@@ -367,7 +373,7 @@ STDMETHODIMP CStreamDriveThruFilter::GetRate(double* pdRate)
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CStreamDriveThruFilter::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CStreamDriveThruFilter::GetPreroll(int64_t* pllPreroll)
 {
     return pllPreroll ? *pllPreroll = 0, S_OK : E_POINTER;
 }

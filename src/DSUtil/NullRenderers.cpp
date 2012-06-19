@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "NullRenderers.h"
 #include "moreuuids.h"
 
@@ -100,7 +106,7 @@ public :
     STDMETHODIMP GetVideoWindow(HWND* phwndVideo);
     STDMETHODIMP RepaintVideo(void) { return E_NOTIMPL; };
     STDMETHODIMP GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib,
-                                 DWORD* pcbDib, LONGLONG* pTimeStamp) { return E_NOTIMPL; };
+                                 DWORD* pcbDib, int64_t* pTimeStamp) { return E_NOTIMPL; };
     STDMETHODIMP SetBorderColor(COLORREF Clr) { return E_NOTIMPL; };
     STDMETHODIMP GetBorderColor(COLORREF* pClr) { return E_NOTIMPL; };
     STDMETHODIMP SetRenderingPrefs(DWORD dwRenderFlags) { return E_NOTIMPL; };

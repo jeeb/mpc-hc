@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "BaseSplitterFile.h"
 #include "../../../DSUtil/DSUtil.h"
 
@@ -42,7 +48,7 @@ CBaseSplitterFile::CBaseSplitterFile(IAsyncReader* pAsyncReader, HRESULT& hr, in
         return;
     }
 
-    LONGLONG total = 0, available;
+    int64_t total = 0, available;
     hr = m_pAsyncReader->Length(&total, &available);
 
     m_fStreaming = total == 0 && available > 0;
@@ -82,7 +88,7 @@ __int64 CBaseSplitterFile::GetPos()
 
 __int64 CBaseSplitterFile::GetAvailable()
 {
-    LONGLONG total, available = 0;
+    int64_t total, available = 0;
     m_pAsyncReader->Length(&total, &available);
     return available;
 }
@@ -92,7 +98,7 @@ __int64 CBaseSplitterFile::GetLength(bool fUpdate)
     if (m_fStreaming) {
         m_len = GetAvailable();
     } else if (fUpdate) {
-        LONGLONG total = 0, available;
+        int64_t total = 0, available;
         m_pAsyncReader->Length(&total, &available);
         m_len = total;
     }
@@ -114,7 +120,7 @@ HRESULT CBaseSplitterFile::Read(BYTE* pData, __int64 len)
     HRESULT hr = S_OK;
 
     if (!m_fRandomAccess) {
-        LONGLONG total = 0, available = -1;
+        int64_t total = 0, available = -1;
         m_pAsyncReader->Length(&total, &available);
         if (total == available) {
             m_fRandomAccess = true;

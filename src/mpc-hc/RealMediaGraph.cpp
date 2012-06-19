@@ -723,17 +723,17 @@ STDMETHODIMP CRealMediaGraph::GetState(LONG msTimeout, OAFilterState* pfs)
 }
 
 // IMediaSeeking
-STDMETHODIMP CRealMediaGraph::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CRealMediaGraph::GetDuration(int64_t* pDuration)
 {
     return pDuration ? *pDuration = m_pRMP->m_nDuration, S_OK : E_POINTER;
 }
 
-STDMETHODIMP CRealMediaGraph::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CRealMediaGraph::GetCurrentPosition(int64_t* pCurrent)
 {
     return pCurrent ? *pCurrent = m_pRMP->m_nCurrent, S_OK : E_POINTER;
 }
 
-STDMETHODIMP CRealMediaGraph::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CRealMediaGraph::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return (dwCurrentFlags & AM_SEEKING_AbsolutePositioning)
            && (PNR_OK == m_pRMP->m_pPlayer->Seek((ULONG)(*pCurrent / 10000))) ? S_OK : E_FAIL;
@@ -797,7 +797,7 @@ STDMETHODIMP CRealMediaGraph::get_Volume(long* plVolume)
 }
 
 // IAMOpenProgress
-STDMETHODIMP CRealMediaGraph::QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent)
+STDMETHODIMP CRealMediaGraph::QueryProgress(int64_t* pllTotal, int64_t* pllCurrent)
 {
     *pllTotal = 100;
     *pllCurrent = m_pRMP->m_unPercentComplete > 0 ? m_pRMP->m_unPercentComplete : 100; // after seeking it drops to 0 and would show annoying "Buffering... (0%)" messages on the status line

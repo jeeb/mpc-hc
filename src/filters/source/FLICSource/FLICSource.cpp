@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "FLICSource.h"
 #include "../../../DSUtil/DSUtil.h"
 
@@ -229,7 +235,7 @@ CFLICStream::CFLICStream(const WCHAR* wfn, CFLICSource* pParent, HRESULT* phr)
                             || fc.type == DTA_COPY
                             || fc.type == KEY_IMAGE;
 
-            ULONGLONG pos = m_flic.GetPosition() + fc.size - sizeof(fc);
+            uint64_t pos = m_flic.GetPosition() + fc.size - sizeof(fc);
             if (pos < m_flic.GetLength()) {
                 m_flic.Seek(pos, CFile::begin);
             } else { break; }
@@ -240,7 +246,7 @@ CFLICStream::CFLICStream(const WCHAR* wfn, CFLICSource* pParent, HRESULT* phr)
             break;
         }
 
-        ULONGLONG pos = ffe.pos + ffe.hdr.size - sizeof(ffe.hdr);
+        uint64_t pos = ffe.pos + ffe.hdr.size - sizeof(ffe.hdr);
         if (pos < m_flic.GetLength()) {
             m_flic.Seek(pos, CFile::begin);
         } else { break; }
@@ -564,7 +570,7 @@ void CFLICStream::ExtractFrame(int nFrame)
             break;
         }
 
-        ULONGLONG next = m_flic.GetPosition() + fc.size - sizeof(fc);
+        uint64_t next = m_flic.GetPosition() + fc.size - sizeof(fc);
         if (next >= m_flic.GetLength()) {
             break;
         }

@@ -55,8 +55,8 @@ class CFLACStream : public CBaseStream
     __int64 m_i64TotalNumSamples;
     int m_nAvgBytesPerSec;
 
-    ULONGLONG m_llOffset;             // Position of first frame in file
-    ULONGLONG m_llFileSize;           // Size of the file
+    uint64_t m_llOffset;             // Position of first frame in file
+    uint64_t m_llFileSize;           // Size of the file
 
 public:
     CFLACStream(const WCHAR* wfn, CSource* pParent, HRESULT* phr);

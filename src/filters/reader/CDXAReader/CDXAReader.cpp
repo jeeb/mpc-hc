@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "CDXAReader.h"
 #include "../../../DSUtil/DSUtil.h"
 #ifdef STANDALONE_FILTER
@@ -279,7 +285,7 @@ bool CCDXAStream::Load(const WCHAR* fnw)
     return true;
 }
 
-HRESULT CCDXAStream::SetPointer(LONGLONG llPos)
+HRESULT CCDXAStream::SetPointer(int64_t llPos)
 {
     return (llPos >= 0 && llPos < m_llLength) ? m_llPosition = llPos, S_OK : S_FALSE;
 }
@@ -289,7 +295,7 @@ HRESULT CCDXAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
     CAutoLock lck(&m_csLock);
 
     PBYTE pbBufferOrg = pbBuffer;
-    LONGLONG pos = m_llPosition;
+    int64_t pos = m_llPosition;
 
     while (pos >= 0 && pos < m_llLength && dwBytesToRead > 0) {
         UINT sector = m_nFirstSector + int(pos / RAW_DATA_SIZE);
@@ -346,7 +352,7 @@ HRESULT CCDXAStream::Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDW
     return S_OK;
 }
 
-LONGLONG CCDXAStream::Size(LONGLONG* pSizeAvailable)
+int64_t CCDXAStream::Size(int64_t* pSizeAvailable)
 {
     if (pSizeAvailable) {
         *pSizeAvailable = m_llLength;

@@ -115,7 +115,7 @@ namespace DSObjects
         void StartWorkerThreads();
         void StopWorkerThreads();
 
-        LONGLONG        m_LastAdapterCheck;
+        int64_t        m_LastAdapterCheck;
         UINT GetAdapter(IDirect3D9* pD3D, bool bGetAdapter = true);
         DWORD GetVertexProcessing();
 
@@ -123,8 +123,8 @@ namespace DSObjects
         bool WaitForVBlankRange(int& _RasterStart, int _RasterEnd, bool _bWaitIfInside, bool _bNeedAccurate, bool _bMeasure, bool& _bTakenLock);
         bool WaitForVBlank(bool& _Waited, bool& _bTakenLock);
         int GetVBlackPos();
-        void CalculateJitter(LONGLONG PerformanceCounter);
-        virtual void OnVBlankFinished(bool fAll, LONGLONG PerformanceCounter) {}
+        void CalculateJitter(int64_t PerformanceCounter);
+        virtual void OnVBlankFinished(bool fAll, int64_t PerformanceCounter) {}
 
         // Casimir666
         typedef HRESULT(WINAPI* D3DXLoadSurfaceFromMemoryPtr)(
@@ -226,14 +226,14 @@ namespace DSObjects
         double                  m_ldDetectedScanlineRateList[100];
         int                     m_DetectedRefreshRatePos;
         bool                    m_bSyncStatsAvailable;
-        LONGLONG                m_pllJitter [NB_JITTER];            // Jitter buffer for stats
-        LONGLONG                m_pllSyncOffset [NB_JITTER];        // Jitter buffer for stats
-        LONGLONG                m_llLastPerf;
-        LONGLONG                m_JitterStdDev;
-        LONGLONG                m_MaxJitter;
-        LONGLONG                m_MinJitter;
-        LONGLONG                m_MaxSyncOffset;
-        LONGLONG                m_MinSyncOffset;
+        int64_t                m_pllJitter [NB_JITTER];            // Jitter buffer for stats
+        int64_t                m_pllSyncOffset [NB_JITTER];        // Jitter buffer for stats
+        int64_t                m_llLastPerf;
+        int64_t                m_JitterStdDev;
+        int64_t                m_MaxJitter;
+        int64_t                m_MinJitter;
+        int64_t                m_MaxSyncOffset;
+        int64_t                m_MinSyncOffset;
         int                     m_nNextJitter;
         int                     m_nNextSyncOffset;
         REFERENCE_TIME          m_rtTimePerFrame;
@@ -241,7 +241,7 @@ namespace DSObjects
         double                  m_DetectedFrameTime;
         double                  m_DetectedFrameTimeStdDev;
         bool                    m_DetectedLock;
-        LONGLONG                m_DetectedFrameTimeHistory[60];
+        int64_t                m_DetectedFrameTimeHistory[60];
         double                  m_DetectedFrameTimeHistoryHistory[500];
         int                     m_DetectedFrameTimePos;
         int                     m_bInterlaced;
@@ -251,29 +251,29 @@ namespace DSObjects
 
         int                     m_VBlankEndWait;
         int                     m_VBlankStartWait;
-        LONGLONG                m_VBlankWaitTime;
-        LONGLONG                m_VBlankLockTime;
+        int64_t                m_VBlankWaitTime;
+        int64_t                m_VBlankLockTime;
         int                     m_VBlankMin;
         int                     m_VBlankMinCalc;
         int                     m_VBlankMax;
         int                     m_VBlankEndPresent;
-        LONGLONG                m_VBlankStartMeasureTime;
+        int64_t                m_VBlankStartMeasureTime;
         int                     m_VBlankStartMeasure;
 
-        LONGLONG                m_PresentWaitTime;
-        LONGLONG                m_PresentWaitTimeMin;
-        LONGLONG                m_PresentWaitTimeMax;
+        int64_t                m_PresentWaitTime;
+        int64_t                m_PresentWaitTimeMin;
+        int64_t                m_PresentWaitTimeMax;
 
-        LONGLONG                m_PaintTime;
-        LONGLONG                m_PaintTimeMin;
-        LONGLONG                m_PaintTimeMax;
+        int64_t                m_PaintTime;
+        int64_t                m_PaintTimeMin;
+        int64_t                m_PaintTimeMax;
 
-        LONGLONG                m_WaitForGPUTime;
+        int64_t                m_WaitForGPUTime;
 
-        LONGLONG                m_RasterStatusWaitTime;
-        LONGLONG                m_RasterStatusWaitTimeMin;
-        LONGLONG                m_RasterStatusWaitTimeMax;
-        LONGLONG                m_RasterStatusWaitTimeMaxCalc;
+        int64_t                m_RasterStatusWaitTime;
+        int64_t                m_RasterStatusWaitTimeMin;
+        int64_t                m_RasterStatusWaitTimeMax;
+        int64_t                m_RasterStatusWaitTimeMaxCalc;
 
         double                  m_ClockDiffCalc;
         double                  m_ClockDiffPrim;
@@ -288,8 +288,8 @@ namespace DSObjects
 
         bool                    m_bCorrectedFrameTime;
         int                     m_FrameTimeCorrection;
-        LONGLONG                m_LastFrameDuration;
-        LONGLONG                m_LastSampleTime;
+        int64_t                m_LastFrameDuration;
+        int64_t                m_LastSampleTime;
 
         CString                 m_strStatsMsg[10];
 

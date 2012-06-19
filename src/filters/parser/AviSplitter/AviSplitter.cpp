@@ -634,7 +634,7 @@ bool CAviSplitterFilter::DemuxLoop()
 
 // IMediaSeeking
 
-STDMETHODIMP CAviSplitterFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CAviSplitterFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     CheckPointer(m_pFile, VFW_E_NOT_CONNECTED);
@@ -689,7 +689,7 @@ STDMETHODIMP CAviSplitterFilter::SetTimeFormat(const GUID* pFormat)
     return S_OK;
 }
 
-STDMETHODIMP CAviSplitterFilter::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CAviSplitterFilter::GetStopPosition(int64_t* pStop)
 {
     CheckPointer(pStop, E_POINTER);
     if (FAILED(__super::GetStopPosition(pStop))) {
@@ -698,14 +698,14 @@ STDMETHODIMP CAviSplitterFilter::GetStopPosition(LONGLONG* pStop)
     if (m_timeformat == TIME_FORMAT_MEDIA_TIME) {
         return S_OK;
     }
-    LONGLONG rt = *pStop;
+    int64_t rt = *pStop;
     if (FAILED(ConvertTimeFormat(pStop, &TIME_FORMAT_FRAME, rt, &TIME_FORMAT_MEDIA_TIME))) {
         return E_FAIL;
     }
     return S_OK;
 }
 
-STDMETHODIMP CAviSplitterFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CAviSplitterFilter::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     CheckPointer(pTarget, E_POINTER);
 
@@ -727,7 +727,7 @@ STDMETHODIMP CAviSplitterFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID
         for (unsigned int i = 0; i < m_pFile->m_strms.GetCount(); ++i) {
             CAviFile::strm_t* s = m_pFile->m_strms[i];
             if (s->strh.fccType == FCC('vids')) {
-                if (Source < 0 || Source >= (LONGLONG)s->cs.GetCount()) {
+                if (Source < 0 || Source >= (int64_t)s->cs.GetCount()) {
                     return E_FAIL;
                 }
                 CAviFile::strm_t::chunk& c = s->cs[(size_t)Source];
@@ -740,7 +740,7 @@ STDMETHODIMP CAviSplitterFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID
     return E_FAIL;
 }
 
-STDMETHODIMP CAviSplitterFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CAviSplitterFilter::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     HRESULT hr;
     if (FAILED(hr = __super::GetPositions(pCurrent, pStop)) || m_timeformat != TIME_FORMAT_FRAME) {
@@ -759,7 +759,7 @@ STDMETHODIMP CAviSplitterFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pSto
     return S_OK;
 }
 
-HRESULT CAviSplitterFilter::SetPositionsInternal(void* id, LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+HRESULT CAviSplitterFilter::SetPositionsInternal(void* id, int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     if (m_timeformat != TIME_FORMAT_FRAME) {
         return __super::SetPositionsInternal(id, pCurrent, dwCurrentFlags, pStop, dwStopFlags);

@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "BitStream.h"
 
 //
@@ -77,9 +83,9 @@ STDMETHODIMP_(UINT64) CBitStream::Seek(UINT64 pos)
     LARGE_INTEGER li;
     li.QuadPart = pos;
     ULARGE_INTEGER linew;
-    linew.QuadPart = (ULONGLONG) - 1;
+    linew.QuadPart = (uint64_t) - 1;
     m_pStream->Seek(li, STREAM_SEEK_SET, &linew);
-    ASSERT(li.QuadPart == (LONGLONG)linew.QuadPart);
+    ASSERT(li.QuadPart == (int64_t)linew.QuadPart);
     return linew.QuadPart;
 }
 

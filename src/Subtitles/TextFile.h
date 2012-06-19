@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include <afx.h>
 
 class CTextFile : protected CStdioFile
@@ -50,9 +55,9 @@ public:
 
     // CStdioFile
 
-    ULONGLONG GetPosition() const;
-    ULONGLONG GetLength() const;
-    ULONGLONG Seek(LONGLONG lOff, UINT nFrom);
+    uint64_t GetPosition() const;
+    uint64_t GetLength() const;
+    uint64_t Seek(int64_t lOff, UINT nFrom);
 
     void WriteString(LPCSTR lpsz/*CStringA str*/);
     void WriteString(LPCWSTR lpsz/*CStringW str*/);
@@ -62,11 +67,11 @@ public:
 
 class CWebTextFile : public CTextFile
 {
-    LONGLONG m_llMaxSize;
+    int64_t m_llMaxSize;
     CString m_tempfn;
 
 public:
-    CWebTextFile(LONGLONG llMaxSize = 1024 * 1024);
+    CWebTextFile(int64_t llMaxSize = 1024 * 1024);
 
     bool Open(LPCTSTR lpszFileName);
     bool Save(LPCTSTR lpszFileName, enc e /*= ASCII*/);

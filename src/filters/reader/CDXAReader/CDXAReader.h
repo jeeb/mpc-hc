@@ -45,7 +45,7 @@ private:
     CCritSec m_csLock;
 
     HANDLE m_hFile;
-    LONGLONG m_llPosition, m_llLength;
+    int64_t m_llPosition, m_llLength;
     int m_nFirstSector;
 
     int m_nBufferedSector;
@@ -59,9 +59,9 @@ public:
 
     bool Load(const WCHAR* fnw);
 
-    HRESULT SetPointer(LONGLONG llPos);
+    HRESULT SetPointer(int64_t llPos);
     HRESULT Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDWORD pdwBytesRead);
-    LONGLONG Size(LONGLONG* pSizeAvailable);
+    int64_t Size(int64_t* pSizeAvailable);
     DWORD Alignment();
     void Lock();
     void Unlock();

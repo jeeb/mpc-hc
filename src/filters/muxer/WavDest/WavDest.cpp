@@ -22,6 +22,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "BaseClasses/streams.h"
 #include <aviriff.h>
 #include "WavDest.h"
@@ -169,7 +175,7 @@ HRESULT CWavDestFilter::Copy(IMediaSample* pSource, IMediaSample* pDest) const
         pDest->SetTime(&TimeStart, &TimeEnd);
     }
 
-    LONGLONG MediaStart, MediaEnd;
+    int64_t MediaStart, MediaEnd;
     if (pSource->GetMediaTime(&MediaStart, &MediaEnd) == NOERROR) {
         pDest->SetMediaTime(&MediaStart, &MediaEnd);
     }

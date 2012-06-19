@@ -167,15 +167,15 @@ namespace GothSync
         virtual void DeleteSurfaces();
 
         HANDLE m_hEvtQuit; // Stop rendering thread event
-        LONGLONG m_LastAdapterCheck;
+        int64_t m_LastAdapterCheck;
         UINT m_CurrentAdapter;
 
         float m_bicubicA;
         HRESULT InitResizers(float bicubicA, bool bNeedScreenSizeTexture);
 
         // Functions to trace timing performance
-        void SyncStats(LONGLONG syncTime);
-        void SyncOffsetStats(LONGLONG syncOffset);
+        void SyncStats(int64_t syncTime);
+        void SyncOffsetStats(int64_t syncOffset);
         void DrawText(const RECT& rc, const CString& strText, int _Priority);
         void DrawStats();
 
@@ -282,24 +282,24 @@ namespace GothSync
         UINT m_pcFramesDuplicated;
         UINT m_pcFramesDrawn;
 
-        LONGLONG m_pllJitter [NB_JITTER]; // Vertical sync time stats
-        LONGLONG m_pllSyncOffset [NB_JITTER]; // Sync offset time stats
+        int64_t m_pllJitter [NB_JITTER]; // Vertical sync time stats
+        int64_t m_pllSyncOffset [NB_JITTER]; // Sync offset time stats
         int m_nNextJitter;
         int m_nNextSyncOffset;
-        LONGLONG m_JitterStdDev;
+        int64_t m_JitterStdDev;
 
-        LONGLONG m_llLastSyncTime;
+        int64_t m_llLastSyncTime;
 
-        LONGLONG m_MaxJitter;
-        LONGLONG m_MinJitter;
-        LONGLONG m_MaxSyncOffset;
-        LONGLONG m_MinSyncOffset;
+        int64_t m_MaxJitter;
+        int64_t m_MinJitter;
+        int64_t m_MaxSyncOffset;
+        int64_t m_MinSyncOffset;
         UINT m_uSyncGlitches;
 
-        LONGLONG m_llSampleTime, m_llLastSampleTime; // Present time for the current sample
+        int64_t m_llSampleTime, m_llLastSampleTime; // Present time for the current sample
         LONG m_lSampleLatency, m_lLastSampleLatency; // Time between intended and actual presentation time
         LONG m_lMinSampleLatency, m_lLastMinSampleLatency;
-        LONGLONG m_llHysteresis;
+        int64_t m_llHysteresis;
         LONG m_lHysteresis;
         LONG m_lShiftToNearest, m_lShiftToNearestPrev;
         bool m_bVideoSlowerThanDisplay;
@@ -368,7 +368,7 @@ namespace GothSync
         STDMETHODIMP_(bool) ResetDevice();
 
         // IMFClockStateSink
-        STDMETHODIMP OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset);
+        STDMETHODIMP OnClockStart(MFTIME hnsSystemTime, int64_t llClockStartOffset);
         STDMETHODIMP OnClockStop(MFTIME hnsSystemTime);
         STDMETHODIMP OnClockPause(MFTIME hnsSystemTime);
         STDMETHODIMP OnClockRestart(MFTIME hnsSystemTime);
@@ -419,7 +419,7 @@ namespace GothSync
         STDMETHODIMP SetVideoWindow(HWND hwndVideo);
         STDMETHODIMP GetVideoWindow(HWND* phwndVideo);
         STDMETHODIMP RepaintVideo(void);
-        STDMETHODIMP GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, LONGLONG* pTimeStamp);
+        STDMETHODIMP GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, int64_t* pTimeStamp);
         STDMETHODIMP SetBorderColor(COLORREF Clr);
         STDMETHODIMP GetBorderColor(COLORREF* pClr);
         STDMETHODIMP SetRenderingPrefs(DWORD dwRenderFlags);
@@ -524,7 +524,7 @@ namespace GothSync
         void FlushSamples();
         void FlushSamplesInternal();
 
-        LONGLONG GetMediaTypeMerit(IMFMediaType* pMediaType);
+        int64_t GetMediaTypeMerit(IMFMediaType* pMediaType);
         HRESULT RenegotiateMediaType();
         HRESULT IsMediaTypeSupported(IMFMediaType* pMixerType);
         HRESULT CreateProposedOutputType(IMFMediaType* pMixerType, IMFMediaType** pType);

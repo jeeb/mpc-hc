@@ -444,7 +444,7 @@ DVD_POSITION* CAppSettings::CurrentDVDPosition()
     }
 }
 
-bool CAppSettings::NewDvd(ULONGLONG llDVDGuid)
+bool CAppSettings::NewDvd(uint64_t llDVDGuid)
 {
     // Look for the DVD position
     for (int i = 0; i < MAX_DVD_POSITION; i++) {

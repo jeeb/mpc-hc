@@ -68,7 +68,7 @@ public:
 
     // IMediaSeeking
 
-    STDMETHODIMP GetDuration(LONGLONG* pDuration);
+    STDMETHODIMP GetDuration(int64_t* pDuration);
 
     // TODO: this is too ugly, integrate this with the baseclass somehow
     GUID m_timeformat;
@@ -76,11 +76,11 @@ public:
     STDMETHODIMP GetTimeFormat(GUID* pFormat);
     STDMETHODIMP IsUsingTimeFormat(const GUID* pFormat);
     STDMETHODIMP SetTimeFormat(const GUID* pFormat);
-    STDMETHODIMP GetStopPosition(LONGLONG* pStop);
-    STDMETHODIMP ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat);
-    STDMETHODIMP GetPositions(LONGLONG* pCurrent, LONGLONG* pStop);
+    STDMETHODIMP GetStopPosition(int64_t* pStop);
+    STDMETHODIMP ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat);
+    STDMETHODIMP GetPositions(int64_t* pCurrent, int64_t* pStop);
 
-    HRESULT SetPositionsInternal(void* id, LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags);
+    HRESULT SetPositionsInternal(void* id, int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags);
 
     // IKeyFrameInfo
 

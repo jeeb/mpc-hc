@@ -82,7 +82,7 @@ BOOL CMultiFiles::OpenFiles(CAtlList<CHdmvClipInfo::PlaylistItem>& files, UINT n
     return TRUE;
 }
 
-ULONGLONG CMultiFiles::Seek(LONGLONG lOff, UINT nFrom)
+uint64_t CMultiFiles::Seek(int64_t lOff, UINT nFrom)
 {
     LARGE_INTEGER   llNewPos;
     LARGE_INTEGER   llOff;
@@ -93,9 +93,9 @@ ULONGLONG CMultiFiles::Seek(LONGLONG lOff, UINT nFrom)
 
         return llNewPos.QuadPart;
     } else {
-        ULONGLONG   lAbsolutePos = GetAbsolutePosition(lOff, nFrom);
+        uint64_t   lAbsolutePos = GetAbsolutePosition(lOff, nFrom);
         int         nNewPart     = 0;
-        ULONGLONG   llSum        = 0;
+        uint64_t   llSum        = 0;
 
         while (m_FilesSize[nNewPart] + llSum <= lAbsolutePos) {
             llSum += m_FilesSize[nNewPart];
@@ -110,7 +110,7 @@ ULONGLONG CMultiFiles::Seek(LONGLONG lOff, UINT nFrom)
     }
 }
 
-ULONGLONG CMultiFiles::GetAbsolutePosition(LONGLONG lOff, UINT nFrom)
+uint64_t CMultiFiles::GetAbsolutePosition(int64_t lOff, UINT nFrom)
 {
     LARGE_INTEGER   llNoMove = {0, 0};
     LARGE_INTEGER   llCurPos;
@@ -128,7 +128,7 @@ ULONGLONG CMultiFiles::GetAbsolutePosition(LONGLONG lOff, UINT nFrom)
     }
 }
 
-ULONGLONG CMultiFiles::GetLength() const
+uint64_t CMultiFiles::GetLength() const
 {
     if (m_strFiles.GetCount() == 1) {
         LARGE_INTEGER   llSize;

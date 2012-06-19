@@ -158,7 +158,7 @@ STDMETHODIMP CQuicktimeGraph::GetState(LONG msTimeout, OAFilterState* pfs)
 }
 
 // IMediaSeeking
-STDMETHODIMP CQuicktimeGraph::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CQuicktimeGraph::GetDuration(::int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
 
@@ -178,7 +178,7 @@ STDMETHODIMP CQuicktimeGraph::GetDuration(LONGLONG* pDuration)
     return S_OK;
 }
 
-STDMETHODIMP CQuicktimeGraph::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CQuicktimeGraph::GetCurrentPosition(::int64_t* pCurrent)
 {
     CheckPointer(pCurrent, E_POINTER);
 
@@ -199,7 +199,7 @@ STDMETHODIMP CQuicktimeGraph::GetCurrentPosition(LONGLONG* pCurrent)
     return S_OK;
 }
 
-STDMETHODIMP CQuicktimeGraph::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CQuicktimeGraph::SetPositions(::int64_t* pCurrent, DWORD dwCurrentFlags, ::int64_t* pStop, DWORD dwStopFlags)
 {
     CheckPointer(pCurrent, E_POINTER);
 

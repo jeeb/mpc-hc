@@ -158,7 +158,7 @@ HRESULT CMpaSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
     return m_pOutputs.GetCount() > 0 ? S_OK : E_FAIL;
 }
 
-STDMETHODIMP CMpaSplitterFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CMpaSplitterFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     CheckPointer(m_pFile, VFW_E_NOT_CONNECTED);

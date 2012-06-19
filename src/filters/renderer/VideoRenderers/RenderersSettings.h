@@ -23,6 +23,11 @@
 
 #pragma once
 
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 enum {
     WM_REARRANGERENDERLESS = WM_APP + 1,
     WM_RESET_DEVICE,
@@ -155,7 +160,7 @@ public:
     bool        m_bFP16Support;
     bool        m_b10bitSupport;
 
-    LONGLONG    GetPerfCounter();
+    int64_t    GetPerfCounter();
     HINSTANCE   GetD3X9Dll();
     UINT        GetDXSdkRelease() {return m_nDXSdkRelease;};
 };

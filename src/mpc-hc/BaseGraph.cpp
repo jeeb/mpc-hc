@@ -456,37 +456,37 @@ STDMETHODIMP CBaseGraph::SetTimeFormat(const GUID* pFormat)
     return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;
 }
 
-STDMETHODIMP CBaseGraph::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CBaseGraph::GetDuration(int64_t* pDuration)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CBaseGraph::GetStopPosition(int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CBaseGraph::GetCurrentPosition(int64_t* pCurrent)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CBaseGraph::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CBaseGraph::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CBaseGraph::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CBaseGraph::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     return E_NOTIMPL;
 }
@@ -501,7 +501,7 @@ STDMETHODIMP CBaseGraph::GetRate(double* pdRate)
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseGraph::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CBaseGraph::GetPreroll(int64_t* pllPreroll)
 {
     return E_NOTIMPL;
 }
@@ -885,7 +885,7 @@ STDMETHODIMP CBaseGraph::get_Balance(long* plBalance)
 }
 
 // IAMOpenProgress
-STDMETHODIMP CBaseGraph::QueryProgress(LONGLONG* pllTotal, LONGLONG* pllCurrent)
+STDMETHODIMP CBaseGraph::QueryProgress(int64_t* pllTotal, int64_t* pllCurrent)
 {
     return E_NOTIMPL;
 }

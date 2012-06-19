@@ -77,7 +77,7 @@ namespace DSObjects
         STDMETHODIMP_(bool) DisplayChange();
 
         // IMFClockStateSink
-        STDMETHODIMP OnClockStart(/* [in] */ MFTIME hnsSystemTime, /* [in] */ LONGLONG llClockStartOffset);
+        STDMETHODIMP OnClockStart(/* [in] */ MFTIME hnsSystemTime, /* [in] */ int64_t llClockStartOffset);
         STDMETHODIMP OnClockStop(/* [in] */ MFTIME hnsSystemTime);
         STDMETHODIMP OnClockPause(/* [in] */ MFTIME hnsSystemTime);
         STDMETHODIMP OnClockRestart(/* [in] */ MFTIME hnsSystemTime);
@@ -133,7 +133,7 @@ namespace DSObjects
         STDMETHODIMP SetVideoWindow(HWND hwndVideo);
         STDMETHODIMP GetVideoWindow(HWND* phwndVideo);
         STDMETHODIMP RepaintVideo(void);
-        STDMETHODIMP GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, LONGLONG* pTimeStamp);
+        STDMETHODIMP GetCurrentImage(BITMAPINFOHEADER* pBih, BYTE** pDib, DWORD* pcbDib, int64_t* pTimeStamp);
         STDMETHODIMP SetBorderColor(COLORREF Clr);
         STDMETHODIMP GetBorderColor(COLORREF* pClr);
         STDMETHODIMP SetRenderingPrefs(DWORD dwRenderFlags);
@@ -158,14 +158,14 @@ namespace DSObjects
 
     protected :
         void            OnResetDevice();
-        virtual void    OnVBlankFinished(bool fAll, LONGLONG PerformanceCounter);
+        virtual void    OnVBlankFinished(bool fAll, int64_t PerformanceCounter);
 
         double          m_ModeratedTime;
-        LONGLONG        m_ModeratedTimeLast;
-        LONGLONG        m_ModeratedClockLast;
-        LONGLONG        m_ModeratedTimer;
+        int64_t        m_ModeratedTimeLast;
+        int64_t        m_ModeratedClockLast;
+        int64_t        m_ModeratedTimer;
         MFCLOCK_STATE   m_LastClockState;
-        LONGLONG        GetClockTime(LONGLONG PerformanceCounter);
+        int64_t        GetClockTime(int64_t PerformanceCounter);
 
     private :
 
@@ -209,20 +209,20 @@ namespace DSObjects
         IMFSample*                              m_pCurrentDisplaydSample;
         bool                                    m_bWaitingSample;
         bool                                    m_bLastSampleOffsetValid;
-        LONGLONG                                m_LastScheduledSampleTime;
+        int64_t                                m_LastScheduledSampleTime;
         double                                  m_LastScheduledSampleTimeFP;
-        LONGLONG                                m_LastScheduledUncorrectedSampleTime;
-        LONGLONG                                m_MaxSampleDuration;
-        LONGLONG                                m_LastSampleOffset;
-        LONGLONG                                m_VSyncOffsetHistory[5];
-        LONGLONG                                m_LastPredictedSync;
+        int64_t                                m_LastScheduledUncorrectedSampleTime;
+        int64_t                                m_MaxSampleDuration;
+        int64_t                                m_LastSampleOffset;
+        int64_t                                m_VSyncOffsetHistory[5];
+        int64_t                                m_LastPredictedSync;
         int                                     m_VSyncOffsetHistoryPos;
 
         UINT                                    m_nResetToken;
         int                                     m_nStepCount;
 
         bool                                    m_bSignaledStarvation;
-        LONGLONG                                m_StarvationClock;
+        int64_t                                m_StarvationClock;
 
         // Stats variable for IQualProp
         UINT                                    m_pcFrames;

@@ -21,6 +21,12 @@
  */
 
 #include "stdafx.h"
+
+#ifndef MSVC_STDINT_H
+#define MSVC_STDINT_H
+#include <stdint.h>
+#endif
+
 #include "SyncClock.h"
 
 CSyncClockFilter::CSyncClockFilter(LPUNKNOWN pUnk, HRESULT* phr)
@@ -110,10 +116,10 @@ REFERENCE_TIME CSyncClock::GetPrivateTime()
 
 REFERENCE_TIME CSyncClock::GetTicks100ns()
 {
-    LONGLONG i64Ticks100ns;
+    int64_t i64Ticks100ns;
     if (m_llPerfFrequency != 0) {
         QueryPerformanceCounter((LARGE_INTEGER*)&i64Ticks100ns);
-        i64Ticks100ns = LONGLONG((double(i64Ticks100ns) * 10000000) / double(m_llPerfFrequency) + 0.5);
+        i64Ticks100ns = int64_t((double(i64Ticks100ns) * 10000000) / double(m_llPerfFrequency) + 0.5);
         return (REFERENCE_TIME)i64Ticks100ns;
     }
     return 0;

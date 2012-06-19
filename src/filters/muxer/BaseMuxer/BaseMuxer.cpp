@@ -436,7 +436,7 @@ STDMETHODIMP CBaseMuxerFilter::SetTimeFormat(const GUID* pFormat)
     return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetDuration(LONGLONG* pDuration)
+STDMETHODIMP CBaseMuxerFilter::GetDuration(int64_t* pDuration)
 {
     CheckPointer(pDuration, E_POINTER);
     *pDuration = 0;
@@ -450,24 +450,24 @@ STDMETHODIMP CBaseMuxerFilter::GetDuration(LONGLONG* pDuration)
     return S_OK;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetStopPosition(LONGLONG* pStop)
+STDMETHODIMP CBaseMuxerFilter::GetStopPosition(int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetCurrentPosition(LONGLONG* pCurrent)
+STDMETHODIMP CBaseMuxerFilter::GetCurrentPosition(int64_t* pCurrent)
 {
     CheckPointer(pCurrent, E_POINTER);
     *pCurrent = m_rtCurrent;
     return S_OK;
 }
 
-STDMETHODIMP CBaseMuxerFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat)
+STDMETHODIMP CBaseMuxerFilter::ConvertTimeFormat(int64_t* pTarget, const GUID* pTargetFormat, int64_t Source, const GUID* pSourceFormat)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseMuxerFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags, LONGLONG* pStop, DWORD dwStopFlags)
+STDMETHODIMP CBaseMuxerFilter::SetPositions(int64_t* pCurrent, DWORD dwCurrentFlags, int64_t* pStop, DWORD dwStopFlags)
 {
     FILTER_STATE fs;
 
@@ -490,12 +490,12 @@ STDMETHODIMP CBaseMuxerFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentF
     return VFW_E_WRONG_STATE;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+STDMETHODIMP CBaseMuxerFilter::GetPositions(int64_t* pCurrent, int64_t* pStop)
 {
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+STDMETHODIMP CBaseMuxerFilter::GetAvailable(int64_t* pEarliest, int64_t* pLatest)
 {
     return E_NOTIMPL;
 }
@@ -510,7 +510,7 @@ STDMETHODIMP CBaseMuxerFilter::GetRate(double* pdRate)
     return E_NOTIMPL;
 }
 
-STDMETHODIMP CBaseMuxerFilter::GetPreroll(LONGLONG* pllPreroll)
+STDMETHODIMP CBaseMuxerFilter::GetPreroll(int64_t* pllPreroll)
 {
     return E_NOTIMPL;
 }

@@ -66,7 +66,7 @@ class CCDDAStream : public CAsyncStream
 private:
     CCritSec m_csLock;
 
-    LONGLONG m_llPosition, m_llLength;
+    int64_t m_llPosition, m_llLength;
 
     HANDLE m_hDrive;
     CDROM_TOC m_TOC;
@@ -84,9 +84,9 @@ public:
     bool Load(const WCHAR* fnw);
 
     // overrides
-    HRESULT SetPointer(LONGLONG llPos);
+    HRESULT SetPointer(int64_t llPos);
     HRESULT Read(PBYTE pbBuffer, DWORD dwBytesToRead, BOOL bAlign, LPDWORD pdwBytesRead);
-    LONGLONG Size(LONGLONG* pSizeAvailable);
+    int64_t Size(int64_t* pSizeAvailable);
     DWORD Alignment();
     void Lock();
     void Unlock();

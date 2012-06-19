@@ -116,7 +116,7 @@ CRenderersData::CRenderersData()
     m_b10bitSupport = true;
 }
 
-LONGLONG CRenderersData::GetPerfCounter()
+int64_t CRenderersData::GetPerfCounter()
 {
     LARGE_INTEGER i64Ticks100ns;
     LARGE_INTEGER llPerfFrequency;
