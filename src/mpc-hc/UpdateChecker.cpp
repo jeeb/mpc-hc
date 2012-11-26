@@ -28,8 +28,10 @@
 
 #include <afxinet.h>
 
-const Version UpdateChecker::MPC_HC_VERSION = { MPC_VERSION_NUM };
-const LPCTSTR UpdateChecker::MPC_HC_UPDATE_URL = _T("http://mpc-hc.sourceforge.net/version.txt");
+#define CCCP_VERSION_NUM ACTUAL_BUILD_YEAR,ACTUAL_BUILD_MONTH,ACTUAL_BUILD_DAY,MPC_VERSION_REV
+
+const Version UpdateChecker::MPC_HC_VERSION = { CCCP_VERSION_NUM };
+const LPCTSTR UpdateChecker::MPC_HC_UPDATE_URL = _T("http://www.cccp-project.net/updater/version.txt");
 
 UpdateChecker::UpdateChecker(CString versionFileURL)
     : versionFileURL(versionFileURL)
