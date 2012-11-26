@@ -34,6 +34,9 @@ public:
     static unsigned GetPatchNumber();
     static unsigned GetRevisionNumber();
     static CString GetGCCVersion();
+    static unsigned int GetCCCPBuildYear();
+    static unsigned int GetCCCPBuildMonth();
+    static unsigned int GetCCCPBuildDay();
 private:
     VersionInfo();
 };
