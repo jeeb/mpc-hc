@@ -32,8 +32,8 @@
 #endif
 
 #define WEBSITE_URL  _T("http://mpc-hc.org/")
-#define DOWNLOAD_URL _T("http://mpc-hc.org/downloads/")
-#define UPDATE_URL   _T("http://mpc-hc.org/version.txt")
+#define DOWNLOAD_URL _T("http://www.cccp-project.net/")
+#define UPDATE_URL   _T("http://www.cccp-project.net/updater/version.txt")
 #define TRAC_URL     _T("https://trac.mpc-hc.org/")
 #define BUGS_URL     _T("https://trac.mpc-hc.org/wiki/How_to_Report_Issues")
 #define TOOLBARS_URL _T("https://trac.mpc-hc.org/wiki/Toolbar_images")
