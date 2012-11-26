@@ -30,7 +30,9 @@
 
 #include <afxinet.h>
 
-const Version UpdateChecker::MPC_HC_VERSION = { MPC_VERSION_NUM };
+#define CCCP_VERSION_NUM CCCP_BUILD_YEAR,CCCP_BUILD_MONTH,CCCP_BUILD_DAY,MPC_VERSION_REV
+
+const Version UpdateChecker::MPC_HC_VERSION = { CCCP_VERSION_NUM };
 const LPCTSTR UpdateChecker::MPC_HC_UPDATE_URL = UPDATE_URL;
 
 bool UpdateChecker::bIsCheckingForUpdate = false;
