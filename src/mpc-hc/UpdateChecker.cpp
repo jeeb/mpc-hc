@@ -31,9 +31,9 @@
 #include <afxinet.h>
 
 const Version UpdateChecker::MPC_HC_VERSION = {
-    VersionInfo::GetMajorNumber(),
-    VersionInfo::GetMinorNumber(),
-    VersionInfo::GetPatchNumber(),
+    VersionInfo::GetCCCPBuildYear(),
+    VersionInfo::GetCCCPBuildMonth(),
+    VersionInfo::GetCCCPBuildDay(),
     VersionInfo::GetRevisionNumber()
 };
 const LPCTSTR UpdateChecker::MPC_HC_UPDATE_URL = UPDATE_URL;
