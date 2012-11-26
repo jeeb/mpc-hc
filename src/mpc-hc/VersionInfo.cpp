@@ -83,3 +83,18 @@ unsigned VersionInfo::GetRevisionNumber()
 {
     return MPC_VERSION_REV;
 }
+
+unsigned int VersionInfo::GetCCCPBuildYear()
+{
+    return CCCP_BUILD_YEAR;
+}
+
+unsigned int VersionInfo::GetCCCPBuildMonth()
+{
+    return CCCP_BUILD_MONTH;
+}
+
+unsigned int VersionInfo::GetCCCPBuildDay()
+{
+    return CCCP_BUILD_DAY;
+}
