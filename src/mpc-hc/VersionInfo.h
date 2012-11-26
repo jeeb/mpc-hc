@@ -33,6 +33,9 @@ public:
     static unsigned GetMinorNumber();
     static unsigned GetPatchNumber();
     static unsigned GetRevisionNumber();
+    static unsigned int GetCCCPBuildYear();
+    static unsigned int GetCCCPBuildMonth();
+    static unsigned int GetCCCPBuildDay();
 private:
     VersionInfo();
 };
