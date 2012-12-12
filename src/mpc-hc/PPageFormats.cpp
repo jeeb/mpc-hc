@@ -305,7 +305,7 @@ BOOL CPPageFormats::OnApply()
             auto iconLib = s.fileAssoc.GetIconLib();
 
             if (fSetAssociatedWithIcon && IsNeededIconsLib() && !iconLib) {
-                AfxMessageBox(IDS_MISSING_ICONS_LIB, MB_ICONEXCLAMATION | MB_OK, 0);
+                // AfxMessageBox(IDS_MISSING_ICONS_LIB, MB_ICONEXCLAMATION | MB_OK, 0);
             }
 
             for (int i = 0, cnt = m_list.GetItemCount(); i < cnt; i++) {
