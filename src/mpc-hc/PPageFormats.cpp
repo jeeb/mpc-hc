@@ -292,7 +292,7 @@ BOOL CPPageFormats::OnApply()
 
         if (m_bFileExtChanged) {
             if (fSetAssociatedWithIcon && IsNeededIconsLib() && !CFileAssoc::LoadIconLib()) {
-                AfxMessageBox(IDS_MISSING_ICONS_LIB, MB_ICONEXCLAMATION | MB_OK, 0);
+                //AfxMessageBox(IDS_MISSING_ICONS_LIB, MB_ICONEXCLAMATION | MB_OK, 0);
             }
 
             for (int i = 0, cnt = m_list.GetItemCount(); i < cnt; i++) {
