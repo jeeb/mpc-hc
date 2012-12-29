@@ -153,7 +153,7 @@ LONG WINAPI CMiniDump::UnhandledExceptionFilter(_EXCEPTION_POINTERS* lpTopLevelE
     if (szResult[0]) {
         switch (MessageBox(NULL, szResult, _T("MPC-HC - Mini Dump"), retval ? MB_YESNO : MB_OK)) {
             case IDYES:
-                ShellExecute(NULL, _T("open"), _T("http://sourceforge.net/apps/trac/mpc-hc/wiki/Bugs_-_Reporting"), NULL, NULL, SW_SHOWDEFAULT);
+                ShellExecute(NULL, _T("open"), _T("http://www.cccp-project.net/wiki/index.php?title=MPC-HC_has_crashed"), NULL, NULL, SW_SHOWDEFAULT);
                 ExploreToFile(strDumpPath);
                 break;
             case IDNO:
