@@ -16,4 +16,6 @@ Legend:
 * Updated Catalan and Greek translations
 * Updated Little CMS to v2.5 (git b58cb85)
 ! Fix a crash when VMR-7 (renderless) renderer failed to load
+! SSA subtitles rendering: Improve error checking to avoid possible crashes when
+  the SSA script was using obviously wrong values
 ! Ticket #2991, Fix loading of MicroDVD subtitles
