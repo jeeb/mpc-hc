@@ -17,9 +17,6 @@
     <ClInclude Include="AAFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cpu_detect.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="FIRFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,16 +55,10 @@
     <ClCompile Include="AAFilter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cpu_detect_x86.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="FIFOSampleBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FIRFilter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="mmx_optimized.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RateTransposer.cpp">

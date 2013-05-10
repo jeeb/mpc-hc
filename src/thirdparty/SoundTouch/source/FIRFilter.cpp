@@ -44,7 +44,6 @@
 #include <math.h>
 #include <stdlib.h>
 #include "FIRFilter.h"
-#include "cpu_detect.h"
 
 using namespace soundtouch;
 
@@ -227,33 +226,6 @@ void * FIRFilter::operator new(size_t s)
 
 
 FIRFilter * FIRFilter::newInstance()
-{
-    uint uExtensions;
-
-    uExtensions = detectCPUextensions();
-
-    // Check if MMX/SSE instruction set extensions supported by CPU
-
-#ifdef SOUNDTOUCH_ALLOW_MMX
-    // MMX routines available only with integer sample types
-    if (uExtensions & SUPPORT_MMX)
-    {
-        return ::new FIRFilterMMX;
-    }
-    else
-#endif // SOUNDTOUCH_ALLOW_MMX
-
-#ifdef SOUNDTOUCH_ALLOW_SSE
-    if (uExtensions & SUPPORT_SSE)
-    {
-        // SSE support
-        return ::new FIRFilterSSE;
-    }
-    else
-#endif // SOUNDTOUCH_ALLOW_SSE
-
-    {
-        // ISA optimizations not supported, use plain C version
-        return ::new FIRFilter;
-    }
+{// edited for MPC-HC, force usage of SSE instructions, no SSE2 or more advanced methods are in this project
+    return ::new FIRFilterSSE;
 }

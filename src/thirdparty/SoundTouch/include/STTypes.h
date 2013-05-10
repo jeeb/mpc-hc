@@ -102,15 +102,13 @@ namespace soundtouch
         ///   also in GNU environment, then please #undef the INTEGER_SAMPLE
         ///   and FLOAT_SAMPLE defines first as in comments above.
 
-        // MPC-HC patch: define SOUNDTOUCH_INTEGER_SAMPLES
         // the default is SOUNDTOUCH_FLOAT_SAMPLES
-        #define SOUNDTOUCH_INTEGER_SAMPLES     1    //< 16bit integer samples
-        //#define SOUNDTOUCH_FLOAT_SAMPLES       1    //< 32bit float samples
+        //#define SOUNDTOUCH_INTEGER_SAMPLES     1    //< 16bit integer samples
+        #define SOUNDTOUCH_FLOAT_SAMPLES       1    //< 32bit float samples
      
     #endif
 
-    #if (_M_IX86 || __i386__ || __x86_64__) /* MPC-HC patch: don't use optimizations for x64 (_M_X64);
-                                               The __m64 data type is not supported on x64 processors */
+    // MPC-HC custom code
         /// Define this to allow X86-specific assembler/intrinsic optimizations. 
         /// Notice that library contains also usual C++ versions of each of these
         /// these routines, so if you're having difficulties getting the optimized 
@@ -126,11 +124,6 @@ namespace soundtouch
         #ifdef SOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS
             #undef SOUNDTOUCH_ALLOW_X86_OPTIMIZATIONS
         #endif
-    #else
-        /// Always disable optimizations when not using a x86 systems.
-        #undef SOUNDTOUCH_ALLOW_X86_OPTIMIZATIONS
-
-    #endif
 
     // If defined, allows the SIMD-optimized routines to take minor shortcuts 
     // for improved performance. Undefine to require faithfully similar SIMD 
@@ -151,7 +144,8 @@ namespace soundtouch
 
         #ifdef SOUNDTOUCH_ALLOW_X86_OPTIMIZATIONS
             // Allow MMX optimizations
-            #define SOUNDTOUCH_ALLOW_MMX   1
+            // // MPC-HC custom code: disable MMX
+            //#define SOUNDTOUCH_ALLOW_MMX   1
         #endif
 
     #else
