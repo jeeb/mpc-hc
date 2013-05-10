@@ -1,5 +1,5 @@
 /*
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -20,78 +20,48 @@
 
 #pragma once
 
-/// === Outer EVR
+#include "AllocatorCommon.h"
+#include <vmr9.h>
+
 namespace DSObjects
 {
-    class COuterEVR
-        : public CUnknown
-        , public IVMRffdshow9
-        , public IVMRMixerBitmap9
-        , public IBaseFilter
+    class COuterEVR// note: this class holds the final reference before destruction of CEVRAllocatorPresenter, see COuterEVR::Release() for reference
+        : public IBaseFilter
+        , public IKsPropertySet
     {
-        CComPtr<IUnknown> m_pEVR;
-        VMR9AlphaBitmap*  m_pVMR9AlphaBitmap;
-        CEVRAllocatorPresenter* m_pAllocatorPresenter;
-
     public:
-        COuterEVR(const TCHAR* pName, LPUNKNOWN pUnk, HRESULT& hr, VMR9AlphaBitmap* pVMR9AlphaBitmap, CEVRAllocatorPresenter* pAllocatorPresenter) : CUnknown(pName, pUnk) {
-            hr = m_pEVR.CoCreateInstance(CLSID_EnhancedVideoRenderer, GetOwner());
-            m_pVMR9AlphaBitmap = pVMR9AlphaBitmap;
-            m_pAllocatorPresenter = pAllocatorPresenter;
-        }
+        IUnknown* m_pEVR;
+        IBaseFilter* m_pBaseFilter;// does not hold a reference inside this class
+        ULONG volatile mv_ulReferenceCount;
 
-        ~COuterEVR() {}
+        __declspec(nothrow noalias) __forceinline COuterEVR() : mv_ulReferenceCount(0) {}// the first reference is created by CEVRAllocatorPresenter
 
-        DECLARE_IUNKNOWN;
-        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv) {
-            HRESULT hr;
-
-            if (riid == __uuidof(IVMRMixerBitmap9)) {
-                return GetInterface((IVMRMixerBitmap9*)this, ppv);
-            }
-            if (riid == __uuidof(IMediaFilter)) {
-                return GetInterface((IMediaFilter*)this, ppv);
-            }
-            if (riid == __uuidof(IPersist)) {
-                return GetInterface((IPersist*)this, ppv);
-            }
-            if (riid == __uuidof(IBaseFilter)) {
-                return GetInterface((IBaseFilter*)this, ppv);
-            }
-
-            hr = m_pEVR ? m_pEVR->QueryInterface(riid, ppv) : E_NOINTERFACE;
-            if (m_pEVR && FAILED(hr)) {
-                if (riid == __uuidof(IVMRffdshow9)) { // Support ffdshow queueing. We show ffdshow that this is patched Media Player Classic.
-                    return GetInterface((IVMRffdshow9*)this, ppv);
-                }
-            }
-
-            return SUCCEEDED(hr) ? hr : __super::NonDelegatingQueryInterface(riid, ppv);
-        }
+        // IUnknown
+        __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
         // IBaseFilter
-        STDMETHODIMP EnumPins(__out  IEnumPins** ppEnum);
-        STDMETHODIMP FindPin(LPCWSTR Id, __out  IPin** ppPin);
-        STDMETHODIMP QueryFilterInfo(__out  FILTER_INFO* pInfo);
-        STDMETHODIMP JoinFilterGraph(__in_opt  IFilterGraph* pGraph, __in_opt  LPCWSTR pName);
-        STDMETHODIMP QueryVendorInfo(__out  LPWSTR* pVendorInfo);
-        STDMETHODIMP Stop();
-        STDMETHODIMP Pause();
-        STDMETHODIMP Run(REFERENCE_TIME tStart);
-        STDMETHODIMP GetState(DWORD dwMilliSecsTimeout, __out  FILTER_STATE* State);
-        STDMETHODIMP SetSyncSource(__in_opt  IReferenceClock* pClock);
-        STDMETHODIMP GetSyncSource(__deref_out_opt  IReferenceClock** pClock);
-        STDMETHODIMP GetClassID(__RPC__out CLSID* pClassID);
+        __declspec(nothrow noalias) STDMETHODIMP EnumPins(__out IEnumPins** ppEnum);
+        __declspec(nothrow noalias) STDMETHODIMP FindPin(LPCWSTR Id, __out IPin** ppPin);
+        __declspec(nothrow noalias) STDMETHODIMP QueryFilterInfo(__out FILTER_INFO* pInfo);
+        __declspec(nothrow noalias) STDMETHODIMP JoinFilterGraph(__in_opt IFilterGraph* pGraph, __in_opt LPCWSTR pName);
+        __declspec(nothrow noalias) STDMETHODIMP QueryVendorInfo(__out LPWSTR* pVendorInfo);
 
-        // IVMRffdshow9
-        STDMETHODIMP support_ffdshow() {
-            queue_ffdshow_support = true;
-            return S_OK;
-        }
+        // IMediaFilter
+        __declspec(nothrow noalias) STDMETHODIMP Stop();
+        __declspec(nothrow noalias) STDMETHODIMP Pause();
+        __declspec(nothrow noalias) STDMETHODIMP Run(REFERENCE_TIME tStart);
+        __declspec(nothrow noalias) STDMETHODIMP GetState(DWORD dwMilliSecsTimeout, __out FILTER_STATE* State);
+        __declspec(nothrow noalias) STDMETHODIMP SetSyncSource(__in_opt IReferenceClock* pClock);
+        __declspec(nothrow noalias) STDMETHODIMP GetSyncSource(__deref_out_opt IReferenceClock** pClock);
 
-        // IVMRMixerBitmap9
-        STDMETHODIMP GetAlphaBitmapParameters(VMR9AlphaBitmap* pBmpParms);
-        STDMETHODIMP SetAlphaBitmap(const VMR9AlphaBitmap* pBmpParms);
-        STDMETHODIMP UpdateAlphaBitmapParameters(const VMR9AlphaBitmap* pBmpParms);
+        // IPersist
+        __declspec(nothrow noalias) STDMETHODIMP GetClassID(__RPC__out CLSID* pClassID);
+
+        // IKsPropertySet - MacrovisionKicker
+        __declspec(nothrow noalias) STDMETHODIMP Set(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength);
+        __declspec(nothrow noalias) STDMETHODIMP Get(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength, ULONG* pBytesReturned);
+        __declspec(nothrow noalias) STDMETHODIMP QuerySupported(REFGUID PropSet, ULONG Id, ULONG* pTypeSupport);
     };
 }

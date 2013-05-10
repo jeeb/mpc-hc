@@ -102,6 +102,9 @@ void CStyleEditorDialog::DoDataExchange(CDataExchange* pDX)
     DDX_Check(pDX, IDC_CHECK1, m_linkalphasliders);
 }
 
+extern TCHAR const* const CharSetNames[20];
+extern unsigned __int8 const CharSetList[20];
+
 void CStyleEditorDialog::UpdateControlData(bool fSave)
 {
     if (fSave) {
@@ -128,7 +131,8 @@ void CStyleEditorDialog::UpdateControlData(bool fSave)
     } else {
         m_font.SetWindowText(m_stss.fontName);
         m_iCharset = -1;
-        for (ptrdiff_t i = 0; i < CharSetLen; i++) {
+        ptrdiff_t i = _countof(CharSetList) - 1;
+        do {
             CString str;
             str.Format(_T("%s (%d)"), CharSetNames[i], CharSetList[i]);
             m_charset.AddString(str);
@@ -136,7 +140,8 @@ void CStyleEditorDialog::UpdateControlData(bool fSave)
             if (m_stss.charSet == CharSetList[i]) {
                 m_iCharset = i;
             }
-        }
+            --i;
+        } while (i >= 0);
         // TODO: allow floats in these edit boxes
         m_spacing = (int)m_stss.fontSpacing;
         m_spacingspin.SetRange32(-10000, 10000);

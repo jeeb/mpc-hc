@@ -26,6 +26,7 @@
 #include "../BaseVideoFilter/BaseVideoFilter.h"
 #include "../../../Subtitles/VobSubFile.h"
 #include "../../../Subtitles/RTS.h"
+#include "../../../SubPic/MemSubPic.h"
 
 typedef struct {
     HWND hSystrayWnd;
@@ -47,7 +48,8 @@ class __declspec(uuid("93A22E7A-5091-45ef-BA61-6DA26156A5D0"))
     friend class CTextInputPin;
 
     CCritSec m_csQueueLock;
-    CComPtr<ISubPicQueue> m_pSubPicQueue;
+    CComPtr<CMemSubPicAllocator> m_pSubPicAllocator;
+    CComPtr<CSubPicQueueImpl> m_pSubPicQueue;
     void InitSubPicQueue();
     SubPicDesc m_spd;
 

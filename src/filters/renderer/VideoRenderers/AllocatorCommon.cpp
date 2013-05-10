@@ -19,100 +19,60 @@
  */
 
 #include "stdafx.h"
-#include <InitGuid.h>
 #include "AllocatorCommon.h"
-#include "../DSUtil/DSUtil.h"
 
-#include "VMR9AllocatorPresenter.h"
-#include "RM9AllocatorPresenter.h"
-#include "QT9AllocatorPresenter.h"
-#include "DXRAllocatorPresenter.h"
-#include "madVRAllocatorPresenter.h"
-#include "EVRAllocatorPresenter.h"
+// Guid to tag IMFSample with DirectX surface index
+extern GUID const GUID_SURFACE_INDEX = {0x30C8E9F6, 0x0415, 0x4B81, {0xA3, 0x15, 0x01, 0x0A, 0xC6, 0xA9, 0xDA, 0x19}};
 
-bool IsVMR9InGraph(IFilterGraph* pFG)
+CCritSec g_ffdshowReceive;
+bool queue_ffdshow_support = false;
+
+extern __declspec(nothrow noalias) double RoundCommonRates(double r)
 {
-    BeginEnumFilters(pFG, pEF, pBF);
-    if (CComQIPtr<IVMRWindowlessControl9>(pBF)) {
-        return true;
-    }
-    EndEnumFilters;
-    return false;
-}
-
-//
-
-HRESULT CreateAP9(const CLSID& clsid, HWND hWnd, bool bFullscreen, ISubPicAllocatorPresenter** ppAP)
-{
-    CheckPointer(ppAP, E_POINTER);
-
-    *ppAP = nullptr;
-
-    using namespace DSObjects;
-
-    HRESULT hr = E_FAIL;
-    CString Error;
-
-    if (IsEqualCLSID(clsid, CLSID_VMR9AllocatorPresenter)) {
-        *ppAP = DEBUG_NEW CVMR9AllocatorPresenter(hWnd, bFullscreen, hr, Error);
-    } else if (IsEqualCLSID(clsid, CLSID_RM9AllocatorPresenter)) {
-        *ppAP = DEBUG_NEW CRM9AllocatorPresenter(hWnd, bFullscreen, hr, Error);
-    } else if (IsEqualCLSID(clsid, CLSID_QT9AllocatorPresenter)) {
-        *ppAP = DEBUG_NEW CQT9AllocatorPresenter(hWnd, bFullscreen, hr, Error);
-    } else if (IsEqualCLSID(clsid, CLSID_DXRAllocatorPresenter)) {
-        *ppAP = DEBUG_NEW CDXRAllocatorPresenter(hWnd, hr, Error);
-    } else if (IsEqualCLSID(clsid, CLSID_madVRAllocatorPresenter)) {
-        *ppAP = DEBUG_NEW CmadVRAllocatorPresenter(hWnd, hr, Error);
-    } else {
-        return E_FAIL;
-    }
-
-    if (*ppAP == nullptr) {
-        return E_OUTOFMEMORY;
-    }
-
-    (*ppAP)->AddRef();
-
-    if (FAILED(hr)) {
-        Error += L"\n";
-        Error += GetWindowsErrorMessage(hr, nullptr);
-
-        MessageBox(hWnd, Error, L"Error creating DX9 allocation presenter", MB_OK | MB_ICONERROR);
-        (*ppAP)->Release();
-        *ppAP = nullptr;
-    } else if (!Error.IsEmpty()) {
-        MessageBox(hWnd, Error, L"Warning creating DX9 allocation presenter", MB_OK | MB_ICONWARNING);
-    }
-
-    return hr;
-}
-
-HRESULT CreateEVR(const CLSID& clsid, HWND hWnd, bool bFullscreen, ISubPicAllocatorPresenter** ppAP)
-{
-    HRESULT hr = E_FAIL;
-    if (clsid == CLSID_EVRAllocatorPresenter) {
-        CString Error;
-        *ppAP = DEBUG_NEW DSObjects::CEVRAllocatorPresenter(hWnd, bFullscreen, hr, Error);
-        (*ppAP)->AddRef();
-
-        if (FAILED(hr)) {
-            Error += L"\n";
-            Error += GetWindowsErrorMessage(hr, nullptr);
-            MessageBox(hWnd, Error, L"Error creating EVR Custom renderer", MB_OK | MB_ICONERROR);
-            (*ppAP)->Release();
-            *ppAP = nullptr;
-        } else if (!Error.IsEmpty()) {
-            MessageBox(hWnd, Error, L"Warning creating EVR Custom renderer", MB_OK | MB_ICONWARNING);
+    if ((r <= 60.0 * 2067.0 / 2048.0) && (r > 24.0 * 2027.0 / 2048.0)) {// rounding the found value, locking the frame rate
+        if (r <= 30.0 * 2067.0 / 2048.0) {// lower set, 24/1.001 to 30 Hz
+            if (r <= 24.0 * 2067.0 / 2048.0) {
+                if (r <= 24.0 * 2047.0 / 2048.0) {
+                    r = 24.0 / 1.001;
+                } else {
+                    r = 24.0;
+                }
+            } else if (r > 30.0 * 2027.0 / 2048.0) {
+                if (r > 30.0 * 2047.0 / 2048.0) {
+                    r = 30.0;
+                } else {
+                    r = 30.0 / 1.001;
+                }
+            } else if ((r > 25.0 * 2038.0 / 2048.0) && (r <= 25.0 * 2058.0 / 2048.0)) {
+                r = 25.0;
+            }
+        } else if (r > 48.0 * 2027.0 / 2048.0) {// higher set, 48/1.001 to 60 Hz
+            if (r <= 48.0 * 2067.0 / 2048.0) {
+                if (r <= 48.0 * 2047.0 / 2048.0) {
+                    r = 48.0 / 1.001;
+                } else {
+                    r = 48.0;
+                }
+            } else if (r > 60.0 * 2027.0 / 2048.0) {
+                if (r > 60.0 * 2047.0 / 2048.0) {
+                    r = 60.0;
+                } else {
+                    r = 60.0 / 1.001;
+                }
+            } else if ((r > 50.0 * 2038.0 / 2048.0) && (r <= 50.0 * 2058.0 / 2048.0)) {
+                r = 50.0;
+            }
         }
     }
-
-    return hr;
+    return r;
 }
 
-CString GetWindowsErrorMessage(HRESULT _Error, HMODULE _Module)
+extern __declspec(nothrow noalias) CString GetWindowsErrorMessage(HRESULT _Error, HINSTANCE _Module)
 {
-
     switch (_Error) {
+        case S_OK:// not covered by the standard converter
+            return _T("S_OK");
+            // D3D errors
         case D3DERR_WRONGTEXTUREFORMAT:
             return _T("D3DERR_WRONGTEXTUREFORMAT");
         case D3DERR_UNSUPPORTEDCOLOROPERATION:
@@ -171,151 +131,28 @@ CString GetWindowsErrorMessage(HRESULT _Error, HMODULE _Module)
             return _T("S_PRESENT_OCCLUDED");
         case D3DERR_DEVICEHUNG:
             return _T("D3DERR_DEVICEHUNG");
-        case E_UNEXPECTED:
-            return _T("E_UNEXPECTED");
+        case D3DERR_UNSUPPORTEDOVERLAY:
+            return _T("D3DERR_UNSUPPORTEDOVERLAY");
+        case D3DERR_UNSUPPORTEDOVERLAYFORMAT:
+            return _T("D3DERR_UNSUPPORTEDOVERLAYFORMAT");
+        case D3DERR_CANNOTPROTECTCONTENT:
+            return _T("D3DERR_CANNOTPROTECTCONTENT");
+        case D3DERR_UNSUPPORTEDCRYPTO:
+            return _T("D3DERR_UNSUPPORTEDCRYPTO");
+        case D3DERR_PRESENT_STATISTICS_DISJOINT:
+            return _T("D3DERR_PRESENT_STATISTICS_DISJOINT");
     }
 
     CString errmsg;
-    LPVOID lpMsgBuf;
-    if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_HMODULE,
-                      _Module, _Error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, nullptr)) {
-        errmsg = (LPCTSTR)lpMsgBuf;
-        LocalFree(lpMsgBuf);
+    TCHAR* pMsgBuf;
+    if (DWORD len = FormatMessage(
+                        _Module ? FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_HMODULE
+                        : FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                        _Module, _Error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPTSTR>(&pMsgBuf), 0, nullptr)) {
+        errmsg.SetString(pMsgBuf, len);
+        LocalFree(pMsgBuf);
+    } else {
+        errmsg.Format(L"0x%08x ", _Error);
     }
-    CString Temp;
-    Temp.Format(L"0x%08x ", _Error);
-    return Temp + errmsg;
-}
-
-const wchar_t* GetD3DFormatStr(D3DFORMAT Format)
-{
-    switch (Format) {
-        case D3DFMT_R8G8B8:
-            return L"R8G8B8";
-        case D3DFMT_A8R8G8B8:
-            return L"A8R8G8B8";
-        case D3DFMT_X8R8G8B8:
-            return L"X8R8G8B8";
-        case D3DFMT_R5G6B5:
-            return L"R5G6B5";
-        case D3DFMT_X1R5G5B5:
-            return L"X1R5G5B5";
-        case D3DFMT_A1R5G5B5:
-            return L"A1R5G5B5";
-        case D3DFMT_A4R4G4B4:
-            return L"A4R4G4B4";
-        case D3DFMT_R3G3B2:
-            return L"R3G3B2";
-        case D3DFMT_A8:
-            return L"A8";
-        case D3DFMT_A8R3G3B2:
-            return L"A8R3G3B2";
-        case D3DFMT_X4R4G4B4:
-            return L"X4R4G4B4";
-        case D3DFMT_A2B10G10R10:
-            return L"A2B10G10R10";
-        case D3DFMT_A8B8G8R8:
-            return L"A8B8G8R8";
-        case D3DFMT_X8B8G8R8:
-            return L"X8B8G8R8";
-        case D3DFMT_G16R16:
-            return L"G16R16";
-        case D3DFMT_A2R10G10B10:
-            return L"A2R10G10B10";
-        case D3DFMT_A16B16G16R16:
-            return L"A16B16G16R16";
-        case D3DFMT_A8P8:
-            return L"A8P8";
-        case D3DFMT_P8:
-            return L"P8";
-        case D3DFMT_L8:
-            return L"L8";
-        case D3DFMT_A8L8:
-            return L"A8L8";
-        case D3DFMT_A4L4:
-            return L"A4L4";
-        case D3DFMT_V8U8:
-            return L"V8U8";
-        case D3DFMT_L6V5U5:
-            return L"L6V5U5";
-        case D3DFMT_X8L8V8U8:
-            return L"X8L8V8U8";
-        case D3DFMT_Q8W8V8U8:
-            return L"Q8W8V8U8";
-        case D3DFMT_V16U16:
-            return L"V16U16";
-        case D3DFMT_A2W10V10U10:
-            return L"A2W10V10U10";
-        case D3DFMT_UYVY:
-            return L"UYVY";
-        case D3DFMT_R8G8_B8G8:
-            return L"R8G8_B8G8";
-        case D3DFMT_YUY2:
-            return L"YUY2";
-        case D3DFMT_G8R8_G8B8:
-            return L"G8R8_G8B8";
-        case D3DFMT_DXT1:
-            return L"DXT1";
-        case D3DFMT_DXT2:
-            return L"DXT2";
-        case D3DFMT_DXT3:
-            return L"DXT3";
-        case D3DFMT_DXT4:
-            return L"DXT4";
-        case D3DFMT_DXT5:
-            return L"DXT5";
-        case D3DFMT_D16_LOCKABLE:
-            return L"D16_LOCKABLE";
-        case D3DFMT_D32:
-            return L"D32";
-        case D3DFMT_D15S1:
-            return L"D15S1";
-        case D3DFMT_D24S8:
-            return L"D24S8";
-        case D3DFMT_D24X8:
-            return L"D24X8";
-        case D3DFMT_D24X4S4:
-            return L"D24X4S4";
-        case D3DFMT_D16:
-            return L"D16";
-        case D3DFMT_D32F_LOCKABLE:
-            return L"D32F_LOCKABLE";
-        case D3DFMT_D24FS8:
-            return L"D24FS8";
-        case D3DFMT_D32_LOCKABLE:
-            return L"D32_LOCKABLE";
-        case D3DFMT_S8_LOCKABLE:
-            return L"S8_LOCKABLE";
-        case D3DFMT_L16:
-            return L"L16";
-        case D3DFMT_VERTEXDATA:
-            return L"VERTEXDATA";
-        case D3DFMT_INDEX16:
-            return L"INDEX16";
-        case D3DFMT_INDEX32:
-            return L"INDEX32";
-        case D3DFMT_Q16W16V16U16:
-            return L"Q16W16V16U16";
-        case D3DFMT_MULTI2_ARGB8:
-            return L"MULTI2_ARGB8";
-        case D3DFMT_R16F:
-            return L"R16F";
-        case D3DFMT_G16R16F:
-            return L"G16R16F";
-        case D3DFMT_A16B16G16R16F:
-            return L"A16B16G16R16F";
-        case D3DFMT_R32F:
-            return L"R32F";
-        case D3DFMT_G32R32F:
-            return L"G32R32F";
-        case D3DFMT_A32B32G32R32F:
-            return L"A32B32G32R32F";
-        case D3DFMT_CxV8U8:
-            return L"CxV8U8";
-        case D3DFMT_A1:
-            return L"A1";
-        case D3DFMT_BINARYBUFFER:
-            return L"BINARYBUFFER";
-    }
-    return L"Unknown";
+    return errmsg;
 }

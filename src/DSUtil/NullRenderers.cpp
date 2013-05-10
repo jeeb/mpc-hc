@@ -34,7 +34,7 @@
 #include <mfapi.h>      // API Media Foundation
 #include <Mferror.h>
 
-// dxva.dll
+// dxva2.dll
 typedef HRESULT(__stdcall* PTR_DXVA2CreateDirect3DDeviceManager9)(UINT* pResetToken, IDirect3DDeviceManager9** ppDeviceManager);
 typedef HRESULT(__stdcall* PTR_DXVA2CreateVideoService)(IDirect3DDevice9* pDD, REFIID riid, void** ppService);
 
@@ -57,8 +57,14 @@ public:
         if (m_pD3DDev) {
             m_pD3DDev = nullptr;
         }
+        if (m_pD3D) {
+            m_pD3D = NULL;
+        }
         if (m_hDXVA2Lib) {
             FreeLibrary(m_hDXVA2Lib);
+        }
+        if (m_hD3D9) {
+            FreeLibrary(m_hD3D9);
         }
     }
 
@@ -107,7 +113,7 @@ public:
     STDMETHODIMP GetFullscreen(BOOL* pfFullscreen) { return E_NOTIMPL; };
 
 private:
-    HMODULE m_hDXVA2Lib;
+    HMODULE m_hDXVA2Lib, m_hD3D9;
     PTR_DXVA2CreateDirect3DDeviceManager9 pfDXVA2CreateDirect3DDeviceManager9;
     PTR_DXVA2CreateVideoService pfDXVA2CreateVideoService;
 
@@ -146,10 +152,14 @@ CNullVideoRendererInputPin::CNullVideoRendererInputPin(CBaseRenderer* pRenderer,
 
 void CNullVideoRendererInputPin::CreateSurface()
 {
-    m_pD3D.Attach(Direct3DCreate9(D3D_SDK_VERSION));
-    if (!m_pD3D) {
-        m_pD3D.Attach(Direct3DCreate9(D3D9b_SDK_VERSION));
-    }
+#ifdef D3D_DEBUG_INFO
+    m_hD3D9 = LoadLibraryW(L"d3d9d.dll");
+#else
+    m_hD3D9 = LoadLibraryW(L"d3d9.dll");
+#endif
+    typedef IDirect3D9* (WINAPI * Direct3DCreate9Ptr)(__in UINT SDKVersion);
+    Direct3DCreate9Ptr pDirect3DCreate9 = reinterpret_cast<Direct3DCreate9Ptr>(GetProcAddress(m_hD3D9, "Direct3DCreate9"));
+    m_pD3D.Attach(pDirect3DCreate9(D3D_SDK_VERSION));
 
     m_hWnd = nullptr;  // TODO : put true window
 
@@ -305,12 +315,14 @@ HRESULT CNullUVideoRenderer::CheckMediaType(const CMediaType* pmt)
 HRESULT CNullUVideoRenderer::DoRenderSample(IMediaSample* pSample)
 {
 #ifdef USE_DXVA
-    CComQIPtr<IMFGetService> pService = pSample;
-    if (pService != nullptr) {
-        CComPtr<IDirect3DSurface9>  pSurface;
-        if (SUCCEEDED(pService->GetService(MR_BUFFER_SERVICE, __uuidof(IDirect3DSurface9), (void**)&pSurface))) {
+    IMFGetService* pService;
+    if (SUCCEEDED(pSample->QueryInterface(IID_IMFGetService, reinterpret_cast<void**>(&pService)))) {
+        IDirect3DSurface9* pSurface;
+        if (SUCCEEDED(pService->GetService(MR_BUFFER_SERVICE, IID_IDirect3DSurface9, reinterpret_cast<void**>(&pSurface)))) {
             // TODO : render surface...
+            pSurface->Release();
         }
+        pService->Release();
     }
 #endif
 

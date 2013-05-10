@@ -264,14 +264,18 @@ HRESULT WINAPI Mine_CoCreateInstance(IN REFCLSID rclsid, IN LPUNKNOWN pUnkOuter,
         if (rclsid == CLSID_VideoMixingRenderer || rclsid == CLSID_VideoMixingRenderer9
                 || rclsid == CLSID_VideoRenderer || rclsid == CLSID_VideoRendererDefault
                 || rclsid == CLSID_OverlayMixer) { // || rclsid == CLSID_OverlayMixer2 - where is this declared?)
-            CMacrovisionKicker* pMK = DEBUG_NEW CMacrovisionKicker(NAME("CMacrovisionKicker"), nullptr);
-            CComPtr<IUnknown> pUnk = (IUnknown*)(INonDelegatingUnknown*)pMK;
-            CComPtr<IUnknown> pInner;
+            CMacrovisionKicker* pMK = DEBUG_NEW CMacrovisionKicker();
+            ASSERT(pMK);
 
-            if (SUCCEEDED(Real_CoCreateInstance(rclsid, pUnk, dwClsContext, __uuidof(IUnknown), (void**)&pInner))) {
+            HRESULT hr;
+            IUnknown* pInner;
+            if (SUCCEEDED(hr = Real_CoCreateInstance(rclsid, static_cast<IUnknown*>(pMK), dwClsContext, IID_IUnknown, reinterpret_cast<void**>(&pInner)))) {
                 pMK->SetInner(pInner);
-                return pUnk->QueryInterface(riid, ppv);
+                HRESULT hr = pMK->QueryInterface(riid, ppv);
+                pInner->Release();
             }
+            pMK->Release();
+            return hr;
         }
 
     return Real_CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);

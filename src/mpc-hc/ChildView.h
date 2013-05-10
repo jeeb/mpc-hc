@@ -25,10 +25,8 @@
 
 class CChildView : public CWnd
 {
-    CRect m_vrect;
-
-    DWORD m_lastlmdowntime;
-    CPoint m_lastlmdownpoint;
+    //DWORD m_lastlmdowntime;
+    //CPoint m_lastlmdownpoint;
 
     CCritSec m_csLogo;
     CMPCPngImage m_logo;
@@ -40,9 +38,6 @@ public:
     DECLARE_DYNAMIC(CChildView)
 
 public:
-    void SetVideoRect(CRect r = CRect(0, 0, 0, 0));
-    CRect GetVideoRect() const { return m_vrect; }
-
     void LoadLogo();
     CSize GetLogoSize();
 

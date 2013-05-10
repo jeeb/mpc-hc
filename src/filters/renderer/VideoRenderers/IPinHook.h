@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -22,6 +22,7 @@
 #pragma once
 
 #include <videoacc.h>
+#include <intrin.h>
 
 interface IPinC;
 
@@ -72,11 +73,8 @@ interface IMemInputPinC {
     CONST_VTBL struct IMemInputPinCVtbl* lpVtbl;
 };
 
-extern bool HookNewSegmentAndReceive(IPinC* pPinC, IMemInputPinC* pMemInputPin);
-extern void UnhookNewSegmentAndReceive();
-extern REFERENCE_TIME g_tSegmentStart, g_tSampleStart, g_rtTimePerFrame;
-
-//
+extern __declspec(nothrow noalias) bool HookNewSegmentAndReceive(IPin* pPin, IMemInputPin* pMemInputPin);
+extern __declspec(nothrow noalias) void UnhookNewSegmentAndReceive();
 
 interface IAMVideoAcceleratorC;
 
@@ -172,10 +170,31 @@ interface IAMVideoAcceleratorC {
     CONST_VTBL struct IAMVideoAcceleratorCVtbl* lpVtbl;
 };
 
-void HookAMVideoAccelerator(IAMVideoAcceleratorC* pAMVideoAcceleratorC);
+interface IDirectXVideoDecoderService;
 
-// DXVA2 hooks
-void HookDirectXVideoDecoderService(void* pIDirectXVideoDecoderService);
-LPCTSTR GetDXVADecoderDescription();
-LPCTSTR GetDXVAVersion();
-void ClearDXVAState();
+extern REFERENCE_TIME g_tSegmentStart;
+extern REFERENCE_TIME g_tSampleStart;
+extern unsigned __int8 g_u8DXVAVersion;
+extern __declspec(align(16)) GUID g_guidDXVADecoder;
+
+extern __declspec(nothrow noalias) void HookDirectXVideoDecoderService(__inout IDirectXVideoDecoderService* pIDirectXVideoDecoderService);
+extern __declspec(nothrow noalias) void HookAMVideoAccelerator(__inout IAMVideoAccelerator* pAMVideoAccelerator);
+extern __declspec(nothrow noalias restrict) wchar_t const* GetSurfaceFormatName(__in DWORD dwFormat);
+
+extern __declspec(nothrow noalias restrict) __forceinline wchar_t const* GetDXVADecoderDescription(size_t* pupStringLength)
+{
+    return GetDXVAMode(&g_guidDXVADecoder, pupStringLength);
+}
+
+extern __declspec(nothrow noalias restrict) __forceinline wchar_t const* GetDXVAVersion()
+{
+    // note: always returns a string of 5 characters
+    static wchar_t const szCollDXVAVersions[] = L"DXVA \0DXVA1\0DXVA2";// each needs to be the same length
+    return reinterpret_cast<wchar_t const*>(reinterpret_cast<__int8 const*>(szCollDXVAVersions) + (12ui8 * g_u8DXVAVersion));// cheaper than handling an array of three character arrays
+}
+
+extern __declspec(nothrow noalias) __forceinline void ClearDXVAState()
+{
+    g_guidDXVADecoder = reinterpret_cast<GUID&>(_mm_setzero_ps());
+    g_u8DXVAVersion = 0;
+}

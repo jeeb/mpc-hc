@@ -19,10 +19,8 @@
  */
 
 #include "stdafx.h"
-#include <tchar.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <process.h>    // _beginthread, _endthread
 #include <time.h>
 #include <locale.h>
 
@@ -35,7 +33,7 @@
 #define LCD_UPD_TIMER 40
 
 
-void LCD_UpdateThread(void* Control)
+DWORD WINAPI LCD_UpdateThread(void* Control)
 {
     CMPC_Lcd* ctrl = static_cast<CMPC_Lcd*>(Control);
     wchar_t str[40];
@@ -70,7 +68,7 @@ void LCD_UpdateThread(void* Control)
     }
 
     _free_locale(locale);
-    _endthread();
+    return 0;
 }
 
 /******************************************************************************************************
@@ -604,7 +602,7 @@ CMPC_Lcd::CMPC_Lcd()
     if (m_Connection.IsConnected()) {
         Thread_Loop = true;
         SetPlayState(PS_STOP);
-        hLCD_UpdateThread = (HANDLE) _beginthread(LCD_UpdateThread, 512 /* stack */, (void*) this /* arg */);
+        hLCD_UpdateThread = ::CreateThread(nullptr, 0x10000, LCD_UpdateThread, this, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
     }
 }
 
@@ -613,8 +611,8 @@ CMPC_Lcd::~CMPC_Lcd()
 {
     if (m_Connection.IsConnected()) {
         Thread_Loop = false;
-        WaitForSingleObject(hLCD_UpdateThread, LCD_UPD_TIMER * 2 /* timeout */);
-        hLCD_UpdateThread = nullptr;
+        WaitForSingleObject(hLCD_UpdateThread, INFINITE);
+        CloseHandle(hLCD_UpdateThread);
     }
 
     DeleteCriticalSection(&cs);

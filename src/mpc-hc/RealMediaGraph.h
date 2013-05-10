@@ -22,8 +22,6 @@
 #pragma once
 
 #include "BaseGraph.h"
-#include "AllocatorCommon7.h"
-#include "AllocatorCommon.h"
 
 #include "realmedia/pntypes.h"
 #include "realmedia/pnwintyp.h"
@@ -108,7 +106,9 @@ namespace DSObjects
         bool Init();
         void Deinit();
 
-        virtual CSize GetVideoSize() { return m_VideoSize; }
+        virtual SIZE GetVideoSize(__in bool fCorrectAR) const {
+            return m_VideoSize;
+        }
         virtual void SetWindowRect(CRect r) {}
         virtual void SetDestRect(CRect r) {}
         virtual bool CreateSite(IRMASite** pSite) = 0;
@@ -165,7 +165,7 @@ namespace DSObjects
     class CRealMediaPlayerWindowless
         : public CRealMediaPlayer
     {
-        CComPtr<ISubPicAllocatorPresenter> m_pRMAP;
+        CComPtr<CSubPicAllocatorPresenterImpl> m_pRMAP;
 
     public:
         CRealMediaPlayerWindowless(HWND hWndParent, CRealMediaGraph* pRMG);
@@ -186,7 +186,7 @@ namespace DSObjects
         CStringW m_fn;
 
     public:
-        CRealMediaGraph(HWND hWndParent, HRESULT& hr); // in windowless mode IVideoWindow::* will return E_NOTIMPL, use ISubPicAllocatorPresenter instead
+        CRealMediaGraph(HWND hWndParent, HRESULT& hr); // in windowless mode IVideoWindow::* will return E_NOTIMPL, use CSubPicAllocatorPresenterImpl instead
         virtual ~CRealMediaGraph();
 
         DECLARE_IUNKNOWN;

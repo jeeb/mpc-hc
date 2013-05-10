@@ -60,7 +60,7 @@ class CSubtitleStream
 {
     CCritSec m_cSharedState;
 
-    int m_nPosition;
+    size_t m_nPosition;
 
     BOOL m_bDiscontinuity, m_bFlushing;
 

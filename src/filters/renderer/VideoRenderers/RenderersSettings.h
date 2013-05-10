@@ -22,138 +22,114 @@
 #pragma once
 
 enum {
-    WM_REARRANGERENDERLESS = WM_APP + 1,
-    WM_RESET_DEVICE
-};
-
-#define WM_MYMOUSELAST WM_XBUTTONDBLCLK
-
-enum {
-    VIDRNDT_RM_DEFAULT,
-    VIDRNDT_RM_DX7,
-    VIDRNDT_RM_DX9
+    WM_RESET_DEVICE = WM_APP + 1
 };
 
 enum {
-    VIDRNDT_QT_DEFAULT,
-    VIDRNDT_QT_DX7,
-    VIDRNDT_QT_DX9
+    VIDRNDT_RM_DEFAULT = 0,
+    VIDRNDT_RM_DX9 = 1
 };
 
 enum {
-    VIDRNDT_AP_SURFACE,
-    VIDRNDT_AP_TEXTURE2D,
-    VIDRNDT_AP_TEXTURE3D
+    VIDRNDT_QT_DEFAULT = 0,
+    VIDRNDT_QT_DX9 = 1
 };
 
-enum VideoSystem {
-    VIDEO_SYSTEM_UNKNOWN,
-    VIDEO_SYSTEM_HDTV,
-    VIDEO_SYSTEM_SDTV_NTSC,
-    VIDEO_SYSTEM_SDTV_PAL
+#define AMBIENT_LIGHT_BRIGHT 0
+#define AMBIENT_LIGHT_OFFICE 1
+#define AMBIENT_LIGHT_DIM 2
+#define AMBIENT_LIGHT_DARK 3
+#define WPADAPT_STATE_NONE 0
+#define WPADAPT_STATE_MEDIUM 1
+#define WPADAPT_STATE_FULL 2
+
+struct Shader {
+    CString label;
+    CString target;
+    CString srcdata;
 };
 
-enum AmbientLight {
-    AMBIENT_LIGHT_BRIGHT,
-    AMBIENT_LIGHT_DIM,
-    AMBIENT_LIGHT_DARK
+struct CRenderersSettings {
+    __declspec(nothrow noalias) void UpdateData(bool bSave);
+    __declspec(nothrow noalias) void SetDefault();
+    __declspec(nothrow noalias) void SetOptimal();
+
+    // EVR Sync-specific settings
+    double fCycleDelta;
+    double fTargetSyncOffset;
+    double fControlLimit;
+    __int32 iLineDelta;
+    __int32 iColumnDelta;
+    bool bSynchronizeVideo;
+    bool bSynchronizeDisplay;
+    bool bSynchronizeNearest;
+
+    // general settings
+    bool fVMR9AlterativeVSync;
+    __int32 iVMR9VSyncOffset;
+
+    bool iVMRFlushGPUBeforeVSync;
+    bool iVMRFlushGPUWait;
+
+    bool bD3DFullscreen;
+    bool iVMR9HighColorResolution;
+    bool iVMR9DisableInitialColorMixing;
+
+    bool iVMRDisableDesktopComposition;
+    bool iEVRAlternativeScheduler;
+    bool iEVREnableFrameTimeCorrection;
+
+    double dRefreshRateAdjust;
+    __int64 GUIDVRendererDevice[2];
+
+    unsigned __int32 iVMR9ColorManagementLookupQuality;
+    unsigned __int8 iVMR9ColorManagementAmbientLight;
+    unsigned __int8 iVMR9ColorManagementIntent;
+    unsigned __int8 iVMR9ColorManagementWpAdaptState;
+    unsigned __int8 iVMR9ColorManagementBPC;
+    unsigned __int8 iVMR9ColorManagementEnable;
+    unsigned __int8 iVMR9ChromaFix;
+    unsigned __int8 iVMR9SurfacesQuality;
+
+    unsigned __int8 iVMR9DitheringTestEnable;
+    unsigned __int8 iVMR9DitheringLevels;
+    unsigned __int8 iVMR9FrameInterpolation;
+
+    bool fVMR9MixerYUV;
+    unsigned __int8 MixerBuffers;
+
+    DWORD dwBPresetCustomColors[16];
+    DWORD dwBackgoundColor;
+
+    bool fSPCAllowAnimationWhenBuffering;
+    bool bPositionRelative;
+    unsigned __int8 nSPCMaxRes;
+    unsigned __int8 nSPCSize;
+
+    unsigned __int8 iDX9Resizer;
 };
 
-enum ColorRenderingIntent {
-    COLOR_RENDERING_INTENT_PERCEPTUAL,
-    COLOR_RENDERING_INTENT_RELATIVE_COLORIMETRIC,
-    COLOR_RENDERING_INTENT_SATURATION,
-    COLOR_RENDERING_INTENT_ABSOLUTE_COLORIMETRIC
-};
-
-class CRenderersSettings
-{
-
-public:
-    bool fResetDevice;
-
-    class CAdvRendererSettings
-    {
-    public:
-        CAdvRendererSettings() { SetDefault(); }
-
-        bool   fVMR9AlterativeVSync;
-        int    iVMR9VSyncOffset;
-        bool   iVMR9VSyncAccurate;
-        bool   iVMR9FullscreenGUISupport;
-        bool   iVMR9VSync;
-        bool   iVMR9FullFloatingPointProcessing;
-        bool   iVMR9HalfFloatingPointProcessing;
-        bool   iVMR9ColorManagementEnable;
-        int    iVMR9ColorManagementInput;
-        int    iVMR9ColorManagementAmbientLight;
-        int    iVMR9ColorManagementIntent;
-        bool   iVMRDisableDesktopComposition;
-        int    iVMRFlushGPUBeforeVSync;
-        int    iVMRFlushGPUAfterPresent;
-        int    iVMRFlushGPUWait;
-
-        // EVR
-        bool iEVRHighColorResolution;
-        bool iEVRForceInputHighColorResolution;
-        bool iEVREnableFrameTimeCorrection;
-        int  iEVROutputRange;
-
-        // SyncRenderer settings
-        int    bSynchronizeVideo;
-        int    bSynchronizeDisplay;
-        int    bSynchronizeNearest;
-        int    iLineDelta;
-        int    iColumnDelta;
-        double fCycleDelta;
-        double fTargetSyncOffset;
-        double fControlLimit;
-
-        void SetDefault();
-        void SetOptimal();
-    };
-
-    CAdvRendererSettings m_AdvRendSets;
-
-    int         iAPSurfaceUsage;
-    int         iDX9Resizer;
-    bool        fVMR9MixerMode;
-    bool        fVMR9MixerYUV;
-    int         iEvrBuffers;
-
-    int         nSPCSize;
-    int         nSPCMaxRes;
-    bool        fSPCPow2Tex;
-    bool        fSPCAllowAnimationWhenBuffering;
-
-    CString     D3D9RenderDevice;
-    void        UpdateData(bool fSave);
-};
-
-class CRenderersData
-{
-    HINSTANCE   m_hD3DX9Dll;
-    UINT        m_nDXSdkRelease;
-
-public:
-    CRenderersData();
-
-    // Casimir666
-    bool        m_fTearingTest;
-    int         m_fDisplayStats;
-    bool        m_bResetStats; // Set to reset the presentation statistics
-    CString     m_strD3DX9Version;
+struct CRenderersData {
+    DWORD m_dwPCIVendor;
+    unsigned __int8 m_fDisplayStats;
+    bool m_bResetStats;// set to reset the presentation statistics
+    bool m_fTearingTest;
 
     // Hardware feature support
-    bool        m_bFP16Support;
-    bool        m_b10bitSupport;
+    bool m_bFP32Support;// note: m_bFP32Support is only 32-bit floating point on the mixer output, and it's 16-bit normalized unsigned integer for the rest of the renderer pipeline (this format is only supported on cards that also support 16- and 32-bit floating point surfaces)
+    bool m_bFP16Support;
+    bool m_bUI10Support;
 
-    LONGLONG    GetPerfCounter() const;
-    HINSTANCE   GetD3X9Dll();
-    UINT        GetDXSdkRelease() { return m_nDXSdkRelease; };
+    __declspec(nothrow noalias) __forceinline CRenderersData()
+        : m_dwPCIVendor(0x1002)// temporary, to enable the item in the main menu
+        , m_fDisplayStats(0)
+        , m_bResetStats(false)
+        , m_fTearingTest(false)
+        , m_bFP32Support(true)// don't disable hardware features before initializing a renderer
+        , m_bFP16Support(true)
+        , m_bUI10Support(true) {}
 };
 
-extern CRenderersData*      GetRenderersData();
-extern CRenderersSettings&  GetRenderersSettings();
-
-extern bool LoadResource(UINT resid, CStringA& str, LPCTSTR restype);
+extern CRenderersData* GetRenderersData();
+extern CRenderersSettings const* GetRenderersSettings();
+extern "C" __declspec(nothrow noalias) __int64 PerfCounter100ns();// external asm file for x64

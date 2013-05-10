@@ -32,7 +32,6 @@ class CPPageSubtitles : public CPPageBase
 
 public:
     CPPageSubtitles();
-    virtual ~CPPageSubtitles();
 
     BOOL m_fOverridePlacement;
     int m_nHorPos;
@@ -44,8 +43,8 @@ public:
     int m_nSPCSize;
     CSpinButtonCtrl m_nSPCSizeCtrl;
     CComboBox m_spmaxres;
-    BOOL m_fSPCPow2Tex;
     BOOL m_fSPCAllowAnimationWhenBuffering;
+    int m_iPositionRelative;
     int m_nSubDelayInterval;
 
     // Dialog Data

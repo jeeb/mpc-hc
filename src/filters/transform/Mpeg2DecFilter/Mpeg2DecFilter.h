@@ -60,6 +60,7 @@ class __declspec(uuid("39F498AF-1A09-4275-B193-673B0BA3D478"))
         BYTE* buf[6];
         REFERENCE_TIME rtStart, rtStop;
         DWORD flags;
+        DWORD biCompression;
         ditype di;
         framebuf()
             : di(DIAuto) {
@@ -72,32 +73,32 @@ class __declspec(uuid("39F498AF-1A09-4275-B193-673B0BA3D478"))
         ~framebuf() {
             Free();
         }
-        void Alloc(int w, int h, int pitch) {
+        void Alloc(size_t w, size_t h, size_t pitch) {
             Free(); // Ensure there is no memory leak
             this->w = w;
             this->h = h;
             this->pitch = pitch;
-            int size = pitch * h;
-            buf_base = (BYTE*)_aligned_malloc(size * 3 + 6 * 32, 32);
+            size_t size = pitch * h, hsize = size >> 2;
+            buf_base = reinterpret_cast<BYTE*>(_aligned_malloc(size * 3 + 6 * 32, 32));
             BYTE* p = buf_base;
             buf[0] = p;
-            p += (size + 31) & ~31;
-            buf[3] = p;
-            p += (size + 31) & ~31;
+            p += (size + 31)&~31;
             buf[1] = p;
-            p += (size / 4 + 31) & ~31;
-            buf[4] = p;
-            p += (size / 4 + 31) & ~31;
+            p += (hsize + 31)&~31;
             buf[2] = p;
-            p += (size / 4 + 31) & ~31;
+            p += (hsize + 31)&~31;
+            buf[3] = p;
+            p += (size + 31)&~31;
+            buf[4] = p;
+            p += (hsize + 31)&~31;
             buf[5] = p;
-            p += (size / 4 + 31) & ~31;
+            p += (hsize + 31)&~31;
         }
         void Free() {
             if (buf_base) {
                 _aligned_free(buf_base);
+                buf_base = NULL;
             }
-            buf_base = NULL;
         }
     } m_fb;
 
@@ -151,7 +152,6 @@ protected:
     float m_bright, m_cont, m_hue, m_sat;
     BYTE m_YTbl[256], m_UTbl[256 * 256], m_VTbl[256 * 256];
     bool m_fForcedSubs;
-    bool m_fPlanarYUV;
     bool m_fInterlaced;
     bool m_bReadARFromStream;
 
@@ -183,8 +183,6 @@ public:
     STDMETHODIMP EnableForcedSubtitles(bool fEnable);
     STDMETHODIMP_(bool) IsForcedSubtitlesEnabled();
 
-    STDMETHODIMP EnablePlanarYUV(bool fEnable);
-    STDMETHODIMP_(bool) IsPlanarYUVEnabled();
     STDMETHODIMP Apply();
     // IMpeg2DecFilter2
 
@@ -252,7 +250,7 @@ class CSubpicInputPin : public CMpeg2DecInputPin
         }
         virtual ~spu() {}
         virtual bool Parse() = 0;
-        virtual void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal) = 0;
+        virtual void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12) = 0;
     };
 
     class dvdspu : public spu
@@ -264,7 +262,7 @@ class CSubpicInputPin : public CMpeg2DecInputPin
         };
         CAtlList<offset_t> m_offsets;
         bool Parse();
-        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal);
+        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12);
     };
 
     class cvdspu : public spu
@@ -275,7 +273,7 @@ class CSubpicInputPin : public CMpeg2DecInputPin
             memset(m_sppal, 0, sizeof(m_sppal));
         }
         bool Parse();
-        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal);
+        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12);
     };
 
     class svcdspu : public spu
@@ -286,7 +284,7 @@ class CSubpicInputPin : public CMpeg2DecInputPin
             memset(m_sppal, 0, sizeof(m_sppal));
         }
         bool Parse();
-        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal);
+        void Render(REFERENCE_TIME rt, BYTE** p, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12);
     };
 
     CAutoPtrList<spu> m_sps;
@@ -298,7 +296,7 @@ public:
     CSubpicInputPin(CTransformFilter* pFilter, HRESULT* phr);
 
     bool HasAnythingToRender(REFERENCE_TIME rt);
-    void RenderSubpics(REFERENCE_TIME rt, BYTE** p, int w, int h);
+    void RenderSubpics(REFERENCE_TIME rt, BYTE** p, int w, int h, bool bIsNV12);
 
     HRESULT CheckMediaType(const CMediaType* mtIn);
     HRESULT SetMediaType(const CMediaType* mtIn);
@@ -325,5 +323,5 @@ public:
 
     CMediaType& CurrentMediaType() { return m_mt; }
 
-    HRESULT Deliver(const void* ptr, int len);
+    HRESULT Deliver(void const* ptr, size_t len);
 };

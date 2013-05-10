@@ -197,7 +197,7 @@ BOOL CPPageFullscreen::OnApply()
     CAppSettings& s = AfxGetAppSettings();
     m_AutoChangeFullscrRes.bEnabled = !!m_fSetFullscreenRes;
 
-    for (int i = 0; i < MAX_FPS_COUNT; i++) {
+    for (size_t i = 0; i < MAX_FPS_COUNT; i++) {
         int n = m_iSeldm[i];
         if (n >= 0 && (size_t)n < m_dms.GetCount() && i < m_list.GetItemCount()) {
             m_AutoChangeFullscrRes.dmFullscreenRes[i].dmFSRes = m_dms[n];
@@ -505,7 +505,7 @@ void CPPageFullscreen::ModesUpdate()
         strModes.Format(_T("[ %d ]  @ %dx%d "), dmtoset[0].freq, dmtoset[0].size.cx, dmtoset[0].size.cy);
         (dmtoset[0].dmDisplayFlags == DM_INTERLACED) ? strModes += _T("i") : strModes += _T("p");
 
-        int idx = 0;
+        size_t idx = 0;
         m_list.InsertItem(idx, ResStr(IDS_PPAGE_FS_DEFAULT));
         m_list.SetItemText(idx, COL_VFR_F, ResStr(IDS_PPAGE_FS_OTHER));
         m_list.SetItemText(idx, COL_VFR_T, ResStr(IDS_PPAGE_FS_OTHER));

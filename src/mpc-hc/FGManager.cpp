@@ -27,9 +27,6 @@
 #include "FileVersionInfo.h"
 #include "WinAPIUtils.h"
 #include "../filters/Filters.h"
-#include "AllocatorCommon7.h"
-#include "AllocatorCommon.h"
-#include "SyncAllocatorPresenter.h"
 #include "madVRAllocatorPresenter.h"
 #include "DeinterlacerFilter.h"
 #include "../DeCSS/VobFile.h"
@@ -1124,19 +1121,20 @@ STDMETHODIMP CFGManager::ConnectFilter(IBaseFilter* pBF, IPin* pPinIn)
     int nTotal = 0, nRendered = 0;
 
     const CAppSettings& s = AfxGetAppSettings();
+    bool bEVR = s.iDSVideoRendererType == IDC_DSEVR_CUSTOM || s.iDSVideoRendererType == IDC_DSEVR || s.iDSVideoRendererType == IDC_DSSYNC;
 
     BeginEnumPins(pBF, pEP, pPin) {
+        CString pin_name;
         if (S_OK == IsPinDirection(pPin, PINDIR_OUTPUT)
                 && S_OK != IsPinConnected(pPin)
-                && !((s.iDSVideoRendererType != VIDRNDT_DS_EVR_CUSTOM && s.iDSVideoRendererType != VIDRNDT_DS_EVR && s.iDSVideoRendererType != VIDRNDT_DS_SYNC) && GetPinName(pPin)[0] == '~')) {
+                && ((pin_name = GetPinName(pPin))[0] != '~' || bEVR)) {
 
             CLSID clsid;
             pBF->GetClassID(&clsid);
             // Disable DVD subtitle mixing in EVR (CP) and Sync Renderer for Microsoft DTV-DVD Video Decoder, it's corrupt DVD playback ...
             if (clsid == CLSID_CMPEG2VidDecoderDS) {
-                if (s.iDSVideoRendererType == VIDRNDT_DS_EVR_CUSTOM || s.iDSVideoRendererType == VIDRNDT_DS_SYNC) {
-                    CString pin_name = GetPinName(pPin);
-                    if (GetPinName(pPin)[0] == '~') {
+                if (s.iDSVideoRendererType == IDC_DSEVR_CUSTOM || s.iDSVideoRendererType == IDC_DSSYNC) {
+                    if (pin_name[0] == '~') {
                         continue;
                     }
                 }
@@ -1145,8 +1143,7 @@ STDMETHODIMP CFGManager::ConnectFilter(IBaseFilter* pBF, IPin* pPinIn)
             else if (clsid == CLSID_CMpeg2DecFilter
                      || clsid == CLSID_NvidiaVideoDecoder
                      || clsid == CLSID_SonicCinemasterVideoDecoder) {
-                CString pin_name = GetPinName(pPin);
-                if (GetPinName(pPin)[0] == '~') {
+                if (pin_name[0] == '~') {
                     continue;
                 }
                 //TODO: enable multiple pins for the renderer, if the video decoder supports DXVA
@@ -1198,7 +1195,7 @@ STDMETHODIMP CFGManager::ConnectFilter(IPin* pPinOut, IBaseFilter* pBF)
     BeginEnumPins(pBF, pEP, pPin) {
         if (S_OK == IsPinDirection(pPin, PINDIR_INPUT)
                 && S_OK != IsPinConnected(pPin)
-                && !((s.iDSVideoRendererType != VIDRNDT_DS_EVR_CUSTOM && s.iDSVideoRendererType != VIDRNDT_DS_EVR && s.iDSVideoRendererType != VIDRNDT_DS_SYNC) && GetPinName(pPin)[0] == '~')) {
+                && !((s.iDSVideoRendererType != IDC_DSEVR_CUSTOM && s.iDSVideoRendererType != IDC_DSEVR && s.iDSVideoRendererType != IDC_DSSYNC) && GetPinName(pPin)[0] == '~')) {
             HRESULT hr = Connect(pPinOut, pPin);
             if (SUCCEEDED(hr)) {
                 return hr;
@@ -1226,7 +1223,7 @@ STDMETHODIMP CFGManager::ConnectFilterDirect(IPin* pPinOut, IBaseFilter* pBF, co
     BeginEnumPins(pBF, pEP, pPin) {
         if (S_OK == IsPinDirection(pPin, PINDIR_INPUT)
                 && S_OK != IsPinConnected(pPin)
-                && !((s.iDSVideoRendererType != VIDRNDT_DS_EVR_CUSTOM && s.iDSVideoRendererType != VIDRNDT_DS_EVR && s.iDSVideoRendererType != VIDRNDT_DS_SYNC) && GetPinName(pPin)[0] == '~')) {
+                && !((s.iDSVideoRendererType != IDC_DSEVR_CUSTOM && s.iDSVideoRendererType != IDC_DSEVR && s.iDSVideoRendererType != IDC_DSSYNC) && GetPinName(pPin)[0] == '~')) {
             HRESULT hr = ConnectDirect(pPinOut, pPin, pmt);
             if (SUCCEEDED(hr)) {
                 return hr;
@@ -2404,7 +2401,7 @@ CFGManagerCustom::CFGManagerCustom(LPCTSTR pName, LPUNKNOWN pUnk)
 
     // Block VSFilter when internal subtitle renderer will get used
     if (s.fAutoloadSubtitles && s.fBlockVSFilter) {
-        if (s.iDSVideoRendererType == VIDRNDT_DS_VMR7RENDERLESS || s.iDSVideoRendererType == VIDRNDT_DS_VMR9RENDERLESS || s.iDSVideoRendererType == VIDRNDT_DS_EVR_CUSTOM || s.iDSVideoRendererType == VIDRNDT_DS_DXR || s.iDSVideoRendererType == VIDRNDT_DS_SYNC || s.iDSVideoRendererType == VIDRNDT_DS_MADVR) {
+        if (s.iDSVideoRendererType == IDC_DSVMR9REN || s.iDSVideoRendererType == IDC_DSEVR_CUSTOM || s.iDSVideoRendererType == IDC_DSDXR || s.iDSVideoRendererType == IDC_DSSYNC || s.iDSVideoRendererType == IDC_DSMADVR) {
             m_transform.AddTail(DEBUG_NEW CFGFilterRegistry(GUIDFromCString(_T("{9852A670-F845-491B-9BE6-EBD841B8A613}")), MERIT64_DO_NOT_USE));
         }
     }
@@ -2488,8 +2485,6 @@ STDMETHODIMP CFGManagerCustom::AddFilter(IBaseFilter* pBF, LPCWSTR pName)
         return hr;
     }
 
-    CAppSettings& s = AfxGetAppSettings();
-
     if (GetCLSID(pBF) == CLSID_DMOWrapperFilter) {
         if (CComQIPtr<IPropertyBag> pPB = pBF) {
             CComVariant var(true);
@@ -2498,6 +2493,7 @@ STDMETHODIMP CFGManagerCustom::AddFilter(IBaseFilter* pBF, LPCWSTR pName)
     }
 
     if (CComQIPtr<IAudioSwitcherFilter> pASF = pBF) {
+        CAppSettings& s = AfxGetAppSettings();
         pASF->EnableDownSamplingTo441(s.fDownSampleTo441);
         pASF->SetSpeakerConfig(s.fCustomChannelMapping, s.pSpeakerToChannelMap);
         pASF->SetAudioTimeShift(s.fAudioTimeShift ? 10000i64 * s.iAudioTimeShift : 0);
@@ -2579,45 +2575,42 @@ CFGManagerPlayer::CFGManagerPlayer(LPCTSTR pName, LPUNKNOWN pUnk, HWND hWnd)
     // Renderers
 
     switch (s.iDSVideoRendererType) {
-        case VIDRNDT_DS_OLDRENDERER:
+        case IDC_DSOLD:
             m_transform.AddTail(DEBUG_NEW CFGFilterRegistry(CLSID_VideoRenderer, m_vrmerit));
             break;
-        case VIDRNDT_DS_OVERLAYMIXER:
+        case IDC_DSOVERLAYMIXER:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_OverlayMixer, ResStr(IDS_PPAGE_OUTPUT_OVERLAYMIXER), m_vrmerit));
             break;
-        case VIDRNDT_DS_VMR7WINDOWED:
+        case IDC_DSVMR7WIN:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_VideoMixingRenderer, ResStr(IDS_PPAGE_OUTPUT_VMR7WINDOWED), m_vrmerit));
             break;
-        case VIDRNDT_DS_VMR9WINDOWED:
+        case IDC_DSVMR9WIN:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_VideoMixingRenderer9, ResStr(IDS_PPAGE_OUTPUT_VMR9WINDOWED), m_vrmerit));
             break;
-        case VIDRNDT_DS_VMR7RENDERLESS:
-            m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_VMR7AllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_VMR7RENDERLESS), m_vrmerit));
-            break;
-        case VIDRNDT_DS_VMR9RENDERLESS:
+        case IDC_DSVMR9REN:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_VMR9AllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_VMR9RENDERLESS), m_vrmerit));
             break;
-        case VIDRNDT_DS_EVR:
+        case IDC_DSEVR:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_EnhancedVideoRenderer, ResStr(IDS_PPAGE_OUTPUT_EVR), m_vrmerit));
             break;
-        case VIDRNDT_DS_EVR_CUSTOM:
+        case IDC_DSEVR_CUSTOM:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_EVRAllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_EVR_CUSTOM), m_vrmerit));
             break;
-        case VIDRNDT_DS_DXR:
+        case IDC_DSDXR:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_DXRAllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_DXR), m_vrmerit));
             break;
-        case VIDRNDT_DS_MADVR:
+        case IDC_DSMADVR:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_madVRAllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_MADVR), m_vrmerit));
             break;
-        case VIDRNDT_DS_SYNC:
+        case IDC_DSSYNC:
             m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_SyncAllocatorPresenter, ResStr(IDS_PPAGE_OUTPUT_SYNC), m_vrmerit));
             break;
-        case VIDRNDT_DS_NULL_COMP:
+        case IDC_DSNULL_COMP:
             pFGF = DEBUG_NEW CFGFilterInternal<CNullVideoRenderer>(ResStr(IDS_PPAGE_OUTPUT_NULL_COMP), MERIT64_ABOVE_DSHOW + 2);
             pFGF->AddType(MEDIATYPE_Video, MEDIASUBTYPE_NULL);
             m_transform.AddTail(pFGF);
             break;
-        case VIDRNDT_DS_NULL_UNCOMP:
+        case IDC_DSNULL_UNCOMP:
             pFGF = DEBUG_NEW CFGFilterInternal<CNullUVideoRenderer>(ResStr(IDS_PPAGE_OUTPUT_NULL_UNCOMP), MERIT64_ABOVE_DSHOW + 2);
             pFGF->AddType(MEDIATYPE_Video, MEDIASUBTYPE_NULL);
             m_transform.AddTail(pFGF);
@@ -2669,7 +2662,7 @@ CFGManagerDVD::CFGManagerDVD(LPCTSTR pName, LPUNKNOWN pUnk, HWND hWnd)
     const CAppSettings& s = AfxGetAppSettings();
 
     // have to avoid the old video renderer
-    if (s.iDSVideoRendererType == VIDRNDT_DS_OLDRENDERER) {
+    if (s.iDSVideoRendererType == IDC_DSOLD) {
         m_transform.AddTail(DEBUG_NEW CFGFilterVideoRenderer(m_hWnd, CLSID_OverlayMixer, L"Overlay Mixer", m_vrmerit - 1));
     }
 

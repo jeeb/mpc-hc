@@ -69,13 +69,14 @@ void CPPageTweaks::DoDataExchange(CDataExchange* pDX)
     DDX_Check(pDX, IDC_CHECK_LCD, m_fLCDSupport);
 }
 
-int CALLBACK EnumFontProc(ENUMLOGFONT FAR* lf, NEWTEXTMETRIC FAR* tm, int FontType, LPARAM dwData)
+// FONTENUMPROC implementation
+static int CALLBACK EnumFontProc(CONST LOGFONT* lf, CONST TEXTMETRIC* tm, DWORD FontType, LPARAM lpData)
 {
-    CAtlArray<CString>* fntl = (CAtlArray<CString>*)dwData;
+    CAtlArray<CString>* fntl = reinterpret_cast<CAtlArray<CString>*>(lpData);
     if (FontType == TRUETYPE_FONTTYPE) {
-        fntl->Add(lf->elfFullName);
+        fntl->Add(lf->lfFaceName);
     }
-    return true;
+    return TRUE;
 }
 
 BOOL CPPageTweaks::OnInitDialog()
@@ -118,7 +119,7 @@ BOOL CPPageTweaks::OnInitDialog()
     m_FontSize.Clear();
     HDC dc = CreateDC(_T("DISPLAY"), nullptr, nullptr, nullptr);
     CAtlArray<CString> fntl;
-    EnumFontFamilies(dc, nullptr, (FONTENUMPROC)EnumFontProc, (LPARAM)&fntl);
+    EnumFontFamilies(dc, nullptr, EnumFontProc, reinterpret_cast<LPARAM>(&fntl));
     DeleteDC(dc);
     for (size_t i = 0; i < fntl.GetCount(); ++i) {
         if (i > 0 && fntl[i - 1] == fntl[i]) {
@@ -134,14 +135,14 @@ BOOL CPPageTweaks::OnInitDialog()
     m_FontType.SetCurSel(iSel);
 
     CString str;
-    for (int i = 10; i < 26; ++i) {
+    for (int i = 10; i <= 100; i += 5) {
         str.Format(_T("%d"), i);
         m_FontSize.AddString(str);
         if (m_OSD_Size == i) {
             iSel = i;
         }
     }
-    m_FontSize.SetCurSel(iSel - 10);
+    m_FontSize.SetCurSel((iSel - 10) / 5);
 
     EnableToolTips(TRUE);
 
@@ -212,10 +213,18 @@ void CPPageTweaks::OnBnClickedButton1()
 
 void CPPageTweaks::OnChngOSDCombo()
 {
-    CString str;
-    m_OSD_Size = m_FontSize.GetCurSel() + 10;
-    m_FontType.GetLBText(m_FontType.GetCurSel(), str);
-    ((CMainFrame*)AfxGetMainWnd())->m_OSD.DisplayMessage(OSD_TOPLEFT, _T("Test"), 2000, m_OSD_Size, str);
+    // let the user test the current setting live in the OSD, if available
+    CAppSettings& s = AfxGetAppSettings();
+    int nOSDSizeOrig(s.nOSDSize);
+    CString strOSDFontOrig(s.strOSDFont);
+    s.nOSDSize = m_OSD_Size = m_FontSize.GetCurSel() * 5 + 10;
+    m_FontType.GetLBText(m_FontType.GetCurSel(), s.strOSDFont);
+    ((CMainFrame*)AfxGetMainWnd())->m_OSD.DisplayMessage(OSD_TOPLEFT, L"Test");
+
+    // set settings to back to previous, only OnApply() should record settings
+    s.nOSDSize = nOSDSizeOrig;
+    s.strOSDFont = strOSDFontOrig;
+
     SetModified();
 }
 

@@ -77,4 +77,6 @@ public:
     afx_msg void OnExportKeys();
 
     virtual void OnCancel();
+    afx_msg void OnNMCustomdrawSliBrightness2(NMHDR* pNMHDR, LRESULT* pResult);
+    afx_msg void OnBackgroundcolor();
 };

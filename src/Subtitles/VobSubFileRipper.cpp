@@ -45,11 +45,24 @@ CVobSubFileRipper::~CVobSubFileRipper()
     CAMThread::Close();
 }
 
-STDMETHODIMP CVobSubFileRipper::NonDelegatingQueryInterface(REFIID riid, void** ppv)
+// IUnknown
+
+__declspec(nothrow noalias) STDMETHODIMP CVobSubFileRipper::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-    return
-        QI(IVSFRipper)
-        __super::NonDelegatingQueryInterface(riid, ppv);
+    ASSERT(ppv);
+    if (riid == IID_IUnknown) { *ppv = static_cast<IUnknown*>(static_cast<CSubPicProviderImpl*>((this))); }// CSubPicProviderImpl is at Vtable location 0
+    else if (riid == __uuidof(CSubPicProviderImpl)) { *ppv = static_cast<CSubPicProviderImpl*>(this); }
+    else if (riid == IID_IPersist) { *ppv = static_cast<IPersist*>(this); }
+    else if (riid == __uuidof(ISubStream)) { *ppv = static_cast<ISubStream*>(this); }
+    else if (riid == __uuidof(IVSFRipper)) { *ppv = static_cast<IVSFRipper*>(this); }
+    else {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
 void CVobSubFileRipper::Log(log_t type, LPCTSTR lpszFormat, ...)
@@ -164,7 +177,7 @@ bool CVobSubFileRipper::LoadIfo(CString fn)
 
     m_rd.vidsize = res[m_rd.vidinfo.source_res][m_rd.vidinfo.system & 1];
 
-    double rate = (m_rd.vidinfo.system == 0) ? 30.0 / 29.97 : 1.0;
+    double rate = (!m_rd.vidinfo.system) ? 1.001 : 1.0;
 
     /* PGCs */
 
@@ -309,7 +322,7 @@ bool CVobSubFileRipper::LoadIfo(CString fn)
                 f.Seek(8, CFile::current);
                 ReadBEdw(pgc.angles[0][j].end);
 
-                float fps;
+                double fps;
                 switch ((pgc.angles[0][j].tTime >> 6) & 0x3) {
                     default:
                     case 3:

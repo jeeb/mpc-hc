@@ -619,8 +619,12 @@ bool CVobFile::Open(CAtlList<CString>& vobs, int offset)
                 CString fn = m_files[0].fn;
                 fn.MakeLower();
 
-                if (fn.Find(_T(":\\video_ts")) == 1 && GetDriveType(fn.Left(3)) == DRIVE_CDROM) {
-                    m_fDVD = true;
+                int root = fn.Find(_T("\\video_ts"));
+                if (root > 0) {
+                    CString drive = fn.Left(root + 1);
+                    if (GetDriveType(drive) == DRIVE_CDROM) {
+                        m_fDVD = true;
+                    }
                 }
 
                 break;
@@ -673,14 +677,16 @@ bool CVobFile::Open(CAtlList<CString>& vobs, int offset)
         }
     }
     /*
-        if(m_files.GetCount() > 0 && !m_fDVD)
-        {
+        if(m_files.GetCount() > 0 && !m_fDVD) {
             CString fn = m_files[0].fn;
             fn.MakeLower();
 
-            if(fn.Find(_T(":\\video_ts")) == 1 && GetDriveType(fn.Left(3)) == DRIVE_CDROM)
-            {
-                m_fDVD = true;
+            int root = fn.Find(_T("\\video_ts"));
+            if (root > 0) {
+                CString drive = fn.Left(root + 1);
+                if (GetDriveType(drive) == DRIVE_CDROM) {
+                    m_fDVD = true;
+                }
             }
         }
     */

@@ -23,6 +23,7 @@
 
 #include <atlbase.h>
 
+#include "FullscreenWnd.h"
 #include "ChildView.h"
 #include "PlayerSeekBar.h"
 #include "PlayerToolBar.h"
@@ -69,9 +70,6 @@
 #include "DSMPropertyBag.h"
 #include "SkypeMoodMsgHandler.h"
 
-
-class CFullscreenWnd;
-
 enum {
     PM_NONE,
     PM_FILE,
@@ -83,19 +81,24 @@ interface __declspec(uuid("6E8D4A21-310C-11d0-B79A-00AA003767A7")) // IID_IAMLin
 IAMLine21Decoder_2 :
 public IAMLine21Decoder {};
 
-class OpenMediaData
+#define OpenMediaType_File 0
+#define OpenMediaType_DVD 1
+#define OpenMediaType_Device 2
+
+class __declspec(novtable) OpenMediaData
 {
 public:
-    //  OpenMediaData() {}
-    virtual ~OpenMediaData() {} // one virtual funct is needed to enable rtti
+    __forceinline OpenMediaData(unsigned __int8 u8MediaType) : u8kMediaType(u8MediaType) {}
+    virtual __forceinline ~OpenMediaData() {}
     CString title;
     CAtlList<CString> subs;
+    unsigned __int8 const u8kMediaType;
 };
 
 class OpenFileData : public OpenMediaData
 {
 public:
-    OpenFileData() : rtStart(0) {}
+    OpenFileData() : OpenMediaData(OpenMediaType_File), rtStart(0) {}
     CAtlList<CString> fns;
     REFERENCE_TIME rtStart;
 };
@@ -103,7 +106,7 @@ public:
 class OpenDVDData : public OpenMediaData
 {
 public:
-    //  OpenDVDData() {}
+    OpenDVDData() : OpenMediaData(OpenMediaType_DVD) {}
     CString path;
     CComPtr<IDvdState> pDvdState;
 };
@@ -111,7 +114,7 @@ public:
 class OpenDeviceData : public OpenMediaData
 {
 public:
-    OpenDeviceData() {
+    OpenDeviceData() : OpenMediaData(OpenMediaType_Device) {
         vinput = vchannel = ainput = -1;
     }
     CStringW DisplayName[2];
@@ -140,7 +143,7 @@ struct SubtitleInput {
 
 interface ISubClock;
 
-class CMainFrame : public CFrameWnd, public CDropTarget
+class CMainFrame : public CFrameWnd, public CDropTarget, public CFullscreenWindow
 {
     enum {
         TIMER_STREAMPOSPOLLER = 1,
@@ -193,8 +196,7 @@ class CMainFrame : public CFrameWnd, public CDropTarget
     CComPtr<IAMTVTuner> pAMTuner;
     CComPtr<IAMDroppedFrames> pAMDF;
 
-    CComPtr<ISubPicAllocatorPresenter> m_pCAP;
-    CComPtr<ISubPicAllocatorPresenter2> m_pCAP2;
+    CComPtr<CSubPicAllocatorPresenterImpl> m_pCAP;
 
     void SetVolumeBoost(UINT nAudioBoost);
     void SetBalance(int balance);
@@ -308,8 +310,8 @@ class CMainFrame : public CFrameWnd, public CDropTarget
 
     void ShowOptions(int idPage = 0);
 
-    bool GetDIB(BYTE** ppData, long& size, bool fSilent = false);
-    void SaveDIB(LPCTSTR fn, BYTE* pData, long size);
+    bool GetDIB(void** ppData, bool bSilent);
+    void SaveDIB(LPCTSTR fn, void* pData);
     BOOL IsRendererCompatibleWithSaveImage();
     void SaveImage(LPCTSTR fn);
     void SaveThumbnails(LPCTSTR fn);
@@ -360,7 +362,7 @@ public:
         return (!m_fFullScreen && AfxGetAppSettings().iCaptionMenuMode != MODE_SHOWCAPTIONMENU);
     }
     bool IsSomethingLoaded() const {
-        return ((m_iMediaLoadState == MLS_LOADING || m_iMediaLoadState == MLS_LOADED) && !IsD3DFullScreenMode());
+        return ((m_iMediaLoadState == MLS_LOADING || m_iMediaLoadState == MLS_LOADED));
     }
     bool IsPlaylistEmpty() {
         return (m_wndPlaylistBar.GetCount() == 0);
@@ -368,7 +370,6 @@ public:
     bool IsInteractiveVideo() const {
         return (AfxGetAppSettings().fIntRealMedia && m_fRealMediaGraph || m_fShockwaveGraph);
     }
-    bool IsD3DFullScreenMode() const;
 
     CControlBar* m_pLastBar;
 
@@ -427,8 +428,7 @@ public:
     void OpenMedia(CAutoPtr<OpenMediaData> pOMD);
     void PlayFavoriteFile(CString fav);
     void PlayFavoriteDVD(CString fav);
-    bool ResetDevice();
-    bool DisplayChange();
+    void ResetDevice();
     void CloseMedia();
     void StartTunerScan(CAutoPtr<TunerScanData> pTSD);
     void StopTunerScan();
@@ -443,7 +443,6 @@ public:
     CSize GetVideoSize() const;
     void ToggleFullscreen(bool fToNearest, bool fSwitchScreenResWhenHasTo);
     void MoveVideoWindow(bool fShowStats = false);
-    void RepaintVideo();
     void HideVideoWindow(bool fHide);
 
     OAFilterState GetMediaState() const;
@@ -460,7 +459,7 @@ public:
     void SetSubtitle(ISubStream* pSubStream, bool bApplyDefStyle = false);
     void ToggleSubtitleOnOff(bool bDisplayMessage = false);
     void ReplaceSubtitle(ISubStream* pSubStreamOld, ISubStream* pSubStreamNew);
-    void InvalidateSubtitle(DWORD_PTR nSubtitleId = -1, REFERENCE_TIME rtInvalidate = -1);
+    void InvalidateSubtitlePic(DWORD_PTR nSubtitleId = -1, REFERENCE_TIME rtInvalidate = -1);
     void ReloadSubtitle();
 
     void SetAudioTrackIdx(int index);
@@ -469,8 +468,7 @@ public:
     void AddFavorite(bool fDisplayMessage = false, bool fShowDialog = true);
 
     // shaders
-    CAtlList<CString> m_shaderlabels;
-    CAtlList<CString> m_shaderlabelsScreenSpace;
+    CAtlList<CString> m_shaderlabels[2];
     void SetShaders();
     void UpdateShaders(CString label);
 
@@ -520,7 +518,7 @@ protected:  // control bar embedded members
     CPlayerNavigationBar m_wndNavigationBar;
     CPlayerShaderEditorBar m_wndShaderEditorBar;
     CEditListEditor m_wndEditListEditor;
-    CList<CSizingControlBar*> m_dockingbars;
+    CList<CPlayerBar*> m_dockingbars;
 
     CFileDropTarget m_fileDropTarget;
     // TODO
@@ -560,7 +558,6 @@ public:
     afx_msg void OnMoving(UINT fwSide, LPRECT pRect);
     afx_msg void OnSize(UINT nType, int cx, int cy);
     afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
-    afx_msg void OnDisplayChange();
 
     afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
     afx_msg void OnActivateApp(BOOL bActive, DWORD dwThreadID);
@@ -573,7 +570,6 @@ public:
 
     afx_msg LRESULT OnGraphNotify(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnResetDevice(WPARAM wParam, LPARAM lParam);
-    afx_msg LRESULT OnRepaintRenderLess(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnResumeFromState(WPARAM wParam, LPARAM lParam);
 
     BOOL OnButton(UINT id, UINT nFlags, CPoint point);
@@ -720,9 +716,7 @@ public:
     afx_msg void OnUpdateViewDisplayStats(CCmdUI* pCmdUI);
     afx_msg void OnViewResetStats();
     afx_msg void OnViewDisplayStatsSC();
-    afx_msg void OnUpdateViewVSync(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewVSyncOffset(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewVSyncAccurate(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewFlushGPU(CCmdUI* pCmdUI);
 
     afx_msg void OnUpdateViewSynchronizeVideo(CCmdUI* pCmdUI);
@@ -730,48 +724,62 @@ public:
     afx_msg void OnUpdateViewSynchronizeNearest(CCmdUI* pCmdUI);
 
     afx_msg void OnUpdateViewD3DFullscreen(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewAlternativeScheduler(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewDisableDesktopComposition(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewAlternativeVSync(CCmdUI* pCmdUI);
 
     afx_msg void OnUpdateViewColorManagementEnable(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewColorManagementInput(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewColorManagementAmbientLight(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewColorManagementIntent(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewColorManagementWpAdaptState(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewColorManagementLookupQuality(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewColorManagementBPC(CCmdUI* pCmdUI);
 
-    afx_msg void OnUpdateViewEVROutputRange(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewFullscreenGUISupport(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewDitheringLevels(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewDitheringTestEnable(CCmdUI* pCmdUI);
+
+    afx_msg void OnUpdateViewFrameInterpolation(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewHighColorResolution(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewForceInputHighColorResolution(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewFullFloatingPointProcessing(CCmdUI* pCmdUI);
-    afx_msg void OnUpdateViewHalfFloatingPointProcessing(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewDisableInitialColorMixing(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateViewChromaFix(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateView32BitFPSurfaces(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateView16BitFPSurfaces(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateView10BitUISurfaces(CCmdUI* pCmdUI);
+    afx_msg void OnUpdateView8BitUISurfaces(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewEnableFrameTimeCorrection(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewVSyncOffsetIncrease(CCmdUI* pCmdUI);
     afx_msg void OnUpdateViewVSyncOffsetDecrease(CCmdUI* pCmdUI);
-    afx_msg void OnViewVSync();
-    afx_msg void OnViewVSyncAccurate();
 
     afx_msg void OnViewSynchronizeVideo();
     afx_msg void OnViewSynchronizeDisplay();
     afx_msg void OnViewSynchronizeNearest();
 
-    afx_msg void OnViewColorManagementEnable();
+    afx_msg void OnViewColorManagementEnable(UINT nID);
     afx_msg void OnViewColorManagementInputAuto();
     afx_msg void OnViewColorManagementInputHDTV();
     afx_msg void OnViewColorManagementInputSDTV_NTSC();
     afx_msg void OnViewColorManagementInputSDTV_PAL();
     afx_msg void OnViewColorManagementAmbientLightBright();
+    afx_msg void OnViewColorManagementAmbientLightOffice();
     afx_msg void OnViewColorManagementAmbientLightDim();
     afx_msg void OnViewColorManagementAmbientLightDark();
+    afx_msg void OnViewColorManagementAmbientLightBypasslinear();
     afx_msg void OnViewColorManagementIntentPerceptual();
     afx_msg void OnViewColorManagementIntentRelativeColorimetric();
     afx_msg void OnViewColorManagementIntentSaturation();
     afx_msg void OnViewColorManagementIntentAbsoluteColorimetric();
+    afx_msg void OnViewColorManagementTrcTypePurePower();
+    afx_msg void OnViewColorManagementTrcTypeInverse();
+    afx_msg void OnViewColorManagementWpAdaptStateFull();
+    afx_msg void OnViewColorManagementWpAdaptStateMedium();
+    afx_msg void OnViewColorManagementWpAdaptStateNone();
+    afx_msg void OnViewColorManagementLookupQuality(UINT nID);
+    afx_msg void OnViewColorManagementBPC();
 
-    afx_msg void OnViewEVROutputRange_0_255();
-    afx_msg void OnViewEVROutputRange_16_235();
+    afx_msg void OnViewDitheringLevels(UINT nID);
+    afx_msg void OnViewDitheringTestEnable();
 
     afx_msg void OnViewFlushGPUBeforeVSync();
-    afx_msg void OnViewFlushGPUAfterVSync();
     afx_msg void OnViewFlushGPUWait();
 
     afx_msg void OnViewD3DFullScreen();
@@ -780,11 +788,12 @@ public:
     afx_msg void OnViewResetDefault();
     afx_msg void OnViewResetOptimal();
 
-    afx_msg void OnViewFullscreenGUISupport();
+    afx_msg void OnViewFrameInterpolation(UINT nID);
     afx_msg void OnViewHighColorResolution();
-    afx_msg void OnViewForceInputHighColorResolution();
-    afx_msg void OnViewFullFloatingPointProcessing();
-    afx_msg void OnViewHalfFloatingPointProcessing();
+    afx_msg void OnViewDisableInitialColorMixing();
+    afx_msg void OnViewChromaFix(UINT nID);
+    afx_msg void OnViewSurfacesQuality(UINT nID);
+    afx_msg void OnViewAlternativeScheduler();
     afx_msg void OnViewEnableFrameTimeCorrection();
     afx_msg void OnViewVSyncOffsetIncrease();
     afx_msg void OnViewVSyncOffsetDecrease();
@@ -881,21 +890,21 @@ public:
     CMPC_Lcd m_Lcd;
 
     // ==== Added by CASIMIR666
-    CWnd*           m_pVideoWnd;            // Current Video (main display screen or 2nd)
+    HWND            m_hVideoWnd;// Current Video window, can be either a copy of CFullscreenWindow::m_hFullscreenWnd or m_wndView.m_hWnd
     SIZE            m_fullWndSize;
-    CFullscreenWnd* m_pFullscreenWnd;
+    RECT            m_arcRendererWindowAndVideoArea[2];// used as a pair, these are written and used by MoveVideoWindow()
     CComPtr<IVMRMixerControl9>      m_pMC;
     CComPtr<IMFVideoDisplayControl> m_pMFVDC;
     CComPtr<IMFVideoProcessor>      m_pMFVP;
     CComPtr<IAMLine21Decoder_2>     m_pLN21;
     CVMROSD     m_OSD;
+    ATOM        m_u16FullscreenWindowClassAtom;
     bool        m_bRemainingTime;
     int         m_nCurSubtitle;
     long        m_lSubtitleShift;
     __int64     m_rtCurSubPos;
     CString     m_strTitle;
-    bool        m_bToggleShader;
-    bool        m_bToggleShaderScreenSpace;
+    bool        m_bToggleShader[2];
     bool        m_bInOptions;
     bool        m_bStopTunerScan;
     bool        m_bLockedZoomVideoWindow;
@@ -903,14 +912,14 @@ public:
 
     void        SetLoadState(MPC_LOADSTATE iState);
     void        SetPlayState(MPC_PLAYSTATE iState);
-    bool        CreateFullScreenWindow();
+    HWND        CreateFullScreenWindow();
     void        SetupEVRColorControl();
     void        SetupVMR9ColorControl();
     void        SetColorControl(DWORD flags, int& brightness, int& contrast, int& hue, int& saturation);
     void        SetClosedCaptions(bool enable);
     LPCTSTR     GetDVDAudioFormatName(DVD_AudioAttributes& ATR) const;
     void        SetAudioDelay(REFERENCE_TIME rtShift);
-    void        SetSubtitleDelay(int delay_ms);
+    void        SetSubtitleDelay(__in const REFERENCE_TIME delay_ms);
     //void      AutoSelectTracks();
     bool        IsRealEngineCompatible(CString strFilename) const;
     void        SetTimersPlay();
@@ -934,7 +943,7 @@ public:
 
     ITaskbarList3* m_pTaskbarList;
     HRESULT CreateThumbnailToolbar();
-    HRESULT UpdateThumbarButton();
+    void UpdateThumbarButton();
     HRESULT UpdateThumbnailClip();
 
 protected:

@@ -23,8 +23,6 @@
 #include "VideoDecDXVAAllocator.h"
 #include "MPCVideoDecFilter.h"
 #include <Mferror.h>
-#include <d3dx9.h>
-#include <evr.h>
 
 
 CDXVA2Sample::CDXVA2Sample(CVideoDecDXVAAllocator* pAlloc, HRESULT* phr)

@@ -138,6 +138,8 @@ private:
     bool m_useWASAPI;
     bool m_useWASAPIAfterRestart;
     bool m_bMuteFastForward;
+    bool m_bSamplesNeed24to32Conversion;
+    CMediaType m_cmtMediaType;
     CString m_csSound_Device;
     IMMDevice* pMMDevice;
     IAudioClient* pAudioClient;

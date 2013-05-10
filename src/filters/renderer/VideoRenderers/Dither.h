@@ -1,5 +1,5 @@
 /*
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -20,5 +20,8 @@
 
 #pragma once
 
-const int DITHER_MATRIX_SIZE = 32;
-extern const unsigned short DITHER_MATRIX[DITHER_MATRIX_SIZE][DITHER_MATRIX_SIZE];
+namespace DSObjects
+{
+    // Dither matrix in 32-bit floating point format, 128×128
+    extern "C" __declspec(align(128)) __int32 const gk_aDitherMatrix[128 * 128]; // cache line align, referenced by UtilityASMx??.asm
+}

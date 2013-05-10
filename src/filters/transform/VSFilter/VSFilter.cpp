@@ -69,8 +69,18 @@ int CVSFilterApp::ExitInstance()
 
 HINSTANCE CVSFilterApp::LoadAppLangResourceDLL()
 {
+    // this function can handle paths over the MAX_PATH limitation
     CString fn;
-    fn.ReleaseBufferSetLength(::GetModuleFileName(m_hInstance, fn.GetBuffer(MAX_PATH), MAX_PATH));
+    LPTSTR szPath = fn.GetBufferSetLength(32767);
+    if (!szPath) {
+        return nullptr;
+    }
+    DWORD dwLength = ::GetModuleFileName(m_hInstance, szPath, 32767);
+    if (!dwLength) {
+        return nullptr;
+    }
+    fn.Truncate(dwLength);
+
     fn = fn.Mid(fn.ReverseFind('\\') + 1);
     fn = fn.Left(fn.ReverseFind('.') + 1);
     fn = fn + _T("lang");
@@ -85,14 +95,18 @@ const AMOVIESETUP_MEDIATYPE sudPinTypesIn[] = {
     // Accepting all media types is needed so that VSFilter can hook
     // on the graph soon enough before the renderer is connected
     {&MEDIATYPE_NULL, &MEDIASUBTYPE_NULL},
-    {&MEDIATYPE_Video, &MEDIASUBTYPE_YUY2},
-    {&MEDIATYPE_Video, &MEDIASUBTYPE_YV12},
-    {&MEDIATYPE_Video, &MEDIASUBTYPE_I420},
-    {&MEDIATYPE_Video, &MEDIASUBTYPE_IYUV},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_ARGB32},// same order as in MemSubPic.h
     {&MEDIATYPE_Video, &MEDIASUBTYPE_RGB32},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_RGB24},
     {&MEDIATYPE_Video, &MEDIASUBTYPE_RGB565},
     {&MEDIATYPE_Video, &MEDIASUBTYPE_RGB555},
-    {&MEDIATYPE_Video, &MEDIASUBTYPE_RGB24},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_AYUV},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_YUY2},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_YV12},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_IYUV},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_I420},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_NV12},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_NV21},
 };
 
 const AMOVIESETUP_MEDIATYPE sudPinTypesIn2[] = {
@@ -132,6 +146,7 @@ CFactoryTemplate g_Templates[] = {
 int g_cTemplates = _countof(g_Templates);
 
 //////////////////////////////
+#define ResStr(id) CString(MAKEINTRESOURCE(id))// TODO; replace this by the usual LoadString() to constant resource
 
 STDAPI DllRegisterServer()
 {

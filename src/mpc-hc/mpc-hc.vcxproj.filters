@@ -823,9 +823,6 @@
     <None Include="res\shaders\empty.psh">
       <Filter>Resource Files\shaders</Filter>
     </None>
-    <None Include="res\shaders\final.psh">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
     <None Include="res\shaders\grayscale.psh">
       <Filter>Resource Files\shaders</Filter>
     </None>
@@ -848,9 +845,6 @@
       <Filter>Resource Files\shaders</Filter>
     </None>
     <None Include="res\shaders\procamp.psh">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
-    <None Include="res\shaders\resizer.psh">
       <Filter>Resource Files\shaders</Filter>
     </None>
     <None Include="res\shaders\sharpen.psh">

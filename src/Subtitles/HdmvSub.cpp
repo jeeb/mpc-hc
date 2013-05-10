@@ -30,8 +30,7 @@
 
 
 CHdmvSub::CHdmvSub()
-    : CBaseSub(ST_HDMV)
-    , m_nCurSegment(NO_SEGMENT)
+    : m_nCurSegment(NO_SEGMENT)
     , m_pSegBuffer(nullptr)
     , m_nTotalSegBuffer(0)
     , m_nSegBufferPos(0)
@@ -39,15 +38,6 @@ CHdmvSub::CHdmvSub()
     , m_pCurrentPresentationSegment(nullptr)
 {
 }
-
-CHdmvSub::~CHdmvSub()
-{
-    Reset();
-
-    delete [] m_pSegBuffer;
-    delete m_pCurrentPresentationSegment;
-}
-
 
 void CHdmvSub::AllocSegment(int nSize)
 {
@@ -60,12 +50,23 @@ void CHdmvSub::AllocSegment(int nSize)
     m_nSegSize = nSize;
 }
 
-POSITION CHdmvSub::GetStartPosition(REFERENCE_TIME rt, double fps)
+// IBaseSub
+
+__declspec(nothrow noalias) void CHdmvSub::Destructor()
+{
+    Reset();
+
+    delete[] m_pSegBuffer;
+    delete m_pCurrentPresentationSegment;
+}
+
+
+__declspec(nothrow noalias restrict) POSITION CHdmvSub::GetStartPosition(__in __int64 i64Time, __in double fps)
 {
     POSITION pos = m_pPresentationSegments.GetHeadPosition();
     while (pos) {
         HDMV_PRESENTATION_SEGMENT* pPresentationSegment = m_pPresentationSegments.GetAt(pos);
-        if (pPresentationSegment->rtStop < rt) {
+        if (pPresentationSegment->rtStop < i64Time) {
             m_pPresentationSegments.GetNext(pos);
         } else {
             break;
@@ -75,7 +76,7 @@ POSITION CHdmvSub::GetStartPosition(REFERENCE_TIME rt, double fps)
     return pos;
 }
 
-HRESULT CHdmvSub::ParseSample(IMediaSample* pSample)
+__declspec(nothrow noalias) HRESULT CHdmvSub::ParseSample(__inout IMediaSample* pSample)
 {
     CheckPointer(pSample, E_POINTER);
     HRESULT hr;
@@ -301,11 +302,11 @@ void CHdmvSub::ParseCompositionDescriptor(CGolombBuffer* pGBuffer, COMPOSITION_D
     pCompositionDescriptor->bState  = pGBuffer->ReadByte() >> 6;
 }
 
-void CHdmvSub::Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox)
+__declspec(nothrow noalias) void CHdmvSub::Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox)
 {
-    RemoveOldSegments(rt);
+    RemoveOldSegments(i64Time);
 
-    HDMV_PRESENTATION_SEGMENT* pPresentationSegment = FindPresentationSegment(rt);
+    HDMV_PRESENTATION_SEGMENT* pPresentationSegment = FindPresentationSegment(i64Time);
 
     bbox.left   = LONG_MAX;
     bbox.top    = LONG_MAX;
@@ -340,25 +341,19 @@ void CHdmvSub::Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox)
     }
 }
 
-HRESULT CHdmvSub::GetTextureSize(POSITION pos, SIZE& MaxTextureSize, SIZE& VideoSize, POINT& VideoTopLeft)
+__declspec(nothrow noalias) unsigned __int64 CHdmvSub::GetTextureSize(__in POSITION pos) const
 {
-    HDMV_PRESENTATION_SEGMENT* pPresentationSegment = m_pPresentationSegments.GetAt(pos);
-    if (pPresentationSegment) {
-        MaxTextureSize.cx = VideoSize.cx = pPresentationSegment->video_descriptor.nVideoWidth;
-        MaxTextureSize.cy = VideoSize.cy = pPresentationSegment->video_descriptor.nVideoHeight;
-
-        // The subs will be directly rendered into the proper position!
-        VideoTopLeft.x = 0; //pObject->m_horizontal_position;
-        VideoTopLeft.y = 0; //pObject->m_vertical_position;
-
-        return S_OK;
+    if (HDMV_PRESENTATION_SEGMENT* pPresentationSegment = m_pPresentationSegments.GetAt(pos)) {
+        ULARGE_INTEGER size;
+        size.LowPart = pPresentationSegment->video_descriptor.nVideoWidth;
+        size.HighPart = pPresentationSegment->video_descriptor.nVideoHeight;
+        return size.QuadPart;
     }
-
-    ASSERT(FALSE);
-    return E_INVALIDARG;
+    ASSERT(0);
+    return 0;
 }
 
-void CHdmvSub::Reset()
+__declspec(nothrow noalias) void CHdmvSub::Reset()
 {
     HDMV_PRESENTATION_SEGMENT* pPresentationSegment;
     while (m_pPresentationSegments.GetCount() > 0) {

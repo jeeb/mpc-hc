@@ -1827,7 +1827,7 @@ HRESULT CRealVideoDecoder::Transform(IMediaSample* pIn)
 
     pOut->SetDiscontinuity(pIn->IsDiscontinuity() == S_OK);
 
-    CopyBuffer(pDataOut, pI420[0], m_w, m_h, m_w, MEDIASUBTYPE_I420);
+    CopyBuffer(pDataOut, pI420[0], m_w, m_h, m_w, '024I');
 
     DbgLog((LOG_TRACE, 0, _T("V: rtStart=%I64d, rtStop=%I64d, disc=%d, sync=%d"),
             rtStart, rtStop, pOut->IsDiscontinuity() == S_OK, pOut->IsSyncPoint() == S_OK));

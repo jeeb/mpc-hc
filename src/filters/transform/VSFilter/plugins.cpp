@@ -36,6 +36,53 @@
 #include "vd2/plugin/vdvideofilt.h"
 #endif
 
+// note: these keep external references at StyleEditorDialog.cpp
+extern TCHAR const* const CharSetNames[20] = {
+    _T("BALTIC (186)"),
+    _T("MAC (77)"),
+    _T("RUSSIAN (204)"),
+    _T("EASTEUROPE (238)"),
+    _T("THAI (222)"),
+    _T("VIETNAMESE (163)"),
+    _T("TURKISH (162)"),
+    _T("GREEK (161)"),
+    _T("ARABIC (178)"),
+    _T("HEBREW (177)"),
+    _T("JOHAB (130)"),
+    _T("OEM (255)"),
+    _T("CHINESEBIG5 (136)"),
+    _T("GB2312 (134)"),
+    _T("HANGUL (129)"),
+    _T("HANGEUL (129)"),
+    _T("SHIFTJIS (128)"),
+    _T("SYMBOL (2)"),
+    _T("DEFAULT (1)"),
+    _T("ANSI (0)")
+};// strings are loaded by a decrementing loop
+
+extern unsigned __int8 const CharSetList[20] = {
+    ANSI_CHARSET,
+    DEFAULT_CHARSET,
+    SYMBOL_CHARSET,
+    SHIFTJIS_CHARSET,
+    HANGEUL_CHARSET,
+    HANGUL_CHARSET,
+    GB2312_CHARSET,
+    CHINESEBIG5_CHARSET,
+    OEM_CHARSET,
+    JOHAB_CHARSET,
+    HEBREW_CHARSET,
+    ARABIC_CHARSET,
+    GREEK_CHARSET,
+    TURKISH_CHARSET,
+    VIETNAMESE_CHARSET,
+    THAI_CHARSET,
+    EASTEUROPE_CHARSET,
+    RUSSIAN_CHARSET,
+    MAC_CHARSET,
+    BALTIC_CHARSET
+};
+
 //
 // Generic interface
 //
@@ -49,14 +96,15 @@ namespace Plugin
         CString m_fn;
 
     protected:
-        float m_fps;
+        double m_fps;
         CCritSec m_csSubLock;
-        CComPtr<ISubPicQueue> m_pSubPicQueue;
-        CComPtr<ISubPicProvider> m_pSubPicProvider;
+        CComPtr<CMemSubPicAllocator> m_pSubPicAllocator;
+        CComPtr<CSubPicQueueImpl> m_pSubPicQueue;
+        CComPtr<CSubPicProviderImpl> m_pSubPicProvider;
         DWORD_PTR m_SubPicProviderId;
 
     public:
-        CFilter() : m_fps(-1), m_SubPicProviderId(0) {
+        CFilter() : m_fps(-1.0), m_SubPicProviderId(0) {
             CAMThread::Create();
         }
         virtual ~CFilter() {
@@ -72,41 +120,45 @@ namespace Plugin
             m_fn = fn;
         }
 
-        bool Render(SubPicDesc& dst, REFERENCE_TIME rt, float fps) {
+        bool Render(SubPicDesc& dst, REFERENCE_TIME rt, double fps) {
             if (!m_pSubPicProvider) {
                 return false;
             }
 
-            CSize size(dst.w, dst.h);
-
             if (!m_pSubPicQueue) {
-                CComPtr<ISubPicAllocator> pAllocator = DEBUG_NEW CMemSubPicAllocator(dst.type, size);
-
-                HRESULT hr;
-                if (!(m_pSubPicQueue = DEBUG_NEW CSubPicQueueNoThread(pAllocator, &hr)) || FAILED(hr)) {
-                    m_pSubPicQueue = nullptr;
+                void* pRawMemA = malloc(sizeof(CMemSubPicAllocator));
+                if (!pRawMemA) {
+                    ASSERT(0);
                     return false;
                 }
+                void* pRawMemQ = malloc(sizeof(CSubPicQueueNoThread));
+                if (!pRawMemQ) {
+                    ASSERT(0);
+                    free(pRawMemA);
+                    return false;
+                }
+                m_pSubPicAllocator = new(pRawMemA) CMemSubPicAllocator(dst.w, dst.h, dst.type);
+                m_pSubPicQueue = new(pRawMemQ) CSubPicQueueNoThread(m_pSubPicAllocator, fps);
             }
 
-            if (m_SubPicProviderId != (DWORD_PTR)(ISubPicProvider*)m_pSubPicProvider) {
+            if (m_SubPicProviderId != (DWORD_PTR)m_pSubPicProvider.p) {
                 m_pSubPicQueue->SetSubPicProvider(m_pSubPicProvider);
-                m_SubPicProviderId = (DWORD_PTR)(ISubPicProvider*)m_pSubPicProvider;
+                m_SubPicProviderId = (DWORD_PTR)m_pSubPicProvider.p;
             }
 
-            CComPtr<ISubPic> pSubPic;
-            if (!m_pSubPicQueue->LookupSubPic(rt, pSubPic)) {
+            CBSubPic* pSubPic = m_pSubPicQueue->LookupSubPic(rt);
+            if (!pSubPic) {
                 return false;
             }
 
-            CRect r;
-            pSubPic->GetDirtyRect(r);
+            RECT r = pSubPic->GetDirtyRect();
 
             if (dst.type == MSP_RGB32 || dst.type == MSP_RGB24 || dst.type == MSP_RGB16 || dst.type == MSP_RGB15) {
                 dst.h = -dst.h;
             }
 
-            pSubPic->AlphaBlt(r, r, &dst);
+            alpha_blt_rgb32(r, r, &dst, static_cast<CMemSubPic*>(pSubPic)->m_spd);
+            pSubPic->Release();
 
             return true;
         }
@@ -185,7 +237,7 @@ namespace Plugin
             m_pSubPicProvider = nullptr;
 
             if (CVobSubFile* vsf = DEBUG_NEW CVobSubFile(&m_csSubLock)) {
-                m_pSubPicProvider = (ISubPicProvider*)vsf;
+                m_pSubPicProvider = (CSubPicProviderImpl*)vsf;
                 if (vsf->Open(CString(fn))) {
                     SetFileName(fn);
                 } else {
@@ -202,7 +254,7 @@ namespace Plugin
         int m_CharSet;
 
     public:
-        CTextSubFilter(CString fn = _T(""), int CharSet = DEFAULT_CHARSET, float fps = -1)
+        CTextSubFilter(CString fn = _T(""), int CharSet = DEFAULT_CHARSET, double fps = -1.0)
             : m_CharSet(CharSet) {
             m_fps = fps;
             if (!fn.IsEmpty()) {
@@ -220,7 +272,7 @@ namespace Plugin
 
             if (!m_pSubPicProvider) {
                 if (CRenderedTextSubtitle* rts = DEBUG_NEW CRenderedTextSubtitle(&m_csSubLock)) {
-                    m_pSubPicProvider = (ISubPicProvider*)rts;
+                    m_pSubPicProvider = (CSubPicProviderImpl*)rts;
                     if (rts->Open(CString(fn), CharSet)) {
                         SetFileName(fn);
                     } else {
@@ -798,9 +850,9 @@ namespace Plugin
                         vi.IsYUY2() ? MSP_YUY2 :
                         -1;
 
-                float fps = m_fps > 0 ? m_fps : (float)vi.fps_numerator / vi.fps_denominator;
+                double fps = (m_fps > 0) ? m_fps : static_cast<double>(vi.fps_numerator) / static_cast<double>(vi.fps_denominator);
 
-                Render(dst, (REFERENCE_TIME)(10000000i64 * n / fps), fps);
+                Render(dst, static_cast<REFERENCE_TIME>(static_cast<double>(10000000i64 * n) / fps + 0.5), fps);
 
                 return frame;
             }
@@ -920,15 +972,9 @@ namespace Plugin
                 /*vi.IsIYUV()*/ vi.pixel_type == VideoInfo::CS_IYUV ? (s_fSwapUV ? MSP_YV12 : MSP_IYUV) :
                         -1;
 
-                float fps = m_fps > 0 ? m_fps : (float)vi.fps_numerator / vi.fps_denominator;
+                double fps = (m_fps > 0.0) ? m_fps : static_cast<double>(vi.fps_numerator) / static_cast<double>(vi.fps_denominator);
 
-                REFERENCE_TIME timestamp;
-
-                if (!vfr) {
-                    timestamp = (REFERENCE_TIME)(10000000i64 * n / fps);
-                } else {
-                    timestamp = (REFERENCE_TIME)(10000000 * vfr->TimeStampFromFrameNumber(n));
-                }
+                REFERENCE_TIME timestamp = static_cast<REFERENCE_TIME>(0.5 + (vfr ? (10000000.0 * vfr->TimeStampFromFrameNumber(n)) : (static_cast<double>(10000000i64 * n) / fps)));
 
                 Render(dst, timestamp, fps);
 
@@ -936,7 +982,7 @@ namespace Plugin
             }
         };
 
-        class CVobSubAvisynthFilter : public CVobSubFilter, public CAvisynthFilter
+    class CVobSubAvisynthFilter : public CVobSubFilter, public CAvisynthFilter
         {
         public:
             CVobSubAvisynthFilter(PClip c, const char* fn, IScriptEnvironment* env)
@@ -1061,14 +1107,16 @@ UINT_PTR CALLBACK OpenHookProc(HWND hDlg, UINT uiMsg, WPARAM wParam, LPARAM lPar
         case WM_INITDIALOG: {
             SetWindowLongPtr(hDlg, GWLP_USERDATA, lParam);
 
-            for (ptrdiff_t i = 0; i < CharSetLen; i++) {
+            ptrdiff_t i = _countof(CharSetList) - 1;
+            do {
                 CString s;
                 s.Format(_T("%s (%d)"), CharSetNames[i], CharSetList[i]);
                 SendMessage(GetDlgItem(hDlg, IDC_COMBO1), CB_ADDSTRING, 0, (LPARAM)(LPCTSTR)s);
                 if (CharSetList[i] == (int)((OPENFILENAME*)lParam)->lCustData) {
                     SendMessage(GetDlgItem(hDlg, IDC_COMBO1), CB_SETCURSEL, i, 0);
                 }
-            }
+                --i;
+            } while (i >= 0);
 
             break;
         }

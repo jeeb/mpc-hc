@@ -29,8 +29,8 @@
 
 class AP4_AsyncReaderStream : public AP4_ByteStream
 {
-    int m_refs;
     CBaseSplitterFile* m_pFile;
+    ULONG volatile mv_ulReferenceCount;
 
 public:
     AP4_AsyncReaderStream(CBaseSplitterFile* pFile);

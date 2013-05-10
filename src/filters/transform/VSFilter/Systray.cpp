@@ -321,6 +321,7 @@ LRESULT CSystrayWindow::OnNotifyIcon(WPARAM wParam, LPARAM lParam)
 
 DWORD CALLBACK SystrayThreadProc(void* pParam)
 {
+    DEBUG_ONLY(SetThreadName(0xFFFFFFFF, "SystrayThreadProc"));
     AFX_MANAGE_STATE(AfxGetStaticModuleState());
 
     CSystrayWindow wnd((SystrayIconData*)pParam);

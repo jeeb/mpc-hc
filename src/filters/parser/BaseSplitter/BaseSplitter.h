@@ -104,11 +104,12 @@ class Packet : public CAtlArray<BYTE>
 {
 public:
     DWORD TrackNumber;
-    BOOL bDiscontinuity, bSyncPoint, bAppendable;
+    bool bDiscontinuity, bSyncPoint, bAppendable;
+    bool const bkMatroskaDerived;
     static const REFERENCE_TIME INVALID_TIME = _I64_MIN;
     REFERENCE_TIME rtStart, rtStop;
     AM_MEDIA_TYPE* pmt;
-    Packet() {
+    Packet(bool bMatroskaDerived = false) : bkMatroskaDerived(bMatroskaDerived) {
         pmt = NULL;
         bDiscontinuity = bAppendable = FALSE;
     }
@@ -182,6 +183,9 @@ private:
     HRESULT m_hrDeliver;
 
     bool m_fFlushing, m_fFlushed;
+public:
+    bool const mk_u8BaseClass;
+private:
     CAMEvent m_eEndFlush;
 
     enum { CMD_EXIT };
@@ -239,11 +243,13 @@ public:
     CBaseSplitterOutputPin(CAtlArray<CMediaType>& mts, LPCWSTR pName,
                            CBaseFilter* pFilter, CCritSec* pLock,
                            HRESULT* phr, int nBuffers = 0,
-                           int QueueMaxPackets = MAXPACKETS);
+                           int QueueMaxPackets = MAXPACKETS,
+                           unsigned __int8 u8BaseClass = 0);
     CBaseSplitterOutputPin(LPCWSTR pName, CBaseFilter* pFilter,
                            CCritSec* pLock, HRESULT* phr,
                            int nBuffers = 0,
-                           int QueueMaxPackets = MAXPACKETS);
+                           int QueueMaxPackets = MAXPACKETS,
+                           unsigned __int8 u8BaseClass = 0);
     virtual ~CBaseSplitterOutputPin();
 
     DECLARE_IUNKNOWN;

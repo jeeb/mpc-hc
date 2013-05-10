@@ -36,7 +36,8 @@ private:
     bool IsRenderTypeAvailable(int VideoRendererType);
 
     CStringArray m_AudioRendererDisplayNames;
-    CStringArray m_D3D9GUIDNames;
+    struct GUIDai {__int64 g[2]; int i;};// GUID and index from m_iD3D9RenderDeviceCtrl
+    CAtlList<GUIDai> m_VRendererDevices;
     CImageList m_tickcross;
     HICON m_tick, m_cross;
 
@@ -67,15 +68,13 @@ public:
     int m_iDSVideoRendererType;
     int m_iRMVideoRendererType;
     int m_iQTVideoRendererType;
-    int m_iAPSurfaceUsage;
     int m_iAudioRendererType;
     int m_iDX9Resizer;
-    BOOL m_fVMR9MixerMode;
     BOOL m_fVMR9MixerYUV;
     BOOL m_fD3DFullscreen;
     BOOL m_fVMR9AlterativeVSync;
-    BOOL m_fResetDevice;
-    CString m_iEvrBuffers;
+    int m_iMixerBuffersBase;
+    double m_dRefreshRateAdjust;
 
     BOOL m_fD3D9RenderDevice;
     int m_iD3D9RenderDevice;
@@ -90,7 +89,6 @@ protected:
 
 public:
     afx_msg void OnUpdateMixerYUV(CCmdUI* pCmdUI);
-    afx_msg void OnSurfaceChange();
     afx_msg void OnDSRendererChange();
     afx_msg void OnRMRendererChange();
     afx_msg void OnQTRendererChange();

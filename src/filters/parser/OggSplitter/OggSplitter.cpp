@@ -239,9 +239,10 @@ HRESULT COggSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
 
                 AddOutputPin(page.m_hdr.bitstream_serial_number, pPinOut);
             } else if (type == 3 && !memcmp(p, "vorbis", 6)) {
-                if (COggSplitterOutputPin* pOggPin =
-                            dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number))) {
-                    pOggPin->AddComment(p + 6, (int)page.GetCount() - 6 - 1);
+                if (CBaseSplitterOutputPin* pBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number)) {
+                    if (pBasePin->mk_u8BaseClass & OggSplitterType_mask) {
+                        static_cast<COggSplitterOutputPin*>(pBasePin)->AddComment(p + 6, (int)page.GetCount() - 6 - 1);
+                    }
                 }
             } else if (type == 0x7F && page.GetCount() > 12 && *(long*)(p + 8) == 0x43614C66) { // Flac
                 // Ogg Flac : method 1
@@ -264,17 +265,21 @@ HRESULT COggSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
             }
         }
 
-        if (COggTheoraOutputPin* ptr = dynamic_cast<COggTheoraOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number))) {
-            ptr->UnpackInitPage(page);
-            if (ptr->IsInitialized()) {
-                nWaitForMore--;
+        if (CBaseSplitterOutputPin* pBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number)) {
+            if (pBasePin->mk_u8BaseClass == OggSplitterType_TheoraOutputPin) {
+                COggTheoraOutputPin* ptr = static_cast<COggTheoraOutputPin*>(pBasePin);
+                ptr->UnpackInitPage(page);
+                if (ptr->IsInitialized()) {
+                    --nWaitForMore;
+                }
             }
-        }
 
-        if (COggVorbisOutputPin* ptr = dynamic_cast<COggVorbisOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number))) {
-            ptr->UnpackInitPage(page);
-            if (ptr->IsInitialized()) {
-                nWaitForMore--;
+            if (pBasePin->mk_u8BaseClass == OggSplitterType_VorbisOutputPin) {
+                COggVorbisOutputPin* ptr = static_cast<COggVorbisOutputPin*>(pBasePin);
+                ptr->UnpackInitPage(page);
+                if (ptr->IsInitialized()) {
+                    --nWaitForMore;
+                }
             }
         }
     }
@@ -288,12 +293,15 @@ HRESULT COggSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
 
         OggPage ppage;
         while (m_pFile->Read(ppage)) {
-            COggSplitterOutputPin* pOggPin = dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(ppage.m_hdr.bitstream_serial_number));
-            if (!pOggPin || ppage.m_hdr.granule_position == -1) {
+            if (ppage.m_hdr.granule_position == -1) {
                 continue;
             }
-            REFERENCE_TIME rt = pOggPin->GetRefTime(ppage.m_hdr.granule_position);
-            m_rtDuration = max(rt, m_rtDuration);
+            if (CBaseSplitterOutputPin* pBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number)) {
+                if (pBasePin->mk_u8BaseClass & OggSplitterType_mask) {
+                    REFERENCE_TIME rt = static_cast<COggSplitterOutputPin*>(pBasePin)->GetRefTime(ppage.m_hdr.granule_position);
+                    m_rtDuration = max(rt, m_rtDuration);
+                }
+            }
         }
     }
 
@@ -316,25 +324,24 @@ HRESULT COggSplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
 
             POSITION pos = m_pOutputs.GetHeadPosition();
             while (pos) {
-                COggSplitterOutputPin* pOggPin = dynamic_cast<COggSplitterOutputPin*>((CBaseOutputPin*)m_pOutputs.GetNext(pos));
-                if (!pOggPin) {
-                    continue;
-                }
-
-                CStringW value = pOggPin->GetComment(oggtag);
-                if (!value.IsEmpty()) {
-                    SetProperty(dsmtag, value);
-                    break;
+                CBaseSplitterOutputPin* pBasePin = m_pOutputs.GetNext(pos);
+                if (pBasePin->mk_u8BaseClass & OggSplitterType_mask) {
+                    CStringW value = static_cast<COggSplitterOutputPin*>(pBasePin)->GetComment(oggtag);
+                    if (!value.IsEmpty()) {
+                        SetProperty(dsmtag, value);
+                        break;
+                    }
                 }
             }
         }
 
         POSITION pos = m_pOutputs.GetHeadPosition();
         while (pos && !ChapGetCount()) {
-            COggSplitterOutputPin* pOggPin = dynamic_cast<COggSplitterOutputPin*>((CBaseOutputPin*)m_pOutputs.GetNext(pos));
-            if (!pOggPin) {
+            CBaseSplitterOutputPin* pBasePin = m_pOutputs.GetNext(pos);
+            if (!(pBasePin->mk_u8BaseClass & OggSplitterType_mask)) {
                 continue;
             }
+            COggSplitterOutputPin* pOggPin = static_cast<COggSplitterOutputPin*>(pBasePin);
 
             for (int i = 1; pOggPin; i++) {
                 CStringW key;
@@ -395,14 +402,16 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                 if (page.m_hdr.granule_position == -1) {
                     continue;
                 }
-
-                COggSplitterOutputPin* pOggPin = dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number));
-                if (!pOggPin) {
+                CBaseSplitterOutputPin* pBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number);
+                if (!pBasePin) {
                     ASSERT(0);
                     continue;
                 }
-
-                rtPos = pOggPin->GetRefTime(page.m_hdr.granule_position);
+                if (!(pBasePin->mk_u8BaseClass & OggSplitterType_mask)) {
+                    ASSERT(0);
+                    continue;
+                }
+                rtPos = static_cast<COggSplitterOutputPin*>(pBasePin)->GetRefTime(page.m_hdr.granule_position);
                 endpos = m_pFile->GetPos();
 
                 break;
@@ -451,11 +460,11 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
 
         POSITION pos = m_pOutputs.GetHeadPosition();
         while (pos) {
-            COggSplitterOutputPin* pPin = dynamic_cast<COggSplitterOutputPin*>(static_cast<CBaseSplitterOutputPin*>(m_pOutputs.GetNext(pos)));
-
-            if (!dynamic_cast<COggVideoOutputPin*>(pPin) && !dynamic_cast<COggTheoraOutputPin*>(pPin)) {
+            CBaseSplitterOutputPin* pBasePin = m_pOutputs.GetNext(pos);
+            if ((pBasePin->mk_u8BaseClass != OggSplitterType_VideoOutputPin) && (pBasePin->mk_u8BaseClass != OggSplitterType_TheoraOutputPin)) {
                 continue;
             }
+            COggSplitterOutputPin* pPin = static_cast<COggSplitterOutputPin*>(pBasePin);
 
             bool fKeyFrameFound = false, fSkipKeyFrame = true;
             __int64 endpos = _I64_MAX;
@@ -467,7 +476,11 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                         continue;
                     }
 
-                    if (pPin != dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number))) {
+                    CBaseSplitterOutputPin* pOutputBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number);
+                    if (!pOutputBasePin) {
+                        continue;
+                    }
+                    if (pPin != static_cast<COggSplitterOutputPin*>(pOutputBasePin)) {
                         continue;
                     }
 
@@ -522,7 +535,11 @@ void COggSplitterFilter::DemuxSeek(REFERENCE_TIME rt)
                         continue;
                     }
 
-                    if (pPin != dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number))) {
+                    CBaseSplitterOutputPin* pOutputBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number);
+                    if (!pOutputBasePin) {
+                        continue;
+                    }
+                    if (pPin != static_cast<COggSplitterOutputPin*>(pOutputBasePin)) {
                         continue;
                     }
 
@@ -558,11 +575,15 @@ bool COggSplitterFilter::DemuxLoop()
 
     OggPage page;
     while (SUCCEEDED(hr) && !CheckRequest(nullptr) && m_pFile->Read(page, true, GetRequestHandle())) {
-        COggSplitterOutputPin* pOggPin = dynamic_cast<COggSplitterOutputPin*>(GetOutputPin(page.m_hdr.bitstream_serial_number));
-        if (!pOggPin) {
-            ASSERT(0);
+        CBaseSplitterOutputPin* pBasePin = GetOutputPin(page.m_hdr.bitstream_serial_number);
+        if (!pBasePin) {
             continue;
         }
+        if (!(pBasePin->mk_u8BaseClass & OggSplitterType_mask)) {
+            continue;
+        }
+        COggSplitterOutputPin* pOggPin = static_cast<COggSplitterOutputPin*>(pBasePin);
+
         if (!pOggPin->IsConnected()) {
             continue;
         }
@@ -596,8 +617,8 @@ COggSourceFilter::COggSourceFilter(LPUNKNOWN pUnk, HRESULT* phr)
 // COggSplitterOutputPin
 //
 
-COggSplitterOutputPin::COggSplitterOutputPin(LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : CBaseSplitterOutputPin(pName, pFilter, pLock, phr)
+COggSplitterOutputPin::COggSplitterOutputPin(LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr, unsigned __int8 u8BaseClass)
+    : CBaseSplitterOutputPin(pName, pFilter, pLock, phr, 0, MAXPACKETS, u8BaseClass)
 {
     ResetState((DWORD) - 1);
 }
@@ -785,7 +806,7 @@ HRESULT COggSplitterOutputPin::DeliverNewSegment(REFERENCE_TIME tStart, REFERENC
 //
 
 COggVorbisOutputPin::COggVorbisOutputPin(OggVorbisIdHeader* h, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : COggSplitterOutputPin(pName, pFilter, pLock, phr)
+    : COggSplitterOutputPin(pName, pFilter, pLock, phr, OggSplitterType_VorbisOutputPin)
 {
     m_audio_sample_rate = h->audio_sample_rate;
     m_blocksize[0] = 1 << h->blocksize_0;
@@ -936,7 +957,7 @@ HRESULT COggVorbisOutputPin::DeliverNewSegment(REFERENCE_TIME tStart, REFERENCE_
 //
 
 COggFlacOutputPin::COggFlacOutputPin(BYTE* h, int nCount, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : COggSplitterOutputPin(pName, pFilter, pLock, phr)
+    : COggSplitterOutputPin(pName, pFilter, pLock, phr, OggSplitterType_FlacOutputPin)
 {
     CGolombBuffer Buffer(h, nCount);
 
@@ -1034,7 +1055,7 @@ HRESULT COggFlacOutputPin::DeliverNewSegment(REFERENCE_TIME tStart, REFERENCE_TI
 //
 
 COggDirectShowOutputPin::COggDirectShowOutputPin(AM_MEDIA_TYPE* pmt, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : COggSplitterOutputPin(pName, pFilter, pLock, phr)
+    : COggSplitterOutputPin(pName, pFilter, pLock, phr, OggSplitterType_DirectShowOutputPin)
 {
     CMediaType mt;
     memcpy((AM_MEDIA_TYPE*)&mt, pmt, FIELD_OFFSET(AM_MEDIA_TYPE, pUnk));
@@ -1093,7 +1114,7 @@ HRESULT COggDirectShowOutputPin::UnpackPacket(CAutoPtr<OggPacket>& p, BYTE* pDat
 //
 
 COggStreamOutputPin::COggStreamOutputPin(OggStreamHeader* h, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : COggSplitterOutputPin(pName, pFilter, pLock, phr)
+    : COggSplitterOutputPin(pName, pFilter, pLock, phr, OggSplitterType_StreamOutputPin)
 {
     m_time_unit = h->time_unit;
     m_samples_per_unit = h->samples_per_unit;
@@ -1225,7 +1246,7 @@ COggTextOutputPin::COggTextOutputPin(OggStreamHeader* h, LPCWSTR pName, CBaseFil
 // COggTheoraOutputPin
 
 COggTheoraOutputPin::COggTheoraOutputPin(BYTE* p, LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr)
-    : COggSplitterOutputPin(pName, pFilter, pLock, phr)
+    : COggSplitterOutputPin(pName, pFilter, pLock, phr, OggSplitterType_TheoraOutputPin)
 {
     CMediaType mt;
     mt.majortype        = MEDIATYPE_Video;

@@ -169,6 +169,8 @@ BOOL CPPageAudioSwitcher::OnInitDialog()
         //      m_list.SetColumnWidth(i, LVSCW_AUTOSIZE);
         //      m_list.SetColumnWidth(i, m_list.GetColumnWidth(i)*8/10);
     }
+    m_list.InsertColumn(19, _T(""), LVCFMT_CENTER, 16);
+    m_list.SetItemText(0, 19, _T("0"));
 
     m_tooltip.Create(GetDlgItem(IDC_SLIDER1));
     m_tooltip.Activate(TRUE);
@@ -217,7 +219,7 @@ void CPPageAudioSwitcher::OnNMClickList1(NMHDR* pNMHDR, LRESULT* pResult)
 {
     LPNMLISTVIEW lpnmlv = (LPNMLISTVIEW)pNMHDR;
 
-    if (lpnmlv->iItem > 0 && lpnmlv->iSubItem > 0 && lpnmlv->iSubItem <= m_nChannels) {
+    if ((lpnmlv->iItem > 0) && ((lpnmlv->iSubItem == 19) || ((lpnmlv->iSubItem > 0) && (lpnmlv->iSubItem <= m_nChannels)))) {
         UpdateData();
         m_pSpeakerToChannelMap[m_nChannels - 1][lpnmlv->iItem - 1] ^= 1 << (lpnmlv->iSubItem - 1);
         m_list.RedrawItems(lpnmlv->iItem, lpnmlv->iItem);
@@ -283,7 +285,7 @@ void CPPageAudioSwitcher::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStru
                 pDC->TextOut(r.left + 1, (r.top + r.bottom - s.cy) / 2, m_list.GetItemText(lpDrawItemStruct->itemID, i));
             }
         } else {
-            pDC->SetTextColor(i > m_nChannels ? 0xe0e0e0 : (!m_list.IsWindowEnabled() ? 0xb0b0b0 : 0));
+            pDC->SetTextColor((i != 19 && i > m_nChannels) ? 0xe0e0e0 : (!m_list.IsWindowEnabled() ? 0xb0b0b0 : 0));
 
             if (lpDrawItemStruct->itemID == 0) {
                 pDC->TextOut((r.left + r.right - s.cx) / 2, (r.top + r.bottom - s.cy) / 2, m_list.GetItemText(lpDrawItemStruct->itemID, i));

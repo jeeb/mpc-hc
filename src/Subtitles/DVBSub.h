@@ -20,28 +20,30 @@
 
 #pragma once
 
-#include "BaseSub.h"
+#include "CompositionObject.h"
 
 #define MAX_REGIONS     10
 #define MAX_OBJECTS     10          // Max number of objects per region
+#define INVALID_TIME _I64_MIN
 
 class CGolombBuffer;
 
-class CDVBSub : public CBaseSub
+class CDVBSub : public IBaseSub
 {
 public:
-    CDVBSub();
-    ~CDVBSub();
+    CDVBSub();// a regular destructor won't work here, the delete command only acts on the IBaseSub pointer
 
-    virtual HRESULT        ParseSample(IMediaSample* pSample);
-    virtual void           EndOfStream();
-    virtual void           Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox);
-    virtual HRESULT        GetTextureSize(POSITION pos, SIZE& MaxTextureSize, SIZE& VideoSize, POINT& VideoTopLeft);
-    virtual POSITION       GetStartPosition(REFERENCE_TIME rt, double fps);
-    virtual POSITION       GetNext(POSITION pos);
-    virtual REFERENCE_TIME GetStart(POSITION nPos);
-    virtual REFERENCE_TIME GetStop(POSITION nPos);
-    virtual void           Reset();
+    // IBaseSub
+    __declspec(nothrow noalias) void Destructor();
+    __declspec(nothrow noalias) HRESULT ParseSample(__inout IMediaSample* pSample);
+    __declspec(nothrow noalias) void Reset();
+    __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 i64Time, __in double fps);
+    __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const;
+    __declspec(nothrow noalias) __int64 GetStart(__in POSITION nPos) const;
+    __declspec(nothrow noalias) __int64 GetStop(__in POSITION nPos) const;
+    __declspec(nothrow noalias) void EndOfStream();
+    __declspec(nothrow noalias) void Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox);
+    __declspec(nothrow noalias) unsigned __int64 GetTextureSize(__in POSITION pos) const;
 
     // EN 300-743, table 2
     enum DVB_SEGMENT_TYPE {
@@ -199,8 +201,6 @@ public:
     };
 
 private:
-    static const REFERENCE_TIME INVALID_TIME = _I64_MIN;
-
     int                 m_nBufferSize;
     int                 m_nBufferReadPos;
     int                 m_nBufferWritePos;
@@ -212,10 +212,10 @@ private:
     REFERENCE_TIME      m_rtStop;
 
     HRESULT             AddToBuffer(BYTE* pData, int nSize);
-    DVB_PAGE*           FindPage(REFERENCE_TIME rt);
+    DVB_PAGE*           FindPage(__in const REFERENCE_TIME rt) const;
     DVB_REGION*         FindRegion(DVB_PAGE* pPage, BYTE bRegionId);
     DVB_CLUT*           FindClut(DVB_PAGE* pPage, BYTE bClutId);
-    CompositionObject*  FindObject(DVB_PAGE* pPage, short sObjectId);
+    CompositionObject*  FindObject(__in const DVB_PAGE* pPage, __in const SHORT sObjectId) const;
 
     HRESULT             ParsePage(CGolombBuffer& gb, WORD wSegLength, CAutoPtr<DVB_PAGE>& pPage);
     HRESULT             ParseDisplay(CGolombBuffer& gb, WORD wSegLength);

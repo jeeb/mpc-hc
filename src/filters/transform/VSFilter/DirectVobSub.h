@@ -36,7 +36,7 @@ protected:
     CString m_FileName;
     int m_iSelectedLanguage;
     bool m_fHideSubtitles;
-    unsigned int m_uSubPictToBuffer;
+    unsigned __int8 m_uSubPictToBuffer;
     bool m_fAnimWhenBuffering;
     bool m_fOverridePlacement;
     int m_PlacementXperc, m_PlacementYperc;

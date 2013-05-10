@@ -19,10 +19,8 @@
  */
 
 #include "stdafx.h"
-#include <d3dx9.h>
 #include "WinAPIUtils.h"
 #include "SysVersion.h"
-
 
 bool SetPrivilege(LPCTSTR privilege, bool bEnable)
 {
@@ -176,34 +174,6 @@ bool ExportRegistryKey(CStdioFile& file, HKEY hKeyRoot, CString keyName)
     return true;
 }
 
-UINT GetAdapter(IDirect3D9* pD3D, HWND hWnd)
-{
-    if (hWnd == nullptr || pD3D == nullptr) {
-        return D3DADAPTER_DEFAULT;
-    }
-
-    HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-    if (hMonitor == nullptr) {
-        return D3DADAPTER_DEFAULT;
-    }
-
-    for (UINT adp = 0, num_adp = pD3D->GetAdapterCount(); adp < num_adp; ++adp) {
-        HMONITOR hAdpMon = pD3D->GetAdapterMonitor(adp);
-        if (hAdpMon == hMonitor) {
-            return adp;
-        }
-    }
-
-    return D3DADAPTER_DEFAULT;
-}
-
-int CALLBACK EnumFontFamExProc(ENUMLOGFONTEX* /*lpelfe*/, NEWTEXTMETRICEX* /*lpntme*/, int /*FontType*/, LPARAM lParam)
-{
-    LPARAM* l = (LPARAM*)lParam;
-    *l = TRUE;
-    return TRUE;
-}
-
 void GetMessageFont(LOGFONT* lf)
 {
     SecureZeroMemory(lf, sizeof(LOGFONT));
@@ -230,6 +200,15 @@ void GetStatusFont(LOGFONT* lf)
     *lf = ncm.lfStatusFont;
 }
 
+int CALLBACK EnumFontFamExProc(CONST LOGFONT* ignored0, CONST TEXTMETRIC* ignored1, DWORD ignored2, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(ignored0);
+    UNREFERENCED_PARAMETER(ignored1);
+    UNREFERENCED_PARAMETER(ignored2);
+    *reinterpret_cast<bool*>(lParam) = true;
+    return TRUE;
+}
+
 bool IsFontInstalled(LPCTSTR lpszFont)
 {
     // Get the screen DC
@@ -238,16 +217,17 @@ bool IsFontInstalled(LPCTSTR lpszFont)
         return false;
     }
 
-    LOGFONT lf = {0};
+    LOGFONTW lf;
     // Any character set will do
     lf.lfCharSet = DEFAULT_CHARSET;
+    lf.lfPitchAndFamily = 0;
     // Set the facename to check for
     _tcscpy_s(lf.lfFaceName, lpszFont);
-    LPARAM lParam = 0;
+    bool bAccepted = false;
     // Enumerate fonts
-    EnumFontFamiliesEx(dc.GetSafeHdc(), &lf, (FONTENUMPROC)EnumFontFamExProc, (LPARAM)&lParam, 0);
+    EnumFontFamiliesEx(dc, &lf, EnumFontFamExProc, reinterpret_cast<LPARAM>(&bAccepted), 0);
 
-    return lParam ? true : false;
+    return bAccepted;
 }
 
 bool ExploreToFile(LPCTSTR path)
@@ -276,14 +256,25 @@ bool FileExists(LPCTSTR fileName)
 
 CString GetProgramPath(bool bWithExecutableName /*= false*/)
 {
+    // this function can handle paths over the MAX_PATH limitation
     CString path;
-
-    DWORD dwLength = ::GetModuleFileName(nullptr, path.GetBuffer(MAX_PATH), MAX_PATH);
-    path.ReleaseBuffer((int)dwLength);
-
-    if (!bWithExecutableName) {
-        path = path.Left(path.ReverseFind(_T('\\')) + 1);
+    LPTSTR szPath = path.GetBufferSetLength(32767);
+    if (!szPath) {
+        goto exit;
     }
-
+    DWORD dwLength = ::GetModuleFileName(nullptr, szPath, 32767);
+    if (!dwLength) {
+        path.Empty();
+        goto exit;
+    }
+    path.Truncate(dwLength);
+    if (dwLength && !bWithExecutableName) {
+        DWORD i = dwLength - 6;// the last five characters (_T("x.exe")) are skipped in this loop
+        while (szPath[i] != _T('\\')) {
+            --i;
+        }
+        path.Truncate(i + 1);// truncate string right after the _T('\\')
+    }
+exit:
     return path;
 }

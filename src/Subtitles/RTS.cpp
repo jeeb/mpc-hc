@@ -26,20 +26,20 @@
 #include "RTS.h"
 #include "../DSUtil/WinAPIUtils.h"
 
-// WARNING: this isn't very thread safe, use only one RTS a time. We should use TLS in future.
-static HDC g_hDC;
-static int g_hDC_refcnt = 0;
+#pragma warning(disable: 4351)// the standard C4351 warning when default initializing arrays is irrelevant
 
-static long revcolor(long c)
+static __forceinline unsigned long revcolor(unsigned long c)
 {
-    return ((c & 0xff0000) >> 16) + (c & 0xff00) + ((c & 0xff) << 16);
+    // 0xAABBCCDD to 0xDDCCBBAA to 0x00DDCCBB, the cheap x86 bswap instruction is more suitable for such a conversion than set of values that are individually masked, shifted and bitwise OR'd together
+    return _byteswap_ulong(c) >> 8;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 // CMyFont
 
-CMyFont::CMyFont(STSStyle& style)
+CMyFont::CMyFont(HDC hDC, STSStyle& style)
+    : m_hDC(hDC)
 {
     LOGFONT lf;
     memset(&lf, 0, sizeof(lf));
@@ -51,23 +51,27 @@ CMyFont::CMyFont(STSStyle& style)
     lf.lfPitchAndFamily = DEFAULT_PITCH | FF_DONTCARE;
 
     if (!CreateFontIndirect(&lf)) {
+        ASSERT(0);
         _tcscpy_s(lf.lfFaceName, _T("Arial"));
-        CreateFontIndirect(&lf);
+        if (!CreateFontIndirect(&lf)) { ASSERT(0); }
     }
 
-    HFONT hOldFont = SelectFont(g_hDC, *this);
+    HFONT hOldFont = SelectFont(m_hDC, *this);
+    ASSERT(hOldFont);
     TEXTMETRIC tm;
-    GetTextMetrics(g_hDC, &tm);
+    GetTextMetrics(m_hDC, &tm);
     m_ascent = ((tm.tmAscent + 4) >> 3);
     m_descent = ((tm.tmDescent + 4) >> 3);
-    SelectFont(g_hDC, hOldFont);
+    HFONT hOldFont2 = SelectFont(m_hDC, hOldFont);
+    ASSERT(hOldFont2);
 }
 
 // CWord
 
-CWord::CWord(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley)
+CWord::CWord(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, bool bTextDerived)
     : m_style(style)
     , m_str(str)
+    , m_hDC(hDC)
     , m_width(0)
     , m_ascent(0)
     , m_descent(0)
@@ -81,12 +85,13 @@ CWord::CWord(STSStyle& style, CStringW str, int ktype, int kstart, int kend, dou
     , m_pOpaqueBox(nullptr)
     , m_scalex(scalex)
     , m_scaley(scaley)
+    , mk_bTextDerived(bTextDerived)
 {
     if (str.IsEmpty()) {
         m_fWhiteSpaceChar = m_fLineBreak = true;
     }
 
-    CMyFont font(m_style);
+    CMyFont font(m_hDC, m_style);
     m_ascent  = (int)(m_style.fontScaleY / 100 * font.m_ascent);
     m_descent = (int)(m_style.fontScaleY / 100 * font.m_descent);
     m_width   = 0;
@@ -166,11 +171,8 @@ void CWord::Paint(CPoint p, CPoint org)
 
 void CWord::Transform(CPoint org)
 {
-    if (fSSE2) {    // SSE code
-        Transform_SSE2(org);
-    } else {        // C-code
-        Transform_C(org);
-    }
+    // Transform_SSE2(org);// doesn't work, see todo
+    Transform_C(org);
 }
 
 bool CWord::CreateOpaqueBox()
@@ -196,7 +198,7 @@ bool CWord::CreateOpaqueBox()
                (m_width + w + 4) / 8, (m_ascent + m_descent + h + 4) / 8,
                -(w + 4) / 8, (m_ascent + m_descent + h + 4) / 8);
 
-    m_pOpaqueBox = DEBUG_NEW CPolygon(style, str, 0, 0, 0, 1.0, 1.0, 0);
+    m_pOpaqueBox = DEBUG_NEW CPolygon(m_hDC, style, str, 0, 0, 0, 1.0, 1.0, 0);
 
     return !!m_pOpaqueBox;
 }
@@ -208,12 +210,12 @@ void CWord::Transform_C(CPoint& org)
     double xzoomf = m_scalex * 20000.0;
     double yzoomf = m_scaley * 20000.0;
 
-    double caz = cos((M_PI / 180.0) * m_style.fontAngleZ);
-    double saz = sin((M_PI / 180.0) * m_style.fontAngleZ);
-    double cax = cos((M_PI / 180.0) * m_style.fontAngleX);
-    double sax = sin((M_PI / 180.0) * m_style.fontAngleX);
-    double cay = cos((M_PI / 180.0) * m_style.fontAngleY);
-    double say = sin((M_PI / 180.0) * m_style.fontAngleY);
+    double caz = cos(DegToRad(m_style.fontAngleZ));
+    double saz = sin(DegToRad(m_style.fontAngleZ));
+    double cax = cos(DegToRad(m_style.fontAngleX));
+    double sax = sin(DegToRad(m_style.fontAngleX));
+    double cay = cos(DegToRad(m_style.fontAngleY));
+    double say = sin(DegToRad(m_style.fontAngleY));
 
     double dOrgX = static_cast<double>(org.x), dOrgY = static_cast<double>(org.y);
     for (ptrdiff_t i = 0; i < mPathPoints; i++) {
@@ -250,6 +252,8 @@ void CWord::Transform_C(CPoint& org)
     }
 }
 
+/*
+TODO: The methods here are very wrong (the C function does work as it should), fix this with decent code, or delete this function
 void CWord::Transform_SSE2(CPoint& org)
 {
     // SSE code
@@ -259,12 +263,12 @@ void CWord::Transform_SSE2(CPoint& org)
     double xzoomf = m_scalex * 20000.0;
     double yzoomf = m_scaley * 20000.0;
 
-    double caz = cos((M_PI / 180.0) * m_style.fontAngleZ);
-    double saz = sin((M_PI / 180.0) * m_style.fontAngleZ);
-    double cax = cos((M_PI / 180.0) * m_style.fontAngleX);
-    double sax = sin((M_PI / 180.0) * m_style.fontAngleX);
-    double cay = cos((M_PI / 180.0) * m_style.fontAngleY);
-    double say = sin((M_PI / 180.0) * m_style.fontAngleY);
+    double caz = cos(DegToRad(m_style.fontAngleZ));
+    double saz = sin(DegToRad(m_style.fontAngleZ));
+    double cax = cos(DegToRad(m_style.fontAngleX));
+    double sax = sin(DegToRad(m_style.fontAngleX));
+    double cay = cos(DegToRad(m_style.fontAngleY));
+    double say = sin(DegToRad(m_style.fontAngleY));
 
     __m128 __xshift = _mm_set_ps1((float)m_style.fontShiftX);
     __m128 __yshift = _mm_set_ps1((float)m_style.fontShiftY);
@@ -404,26 +408,29 @@ void CWord::Transform_SSE2(CPoint& org)
         }
     }
 }
+*/
 
 // CText
 
-CText::CText(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley)
-    : CWord(style, str, ktype, kstart, kend, scalex, scaley)
+CText::CText(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley)
+    : CWord(hDC, style, str, ktype, kstart, kend, scalex, scaley, true)
 {
     if (m_str == L" ") {
         m_fWhiteSpaceChar = true;
     }
 
-    CMyFont font(m_style);
+    CMyFont font(m_hDC, m_style);
 
-    HFONT hOldFont = SelectFont(g_hDC, font);
+    HFONT hOldFont = SelectFont(m_hDC, font);
+    ASSERT(hOldFont);
 
     if (m_style.fontSpacing) {
         for (LPCWSTR s = m_str; *s; s++) {
             CSize extent;
-            if (!GetTextExtentPoint32W(g_hDC, s, 1, &extent)) {
-                SelectFont(g_hDC, hOldFont);
+            if (!GetTextExtentPoint32W(m_hDC, s, 1, &extent)) {
                 ASSERT(0);
+                HFONT hOldFont2 = SelectFont(m_hDC, hOldFont);
+                ASSERT(hOldFont2);
                 return;
             }
             m_width += extent.cx + (int)m_style.fontSpacing;
@@ -431,9 +438,10 @@ CText::CText(STSStyle& style, CStringW str, int ktype, int kstart, int kend, dou
         //          m_width -= (int)m_style.fontSpacing; // TODO: subtract only at the end of the line
     } else {
         CSize extent;
-        if (!GetTextExtentPoint32W(g_hDC, m_str, (int)wcslen(str), &extent)) {
-            SelectFont(g_hDC, hOldFont);
+        if (!GetTextExtentPoint32W(m_hDC, m_str, str.GetLength(), &extent)) {
             ASSERT(0);
+            HFONT hOldFont2 = SelectFont(m_hDC, hOldFont);
+            ASSERT(hOldFont2);
             return;
         }
         m_width += extent.cx;
@@ -441,7 +449,8 @@ CText::CText(STSStyle& style, CStringW str, int ktype, int kstart, int kend, dou
 
     m_width = (int)(m_style.fontScaleX / 100 * m_width + 4) >> 3;
 
-    SelectFont(g_hDC, hOldFont);
+    HFONT hOldFont3 = SelectFont(m_hDC, hOldFont);
+    ASSERT(hOldFont3);
 }
 
 CWord* CText::Copy()
@@ -451,14 +460,15 @@ CWord* CText::Copy()
 
 bool CText::Append(CWord* w)
 {
-    return (dynamic_cast<CText*>(w) && CWord::Append(w));
+    return (w->mk_bTextDerived && CWord::Append(w));
 }
 
 bool CText::CreatePath()
 {
-    CMyFont font(m_style);
+    CMyFont font(m_hDC, m_style);
 
-    HFONT hOldFont = SelectFont(g_hDC, font);
+    HFONT hOldFont = SelectFont(m_hDC, font);
+    ASSERT(hOldFont);
 
     if (m_style.fontSpacing) {
         int width = 0;
@@ -466,47 +476,50 @@ bool CText::CreatePath()
 
         for (LPCWSTR s = m_str; *s; s++) {
             CSize extent;
-            if (!GetTextExtentPoint32W(g_hDC, s, 1, &extent)) {
-                SelectFont(g_hDC, hOldFont);
+            if (!GetTextExtentPoint32W(m_hDC, s, 1, &extent)) {
                 ASSERT(0);
+                HFONT hOldFont2 = SelectFont(m_hDC, hOldFont);
+                ASSERT(hOldFont2);
                 return false;
             }
 
-            PartialBeginPath(g_hDC, bFirstPath);
+            PartialBeginPath(m_hDC, bFirstPath);
             bFirstPath = false;
-            TextOutW(g_hDC, 0, 0, s, 1);
-            PartialEndPath(g_hDC, width, 0);
+            TextOutW(m_hDC, 0, 0, s, 1);
+            PartialEndPath(m_hDC, width, 0);
 
             width += extent.cx + (int)m_style.fontSpacing;
         }
     } else {
-        CSize extent;
-        if (!GetTextExtentPoint32W(g_hDC, m_str, m_str.GetLength(), &extent)) {
-            SelectFont(g_hDC, hOldFont);
+        SIZE extent;
+        if (!GetTextExtentPoint32W(m_hDC, m_str, m_str.GetLength(), &extent)) {
             ASSERT(0);
+            HFONT hOldFont2 = SelectFont(m_hDC, hOldFont);
+            ASSERT(hOldFont2);
             return false;
         }
 
-        BeginPath(g_hDC);
-        TextOutW(g_hDC, 0, 0, m_str, m_str.GetLength());
-        EndPath(g_hDC);
+        BeginPath(m_hDC);
+        TextOutW(m_hDC, 0, 0, m_str, m_str.GetLength());
+        EndPath(m_hDC);
     }
 
-    SelectFont(g_hDC, hOldFont);
+    HFONT hOldFont3 = SelectFont(m_hDC, hOldFont);
+    ASSERT(hOldFont3);
 
     return true;
 }
 
 // CPolygon
 
-CPolygon::CPolygon(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, int baseline)
-    : CWord(style, str, ktype, kstart, kend, scalex, scaley)
+CPolygon::CPolygon(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, int baseline)
+    : CWord(hDC, style, str, ktype, kstart, kend, scalex, scaley, false)
     , m_baseline(baseline)
 {
     ParseStr();
 }
 
-CPolygon::CPolygon(CPolygon& src) : CWord(src.m_style, src.m_str, src.m_ktype, src.m_kstart, src.m_kend, src.m_scalex, src.m_scaley)
+CPolygon::CPolygon(CPolygon& src) : CWord(src.m_hDC, src.m_style, src.m_str, src.m_ktype, src.m_kstart, src.m_kend, src.m_scalex, src.m_scaley, false)
 {
     m_baseline = src.m_baseline;
     m_width = src.m_width;
@@ -528,14 +541,12 @@ CWord* CPolygon::Copy()
 
 bool CPolygon::Append(CWord* w)
 {
-    CPolygon* p = dynamic_cast<CPolygon*>(w);
-    if (!p) {
-        return false;
-    }
-
-    // TODO
+    //if (w->mk_bTextDerived) {
+    //    return false;
+    //}
+    //CPolygon* p = static_cast<CPolygon*>(w);
     return false;
-
+    // TODO
     //return true;
 }
 
@@ -728,8 +739,8 @@ bool CPolygon::CreatePath()
 
 // CClipper
 
-CClipper::CClipper(CStringW str, CSize size, double scalex, double scaley, bool inverse, CPoint cpOffset)
-    : CPolygon(STSStyle(), str, 0, 0, 0, scalex, scaley, 0)
+CClipper::CClipper(HDC hDC, CStringW str, CSize size, double scalex, double scaley, bool inverse)
+    : CPolygon(hDC, STSStyle(), str, 0, 0, 0, scalex, scaley, 0)
 {
     m_size.cx = m_size.cy = 0;
     m_pAlphaMask = nullptr;
@@ -745,7 +756,6 @@ CClipper::CClipper(CStringW str, CSize size, double scalex, double scaley, bool 
 
     m_size = size;
     m_inverse = inverse;
-    m_cpOffset = cpOffset;
 
     memset(m_pAlphaMask, 0, size.cx * size.cy);
 
@@ -753,7 +763,7 @@ CClipper::CClipper(CStringW str, CSize size, double scalex, double scaley, bool 
 
     int w = mOverlayWidth, h = mOverlayHeight;
 
-    int x = (mOffsetX + cpOffset.x + 4) >> 3, y = (mOffsetY + cpOffset.y + 4) >> 3;
+    int x = (mOffsetX + 4) >> 3, y = (mOffsetY + 4) >> 3;
     int xo = 0, yo = 0;
 
     if (x < 0) {
@@ -804,7 +814,7 @@ CClipper::~CClipper()
 
 CWord* CClipper::Copy()
 {
-    return DEBUG_NEW CClipper(m_str, m_size, m_scalex, m_scaley, m_inverse, m_cpOffset);
+    return DEBUG_NEW CClipper(m_hDC, m_str, m_size, m_scalex, m_scaley, m_inverse);
 }
 
 bool CClipper::Append(CWord* w)
@@ -1016,7 +1026,7 @@ CRect CLine::PaintBody(SubPicDesc& spd, CRect& clipRect, BYTE* pAlphaMask, CPoin
             }
         }
 
-        if (t >= 1) {
+        if (t >= 1.0) {
             sw[1] = 0xFFFFFFF;
         }
 
@@ -1047,12 +1057,14 @@ CRect CLine::PaintBody(SubPicDesc& spd, CRect& clipRect, BYTE* pAlphaMask, CPoin
 
 // CSubtitle
 
-CSubtitle::CSubtitle()
+CSubtitle::CSubtitle(HDC hDC)
+    : m_hDC(hDC)
+    , m_effects()
+    , m_pClipper(nullptr)
+    , m_clipInverse(false)
+    , m_scalex(1.0)
+    , m_scaley(1.0)
 {
-    memset(m_effects, 0, sizeof(Effect*)*EF_NUMBEROFEFFECTS);
-    m_pClipper = nullptr;
-    m_clipInverse = false;
-    m_scalex = m_scaley = 1;
 }
 
 CSubtitle::~CSubtitle()
@@ -1246,7 +1258,7 @@ void CSubtitle::CreateClippers(CSize size)
         if (!m_pClipper) {
             CStringW str;
             str.Format(L"m %d %d l %d %d %d %d %d %d", 0, 0, w, 0, w, h, 0, h);
-            m_pClipper = DEBUG_NEW CClipper(str, size, 1, 1, false, CPoint(0, 0));
+            m_pClipper = DEBUG_NEW CClipper(m_hDC, str, size, 1, 1, false);
             if (!m_pClipper) {
                 return;
             }
@@ -1283,7 +1295,7 @@ void CSubtitle::CreateClippers(CSize size)
         if (!m_pClipper) {
             CStringW str;
             str.Format(L"m %d %d l %d %d %d %d %d %d", 0, 0, w, 0, w, h, 0, h);
-            m_pClipper = DEBUG_NEW CClipper(str, size, 1, 1, false, CPoint(0, 0));
+            m_pClipper = DEBUG_NEW CClipper(m_hDC, str, size, 1, 1, false);
             if (!m_pClipper) {
                 return;
             }
@@ -1374,10 +1386,10 @@ void CSubtitle::MakeLines(CSize size, CRect marginRect)
 
     m_rect = CRect(
                  CPoint((m_scrAlignment % 3) == 1 ? marginRect.left
-                        : (m_scrAlignment % 3) == 2 ? (marginRect.left + (size.cx - marginRect.right) - spaceNeeded.cx + 1) / 2
+                        : (m_scrAlignment % 3) == 2 ? (marginRect.left + (size.cx - marginRect.right) - spaceNeeded.cx + 1) >> 1
                         : (size.cx - marginRect.right - spaceNeeded.cx),
                         m_scrAlignment <= 3 ? (size.cy - marginRect.bottom - spaceNeeded.cy)
-                        : m_scrAlignment <= 6 ? (marginRect.top + (size.cy - marginRect.bottom) - spaceNeeded.cy + 1) / 2
+                        : m_scrAlignment <= 6 ? (marginRect.top + (size.cy - marginRect.bottom) - spaceNeeded.cy + 1) >> 1
                         : marginRect.top),
                  spaceNeeded);
 }
@@ -1469,26 +1481,22 @@ CRenderedTextSubtitle::CRenderedTextSubtitle(CCritSec* pLock, STSStyle* styleOve
     : CSubPicProviderImpl(pLock)
     , m_doOverrideStyle(doOverride)
     , m_pStyleOverride(styleOverride)
+    , CSimpleTextSubtitle(true)
+    , m_size(0, 0)
 {
-    m_size = CSize(0, 0);
-
-    if (g_hDC_refcnt == 0) {
-        g_hDC = CreateCompatibleDC(nullptr);
-        SetBkMode(g_hDC, TRANSPARENT);
-        SetTextColor(g_hDC, 0xffffff);
-        SetMapMode(g_hDC, MM_TEXT);
-    }
-
-    g_hDC_refcnt++;
+    m_hDC = CreateCompatibleDC(nullptr);
+    ASSERT(m_hDC);
+    SetBkMode(m_hDC, TRANSPARENT);
+    SetTextColor(m_hDC, 0xffffff);
+    SetMapMode(m_hDC, MM_TEXT);
 }
 
 CRenderedTextSubtitle::~CRenderedTextSubtitle()
 {
     Deinit();
-
-    g_hDC_refcnt--;
-    if (g_hDC_refcnt == 0) {
-        DeleteDC(g_hDC);
+    if (m_hDC) {
+        BOOL b = DeleteDC(m_hDC);
+        ASSERT(b);
     }
 }
 
@@ -1496,10 +1504,11 @@ void CRenderedTextSubtitle::Copy(CSimpleTextSubtitle& sts)
 {
     __super::Copy(sts);
 
-    m_size = CSize(0, 0);
+    m_size.cx = 0;
+    m_size.cy = 0;
 
-    if (CRenderedTextSubtitle* pRTS = dynamic_cast<CRenderedTextSubtitle*>(&sts)) {
-        m_size = pRTS->m_size;
+    if (sts.mk_bRenderedTextType) {
+        m_size = static_cast<CRenderedTextSubtitle*>(&sts)->m_size;
     }
 }
 
@@ -1516,7 +1525,7 @@ void CRenderedTextSubtitle::OnChanged()
 
     POSITION pos = m_subtitleCache.GetStartPosition();
     while (pos) {
-        int i;
+        size_t i;
         CSubtitle* s;
         m_subtitleCache.GetNextAssoc(pos, i, s);
         delete s;
@@ -1543,7 +1552,7 @@ void CRenderedTextSubtitle::Deinit()
 {
     POSITION pos = m_subtitleCache.GetStartPosition();
     while (pos) {
-        int i;
+        size_t i;
         CSubtitle* s;
         m_subtitleCache.GetNextAssoc(pos, i, s);
         delete s;
@@ -1553,7 +1562,8 @@ void CRenderedTextSubtitle::Deinit()
 
     m_sla.Empty();
 
-    m_size = CSize(0, 0);
+    m_size.cx = 0;
+    m_size.cy = 0;
     m_vidrect.SetRectEmpty();
 }
 
@@ -1633,19 +1643,19 @@ void CRenderedTextSubtitle::ParseString(CSubtitle* sub, CStringW str, STSStyle& 
         }
 
         if (i < j) {
-            if (CWord* w = DEBUG_NEW CText(style, str.Mid(i, j - i), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
+            if (CWord* w = DEBUG_NEW CText(m_hDC, style, str.Mid(i, j - i), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
                 sub->m_words.AddTail(w);
                 m_kstart = m_kend;
             }
         }
 
         if (c == L'\n') {
-            if (CWord* w = DEBUG_NEW CText(style, CStringW(), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
+            if (CWord* w = DEBUG_NEW CText(m_hDC, style, CStringW(), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
                 sub->m_words.AddTail(w);
                 m_kstart = m_kend;
             }
         } else if (c == L' ' || c == L'\x00A0') {
-            if (CWord* w = DEBUG_NEW CText(style, CStringW(c), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
+            if (CWord* w = DEBUG_NEW CText(m_hDC, style, CStringW(c), m_ktype, m_kstart, m_kend, sub->m_scalex, sub->m_scaley)) {
                 sub->m_words.AddTail(w);
                 m_kstart = m_kend;
             }
@@ -1663,7 +1673,8 @@ void CRenderedTextSubtitle::ParsePolygon(CSubtitle* sub, CStringW str, STSStyle&
         return;
     }
 
-    if (CWord* w = DEBUG_NEW CPolygon(style, str, m_ktype, m_kstart, m_kend, sub->m_scalex / (1 << (m_nPolygon - 1)), sub->m_scaley / (1 << (m_nPolygon - 1)), m_polygonBaselineOffset)) {
+    double dPsf = static_cast<double>(1 << (m_nPolygon - 1));
+    if (CWord* w = DEBUG_NEW CPolygon(m_hDC, style, str, m_ktype, m_kstart, m_kend, sub->m_scalex / dPsf, sub->m_scaley / dPsf, m_polygonBaselineOffset)) {
         sub->m_words.AddTail(w);
         m_kstart = m_kend;
     }
@@ -1879,39 +1890,38 @@ bool CRenderedTextSubtitle::ParseSSATag(CSubtitle* sub, CStringW str, STSStyle& 
             bool invert = (cmd == L"iclip");
 
             if (params.GetCount() == 1 && !sub->m_pClipper) {
-                sub->m_pClipper = DEBUG_NEW CClipper(params[0], CSize(m_size.cx >> 3, m_size.cy >> 3), sub->m_scalex, sub->m_scaley, invert, (sub->m_relativeTo == 1) ? CPoint(m_vidrect.left, m_vidrect.top) : CPoint(0, 0));
+                sub->m_pClipper = DEBUG_NEW CClipper(m_hDC, params[0], CSize(m_size.cx >> 3, m_size.cy >> 3), sub->m_scalex, sub->m_scaley, invert);
             } else if (params.GetCount() == 2 && !sub->m_pClipper) {
                 long scale = wcstol(p, nullptr, 10);
                 if (scale < 1) {
                     scale = 1;
                 }
-                sub->m_pClipper = DEBUG_NEW CClipper(params[1], CSize(m_size.cx >> 3, m_size.cy >> 3), sub->m_scalex / (1 << (scale - 1)), sub->m_scaley / (1 << (scale - 1)), invert, (sub->m_relativeTo == 1) ? CPoint(m_vidrect.left, m_vidrect.top) : CPoint(0, 0));
+                sub->m_pClipper = DEBUG_NEW CClipper(m_hDC, params[1], CSize(m_size.cx >> 3, m_size.cy >> 3), sub->m_scalex / (1 << (scale - 1)), sub->m_scaley / (1 << (scale - 1)), invert);
             } else if (params.GetCount() == 4) {
-                CRect r;
-
                 sub->m_clipInverse = invert;
 
-                r.SetRect(
+                CRect r(
                     wcstol(params[0], nullptr, 10),
                     wcstol(params[1], nullptr, 10),
                     wcstol(params[2], nullptr, 10),
                     wcstol(params[3], nullptr, 10));
 
                 double dLeft = sub->m_scalex * static_cast<double>(r.left), dTop = sub->m_scaley * static_cast<double>(r.top), dRight = sub->m_scalex * static_cast<double>(r.right), dBottom = sub->m_scaley * static_cast<double>(r.bottom);
-                if (sub->m_relativeTo == 1) {
-                    double dOffsetX = static_cast<double>(m_vidrect.left) * 0.125;
-                    double dOffsetY = static_cast<double>(m_vidrect.top) * 0.125;
-                    dLeft += dOffsetX;
-                    dTop += dOffsetY;
-                    dRight += dOffsetX;
-                    dBottom += dOffsetY;
-                }
+
+                double dTLeft = CalcAnimation(dLeft, sub->m_clip.left, fAnimate);
+                double dTTop = CalcAnimation(dTop, sub->m_clip.top, fAnimate);
+                double dTRight = CalcAnimation(dRight, sub->m_clip.right, fAnimate);
+                double dTBottom = CalcAnimation(dBottom, sub->m_clip.bottom, fAnimate);
+                double dTLeftRo = (dTLeft < 0.0) ? -0.5 : 0.5;
+                double dTTopRo = (dTTop < 0.0) ? -0.5 : 0.5;
+                double dTRightRo = (dTRight < 0.0) ? -0.5 : 0.5;
+                double dTBottomRo = (dTBottom < 0.0) ? -0.5 : 0.5;
 
                 sub->m_clip.SetRect(
-                    static_cast<int>(CalcAnimation(dLeft, sub->m_clip.left, fAnimate)),
-                    static_cast<int>(CalcAnimation(dTop, sub->m_clip.top, fAnimate)),
-                    static_cast<int>(CalcAnimation(dRight, sub->m_clip.right, fAnimate)),
-                    static_cast<int>(CalcAnimation(dBottom, sub->m_clip.bottom, fAnimate)));
+                    static_cast<int>(dTLeftRo + dTLeft),
+                    static_cast<int>(dTTopRo + dTTop),
+                    static_cast<int>(dTRightRo + dTRight),
+                    static_cast<int>(dTBottomRo + dTBottom));
             }
         } else if (cmd == L"c") {
             DWORD c = wcstol(p, nullptr, 16);
@@ -2054,11 +2064,6 @@ bool CRenderedTextSubtitle::ParseSSATag(CSubtitle* sub, CStringW str, STSStyle& 
                 if (Effect* e = DEBUG_NEW Effect) {
                     e->param[0] = (int)(sub->m_scalex * wcstod(params[0], nullptr) * 8.0);
                     e->param[1] = (int)(sub->m_scaley * wcstod(params[1], nullptr) * 8.0);
-
-                    if (sub->m_relativeTo == 1) {
-                        e->param[0] += m_vidrect.left;
-                        e->param[1] += m_vidrect.top;
-                    }
 
                     sub->m_effects[EF_ORG] = e;
                 }
@@ -2270,14 +2275,13 @@ bool CRenderedTextSubtitle::ParseHtmlTag(CSubtitle* sub, CStringW str, STSStyle&
 
 double CRenderedTextSubtitle::CalcAnimation(double dst, double src, bool fAnimate)
 {
-    int s = m_animStart ? m_animStart : 0;
     int e = m_animEnd ? m_animEnd : m_delay;
 
     if (fabs(dst - src) >= 0.0001 && fAnimate) {
-        if (m_time < s) {
+        if (m_time < m_animStart) {
             dst = src;
-        } else if (s <= m_time && m_time < e) {
-            double t = pow(1.0 * (m_time - s) / (e - s), m_animAccel);
+        } else if ((m_animStart <= m_time) && (m_time < e)) {
+            double t = pow(static_cast<double>(m_time - m_animStart) / static_cast<double>(e - m_animStart), m_animAccel);
             dst = (1 - t) * src + t * dst;
         }
         //      else dst = dst;
@@ -2286,7 +2290,7 @@ double CRenderedTextSubtitle::CalcAnimation(double dst, double src, bool fAnimat
     return dst;
 }
 
-CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
+CSubtitle* CRenderedTextSubtitle::GetSubtitle(size_t entry)
 {
     CSubtitle* sub;
     if (m_subtitleCache.Lookup(entry, sub)) {
@@ -2298,7 +2302,7 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
         }
     }
 
-    sub = DEBUG_NEW CSubtitle();
+    sub = DEBUG_NEW CSubtitle(m_hDC);
     if (!sub) {
         return nullptr;
     }
@@ -2341,18 +2345,17 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
     sub->m_scrAlignment = -stss.scrAlignment;
     sub->m_wrapStyle = m_defaultWrapStyle;
     sub->m_fAnimated = false;
-    sub->m_relativeTo = stss.relativeTo;
     // this whole conditional is a work-around for what happens in STS.cpp:
     // in CSimpleTextSubtitle::Open, we have m_dstScreenSize = CSize(384, 288)
     // now, files containing embedded subtitles (and with styles) set m_dstScreenSize to a correct value
     // but where no style is given, those defaults are taken - 384, 288
     if (m_doOverrideStyle && m_pStyleOverride) {
         // so mind the default values, stated here to increase comprehension
-        sub->m_scalex = m_size.cx / (384 * 8);
-        sub->m_scaley = m_size.cy / (288 * 8);
+        sub->m_scalex = static_cast<double>(m_size.cx) / (384.0 * 8.0);
+        sub->m_scaley = static_cast<double>(m_size.cy) / (288.0 * 8.0);
     } else {
-        sub->m_scalex = m_dstScreenSize.cx > 0 ? 1.0 * (stss.relativeTo == 1 ? m_vidrect.Width() : m_size.cx) / (m_dstScreenSize.cx * 8) : 1.0;
-        sub->m_scaley = m_dstScreenSize.cy > 0 ? 1.0 * (stss.relativeTo == 1 ? m_vidrect.Height() : m_size.cy) / (m_dstScreenSize.cy * 8) : 1.0;
+        sub->m_scalex = (m_dstScreenSize.cx > 0) ? static_cast<double>(m_size.cx) / static_cast<double>(m_dstScreenSize.cx << 3) : 1.0;
+        sub->m_scaley = (m_dstScreenSize.cy > 0) ? static_cast<double>(m_size.cy) / static_cast<double>(m_dstScreenSize.cy << 3) : 1.0;
     }
 
     m_animStart = m_animEnd = 0;
@@ -2445,13 +2448,6 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
     marginRect.right = (int)(sub->m_scalex * marginRect.right * 8);
     marginRect.bottom = (int)(sub->m_scaley * marginRect.bottom * 8);
 
-    if (stss.relativeTo == 1) {
-        marginRect.left += m_vidrect.left;
-        marginRect.top += m_vidrect.top;
-        marginRect.right += m_size.cx - m_vidrect.right;
-        marginRect.bottom += m_size.cy - m_vidrect.bottom;
-    }
-
     sub->CreateClippers(m_size);
 
     sub->MakeLines(m_size, marginRect);
@@ -2461,76 +2457,122 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
     return sub;
 }
 
-//
+// IUnknown
 
-STDMETHODIMP CRenderedTextSubtitle::NonDelegatingQueryInterface(REFIID riid, void** ppv)
+__declspec(nothrow noalias) STDMETHODIMP CRenderedTextSubtitle::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-    CheckPointer(ppv, E_POINTER);
-    *ppv = nullptr;
+    ASSERT(ppv);
 
-    return
-        QI(IPersist)
-        QI(ISubStream)
-        QI(ISubPicProvider)
-        __super::NonDelegatingQueryInterface(riid, ppv);
+    if (riid == IID_IUnknown) { *ppv = static_cast<IUnknown*>(static_cast<CSubPicProviderImpl*>((this))); }// CSubPicProviderImpl is at Vtable location 0
+    else if (riid == __uuidof(CSubPicProviderImpl)) { *ppv = static_cast<CSubPicProviderImpl*>(this); }
+    else if (riid == IID_IPersist) { *ppv = static_cast<IPersist*>(this); }
+    else if (riid == __uuidof(ISubStream)) { *ppv = static_cast<ISubStream*>(this); }
+    else {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
-// ISubPicProvider
-
-STDMETHODIMP_(POSITION) CRenderedTextSubtitle::GetStartPosition(REFERENCE_TIME rt, double fps)
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CRenderedTextSubtitle::AddRef()
 {
-    int iSegment = -1;
-    SearchSubs((int)(rt / 10000), fps, &iSegment, nullptr);
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
+}
 
-    if (iSegment < 0) {
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CRenderedTextSubtitle::Release()
+{
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
+
+        delete this;
+        return 0;
+    } else {
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
+    }
+}
+
+// CSubPicProviderImpl
+
+__declspec(nothrow noalias restrict) POSITION CRenderedTextSubtitle::GetStartPosition(__in __int64 i64Time, __in double fps)
+{
+    size_t iSegment = MAXSIZE_T;
+    SearchSubs(i64Time / 10000, fps, &iSegment, NULL);
+
+    if (iSegment == MAXSIZE_T) {
         iSegment = 0;
     }
 
     return GetNext((POSITION)iSegment);
 }
 
-STDMETHODIMP_(POSITION) CRenderedTextSubtitle::GetNext(POSITION pos)
+__declspec(nothrow noalias restrict) POSITION CRenderedTextSubtitle::GetNext(__in POSITION pos) const
 {
-    int iSegment = (int)pos;
-
+    uintptr_t iSegment = reinterpret_cast<uintptr_t>(pos);
     const STSSegment* stss = GetSegment(iSegment);
     while (stss && stss->subs.GetCount() == 0) {
         iSegment++;
         stss = GetSegment(iSegment);
     }
 
-    return (stss ? (POSITION)(iSegment + 1) : nullptr);
+    return (stss ? reinterpret_cast<POSITION>(iSegment + 1) : nullptr);
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CRenderedTextSubtitle::GetStart(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CRenderedTextSubtitle::GetStart(__in POSITION pos, __in double fps) const
 {
-    return (10000i64 * TranslateSegmentStart((int)pos - 1, fps));
+    return (10000i64 * TranslateSegmentStart(reinterpret_cast<uintptr_t>(pos) - 1, fps));
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CRenderedTextSubtitle::GetStop(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CRenderedTextSubtitle::GetStop(__in POSITION pos, __in double fps) const
 {
-    return (10000i64 * TranslateSegmentEnd((int)pos - 1, fps));
+    return (10000i64 * TranslateSegmentEnd(reinterpret_cast<uintptr_t>(pos) - 1, fps));
 }
 
-STDMETHODIMP_(bool) CRenderedTextSubtitle::IsAnimated(POSITION pos)
+__declspec(nothrow noalias) bool CRenderedTextSubtitle::IsAnimated(__in POSITION pos) const
 {
     return true;
 }
 
 struct LSub {
-    int idx, layer, readorder;
+    size_t idx, layer, readorder;
 };
 
 static int lscomp(const void* ls1, const void* ls2)
 {
-    int ret = ((LSub*)ls1)->layer - ((LSub*)ls2)->layer;
+    ptrdiff_t ret = ((LSub*)ls1)->layer - ((LSub*)ls2)->layer;
     if (!ret) {
         ret = ((LSub*)ls1)->readorder - ((LSub*)ls2)->readorder;
     }
+#ifdef _M_X64
+    ASSERT(ret >= MININT32 && ret <= MAXINT32);
+#endif
     return ret;
 }
 
-STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox)
+__declspec(nothrow noalias) HRESULT CRenderedTextSubtitle::Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox)
 {
     CRect bbox2(0, 0, 0, 0);
 
@@ -2538,10 +2580,10 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
         Init(CSize(spd.w, spd.h), spd.vidrect);
     }
 
-    int t = (int)(rt / 10000);
+    LONGLONG t = i64Time / 10000;
 
-    int segment;
-    const STSSegment* stss = SearchSubs(t, fps, &segment);
+    size_t segment;
+    STSSegment const* stss = SearchSubs(t, fps, &segment);
     if (!stss) {
         return S_FALSE;
     }
@@ -2550,7 +2592,7 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
     {
         POSITION pos = m_subtitleCache.GetStartPosition();
         while (pos) {
-            int entry;
+            size_t entry;
             CSubtitle* pSub;
             m_subtitleCache.GetNextAssoc(pos, entry, pSub);
 
@@ -2577,12 +2619,12 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
     qsort(subs.GetData(), subs.GetCount(), sizeof(LSub), lscomp);
 
     for (ptrdiff_t i = 0, j = subs.GetCount(); i < j; i++) {
-        int entry = subs[i].idx;
+        size_t entry = subs[i].idx;
 
         STSEntry stse = GetAt(entry);
 
         {
-            int start = TranslateStart(entry, fps);
+            LONGLONG start = TranslateStart(entry, fps);
             m_time = t - start;
             m_delay = TranslateEnd(entry, fps) - start;
         }
@@ -2646,9 +2688,6 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
                                    s->m_scrAlignment <= 3 ? p.y - spaceNeeded.cy : s->m_scrAlignment <= 6 ? p.y - (spaceNeeded.cy + 1) / 2 : p.y),
                             spaceNeeded);
 
-                    if (s->m_relativeTo == 1) {
-                        r.OffsetRect(m_vidrect.TopLeft());
-                    }
                     fPosOverride = true;
                 }
                 break;
@@ -2685,16 +2724,12 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
                 }
                 break;
                 case EF_BANNER: { // Banner;delay=param[0][;leftoright=param[1];fadeawaywidth=param[2]]
-                    int left = s->m_relativeTo == 1 ? m_vidrect.left : 0,
-                        right = s->m_relativeTo == 1 ? m_vidrect.right : m_size.cx;
-
                     r.left = !!s->m_effects[k]->param[1]
-                             ? (left/*marginRect.left*/ - spaceNeeded.cx) + (int)(m_time * 8.0 / s->m_effects[k]->param[0])
-                             : (right /*- marginRect.right*/) - (int)(m_time * 8.0 / s->m_effects[k]->param[0]);
+                             ? -spaceNeeded.cx + (int)(m_time * 8.0 / s->m_effects[k]->param[0])
+                             : m_size.cx - (int)(m_time * 8.0 / s->m_effects[k]->param[0]);
 
                     r.right = r.left + spaceNeeded.cx;
-
-                    clipRect &= CRect(left >> 3, clipRect.top, right >> 3, clipRect.bottom);
+                    clipRect &= CRect(0, clipRect.top, m_size.cx >> 3, clipRect.bottom);
 
                     fPosOverride = true;
                 }
@@ -2707,12 +2742,6 @@ STDMETHODIMP CRenderedTextSubtitle::Render(SubPicDesc& spd, REFERENCE_TIME rt, d
                     r.bottom = r.top + spaceNeeded.cy;
 
                     CRect cr(0, (s->m_effects[k]->param[0] + 4) >> 3, spd.w, (s->m_effects[k]->param[1] + 4) >> 3);
-
-                    if (s->m_relativeTo == 1)
-                        r.top += m_vidrect.top,
-                                 r.bottom += m_vidrect.top,
-                                             cr.top += m_vidrect.top >> 3,
-                                                       cr.bottom += m_vidrect.top >> 3;
 
                     clipRect &= cr;
 
@@ -2822,14 +2851,14 @@ STDMETHODIMP CRenderedTextSubtitle::GetClassID(CLSID* pClassID)
 
 // ISubStream
 
-STDMETHODIMP_(int) CRenderedTextSubtitle::GetStreamCount()
+__declspec(nothrow noalias) size_t CRenderedTextSubtitle::GetStreamCount() const
 {
     return 1;
 }
 
-STDMETHODIMP CRenderedTextSubtitle::GetStreamInfo(int iStream, WCHAR** ppName, LCID* pLCID)
+__declspec(nothrow noalias) HRESULT CRenderedTextSubtitle::GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const
 {
-    if (iStream != 0) {
+    if (upStream != 0) {
         return E_INVALIDARG;
     }
 
@@ -2852,17 +2881,17 @@ STDMETHODIMP CRenderedTextSubtitle::GetStreamInfo(int iStream, WCHAR** ppName, L
     return S_OK;
 }
 
-STDMETHODIMP_(int) CRenderedTextSubtitle::GetStream()
+__declspec(nothrow noalias) size_t CRenderedTextSubtitle::GetStream() const
 {
     return 0;
 }
 
-STDMETHODIMP CRenderedTextSubtitle::SetStream(int iStream)
+__declspec(nothrow noalias) HRESULT CRenderedTextSubtitle::SetStream(__in size_t upStream)
 {
-    return iStream == 0 ? S_OK : E_FAIL;
+    return (!upStream) ? S_OK : E_FAIL;
 }
 
-STDMETHODIMP CRenderedTextSubtitle::Reload()
+__declspec(nothrow noalias) HRESULT CRenderedTextSubtitle::Reload()
 {
     if (!FileExists(m_path)) {
         return E_FAIL;

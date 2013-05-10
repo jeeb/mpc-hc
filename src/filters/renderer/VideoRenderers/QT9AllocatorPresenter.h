@@ -1,5 +1,5 @@
 /*
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -29,20 +29,35 @@ namespace DSObjects
         : public CDX9AllocatorPresenter
         , public IQTVideoSurface
     {
-        CComPtr<IDirect3DSurface9> m_pVideoSurfaceOff;
+        __declspec(nothrow noalias) __forceinline ~CQT9AllocatorPresenter() {
+            if (m_pVideoSurfaceOff) {
+                ULONG u = m_pVideoSurfaceOff->Release();
+                ASSERT(!u);
+            }
+        }
 
-    protected:
-        HRESULT AllocSurfaces();
-        void DeleteSurfaces();
+        IDirect3DSurface9* m_pVideoSurfaceOff;
 
     public:
-        CQT9AllocatorPresenter(HWND hWnd, bool bFullscreen, HRESULT& hr, CString& _Error);
+        // IUnknown
+        __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
-        DECLARE_IUNKNOWN
-        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+        // CSubPicAllocatorPresenterImpl
+        __declspec(nothrow noalias) void ResetDevice();
 
         // IQTVideoSurface
-        STDMETHODIMP BeginBlt(const BITMAP& bm);
-        STDMETHODIMP DoBlt(const BITMAP& bm);
+        __declspec(nothrow noalias) STDMETHODIMP BeginBlt(BITMAP const& bm);
+        __declspec(nothrow noalias) STDMETHODIMP DoBlt(BITMAP const& bm);
+
+        __declspec(nothrow noalias) __forceinline CQT9AllocatorPresenter(__in HWND hWnd, __inout CStringW* pstrError)
+            : CDX9AllocatorPresenter(hWnd, pstrError, false)
+            , m_pVideoSurfaceOff(nullptr) {
+            ASSERT(pstrError);
+
+            m_u8MixerSurfaceCount = mk_pRendererSettings->MixerBuffers;// set the number of buffers
+            // note; when expanding this function, handle the case for when CDX9AllocatorPresenter() fails
+        }
     };
 }

@@ -20,16 +20,15 @@
 
 #pragma once
 
-#include "BaseSub.h"
+#include "CompositionObject.h"
+
+#define INVALID_TIME _I64_MIN
 
 class CGolombBuffer;
 
-class CHdmvSub : public CBaseSub
+class CHdmvSub : public IBaseSub
 {
 public:
-
-    static const REFERENCE_TIME INVALID_TIME = _I64_MIN;
-
     enum HDMV_SEGMENT_TYPE {
         NO_SEGMENT       = 0xFFFF,
         PALETTE          = 0x14,
@@ -95,30 +94,28 @@ public:
         }
     };
 
-    CHdmvSub();
-    ~CHdmvSub();
+    CHdmvSub();// a regular destructor won't work here, the delete command only acts on the IBaseSub pointer
 
-    HRESULT ParseSample(IMediaSample* pSample);
-
-    POSITION GetStartPosition(REFERENCE_TIME rt, double fps);
-    POSITION GetNext(POSITION pos) {
+    // IBaseSub
+    __declspec(nothrow noalias) void Destructor();
+    __declspec(nothrow noalias) HRESULT ParseSample(__inout IMediaSample* pSample);
+    __declspec(nothrow noalias) void Reset();
+    __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 i64Time, __in double fps);
+    __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const {
         m_pPresentationSegments.GetNext(pos);
         return pos;
-    };
-
-
-    virtual REFERENCE_TIME GetStart(POSITION nPos) {
+    }
+    __declspec(nothrow noalias) __int64 GetStart(__in POSITION nPos) const {
         HDMV_PRESENTATION_SEGMENT* pPresentationSegment = m_pPresentationSegments.GetAt(nPos);
         return pPresentationSegment != NULL ? pPresentationSegment->rtStart : INVALID_TIME;
-    };
-    virtual REFERENCE_TIME GetStop(POSITION nPos) {
+    }
+    __declspec(nothrow noalias) __int64 GetStop(__in POSITION nPos) const {
         HDMV_PRESENTATION_SEGMENT* pPresentationSegment = m_pPresentationSegments.GetAt(nPos);
         return pPresentationSegment != NULL ? pPresentationSegment->rtStop : INVALID_TIME;
-    };
-
-    void    Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox);
-    HRESULT GetTextureSize(POSITION pos, SIZE& MaxTextureSize, SIZE& VideoSize, POINT& VideoTopLeft);
-    void    Reset();
+    }
+    __declspec(nothrow noalias) void EndOfStream() {}// Nothing to do
+    __declspec(nothrow noalias) void Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox);
+    __declspec(nothrow noalias) unsigned __int64 GetTextureSize(__in POSITION pos) const;
 
 private:
 

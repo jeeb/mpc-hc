@@ -32,6 +32,7 @@
 
 #include "version.h"
 
+#define ResStr(id) CString(MAKEINTRESOURCE(id))// TODO; replace this by the usual LoadString() to constant resource
 
 BOOL WINAPI MyGetDialogSize(int iResourceID, DLGPROC pDlgProc, LPARAM lParam, SIZE* pResult)
 {

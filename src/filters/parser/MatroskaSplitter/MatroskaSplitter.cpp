@@ -443,9 +443,9 @@ avcsuccess:
                     m_pSegment = Root.Child(0x18538067);
                     m_pCluster = m_pSegment->Child(0x1F43B675);
 
-                    MatroskaReader::QWORD lastCueClusterPosition = (MatroskaReader::QWORD) - 1;
-                    UINT64 timecode1 = -1;
-                    UINT64 timecode2 = -1;
+                    MatroskaReader::QWORD lastCueClusterPosition = MAXUINT64;
+                    UINT64 timecode1 = MAXUINT64;
+                    UINT64 timecode2 = MAXUINT64;
                     unsigned int framecount = 0;
                     bool readmore = true;
 
@@ -1440,10 +1440,10 @@ HRESULT CMatroskaSplitterOutputPin::DeliverEndOfStream()
 
 HRESULT CMatroskaSplitterOutputPin::DeliverPacket(CAutoPtr<Packet> p)
 {
-    MatroskaPacket* mp = dynamic_cast<MatroskaPacket*>(p.m_p);
-    if (!mp) {
+    if (!p->bkMatroskaDerived) {
         return __super::DeliverPacket(p);
     }
+    MatroskaPacket* mp = static_cast<MatroskaPacket*>(p.m_p);
 
     // don't try to understand what's happening here, it's magic
 

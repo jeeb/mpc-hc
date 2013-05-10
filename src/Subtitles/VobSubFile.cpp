@@ -30,7 +30,6 @@
 #else
 #include "unrar/dll.hpp"
 #endif
-#include "RTS.h"
 #include "../DSUtil/WinAPIUtils.h"
 
 //
@@ -323,7 +322,7 @@ bool CVobSubFile::Open(CString fn)
 
         m_title = fn;
 
-        for (int i = 0; i < 32; i++) {
+        for (ptrdiff_t i = 0; i < 32; i++) {
             CAtlArray<SubPos>& sp = m_langs[i].subpos;
 
             for (size_t j = 0; j < sp.GetCount(); j++) {
@@ -331,14 +330,14 @@ bool CVobSubFile::Open(CString fn)
                 sp[j].fForced = false;
 
                 int packetsize = 0, datasize = 0;
-                BYTE* buff = GetPacket((int)j, packetsize, datasize, i);
+                BYTE* buff = GetPacket(j, packetsize, datasize, i);
                 if (!buff) {
                     continue;
                 }
 
-                m_img.delay = j + 1 < sp.GetCount() ? sp[j + 1].start - sp[j].start : 3000;
+                m_img.delay = j < (sp.GetCount() - 1) ? sp[j + 1].start - sp[j].start : 3000;
                 m_img.GetPacketInfo(buff, packetsize, datasize);
-                if (j + 1 < sp.GetCount()) {
+                if (j < (sp.GetCount() - 1)) {
                     m_img.delay = min(m_img.delay, sp[j + 1].start - sp[j].start);
                 }
 
@@ -1099,9 +1098,9 @@ bool CVobSubFile::WriteSub(CString fn)
 
     m_sub.SeekToBegin();
 
-    int len;
-    BYTE buff[2048];
-    while ((len = m_sub.Read(buff, sizeof(buff))) > 0 && *(DWORD*)buff == 0xba010000) {
+    UINT len;
+    DWORD buff[2048 >> 2];// DWORD here only for alignment
+    while ((len = m_sub.Read(buff, sizeof(buff))) && (*buff == 0xba010000)) {
         f.Write(buff, len);
     }
 
@@ -1152,7 +1151,7 @@ BYTE* CVobSubFile::GetPacket(int idx, int& packetsize, int& datasize, int iLang)
         }
 
         int i = 0, sizeleft = packetsize;
-        for (int size; i < packetsize; i += size, sizeleft -= size) {
+        for (ptrdiff_t size; i < packetsize; i += size, sizeleft -= size) {
             int hsize = 0x18 + buff[0x16];
             size = min(sizeleft, 0x800 - hsize);
             memcpy(&ret[i], &buff[hsize], size);
@@ -1174,33 +1173,34 @@ BYTE* CVobSubFile::GetPacket(int idx, int& packetsize, int& datasize, int iLang)
     return ret;
 }
 
-bool CVobSubFile::GetFrame(int idx, int iLang)
+bool CVobSubFile::InspectFrame(__in const uintptr_t idx) const// lighter version of "GetFrame", only for inspector class types
 {
-    if (iLang < 0 || iLang >= 32) {
-        iLang = m_iLang;
-    }
-    CAtlArray<SubPos>& sp = m_langs[iLang].subpos;
+    if (idx >= m_langs[m_iLang].subpos.GetCount()) { return false; }
+    return m_fOnlyShowForcedSubs ? m_img.fForced : true;
+}
 
-    if (idx < 0 || (size_t)idx >= sp.GetCount()) {
-        return false;
-    }
+bool CVobSubFile::GetFrame(__in const uintptr_t idx)
+{
+    CAtlArray<SubPos> const& sp = m_langs[m_iLang].subpos;
 
-    if (m_img.iLang != iLang || m_img.iIdx != idx) {
+    if (idx >= sp.GetCount()) { return false; }
+
+    if (m_img.iLang != m_iLang || m_img.iIdx != idx) {
         int packetsize = 0, datasize = 0;
         CAutoVectorPtr<BYTE> buff;
-        buff.Attach(GetPacket(idx, packetsize, datasize, iLang));
+        buff.Attach(GetPacket(idx, packetsize, datasize, m_iLang));
         if (!buff || packetsize <= 0 || datasize <= 0) {
             return false;
         }
 
         m_img.start = sp[idx].start;
-        m_img.delay = (size_t)idx < (sp.GetCount() - 1)
+        m_img.delay = idx < (sp.GetCount() - 1)
                       ? sp[idx + 1].start - sp[idx].start
                       : 3000;
 
         bool ret = m_img.Decode(buff, packetsize, datasize, m_fCustomPal, m_tridx, m_orgpal, m_cuspal, true);
 
-        if ((size_t)idx < (sp.GetCount() - 1)) {
+        if (idx < (sp.GetCount() - 1)) {
             m_img.delay = min(m_img.delay, sp[idx + 1].start - m_img.start);
         }
 
@@ -1209,10 +1209,10 @@ bool CVobSubFile::GetFrame(int idx, int iLang)
         }
 
         m_img.iIdx = idx;
-        m_img.iLang = iLang;
+        m_img.iLang = m_iLang;
     }
 
-    return (m_fOnlyShowForcedSubs ? m_img.fForced : true);
+    return m_fOnlyShowForcedSubs ? m_img.fForced : true;
 }
 
 bool CVobSubFile::GetFrameByTimeStamp(__int64 time)
@@ -1220,13 +1220,13 @@ bool CVobSubFile::GetFrameByTimeStamp(__int64 time)
     return GetFrame(GetFrameIdxByTimeStamp(time));
 }
 
-int CVobSubFile::GetFrameIdxByTimeStamp(__int64 time)
+int CVobSubFile::GetFrameIdxByTimeStamp(__int64 time) const
 {
     if (m_iLang < 0 || m_iLang >= 32) {
         return -1;
     }
 
-    CAtlArray<SubPos>& sp = m_langs[m_iLang].subpos;
+    CAtlArray<SubPos> const& sp = m_langs[m_iLang].subpos;
 
     int i = 0, j = (int)sp.GetCount() - 1, ret = -1;
 
@@ -1259,36 +1259,79 @@ int CVobSubFile::GetFrameIdxByTimeStamp(__int64 time)
     return ret;
 }
 
-//
+// IUnknown
 
-STDMETHODIMP CVobSubFile::NonDelegatingQueryInterface(REFIID riid, void** ppv)
+__declspec(nothrow noalias) STDMETHODIMP CVobSubFile::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-    CheckPointer(ppv, E_POINTER);
-    *ppv = nullptr;
-
-    return
-        QI(IPersist)
-        QI(ISubStream)
-        QI(ISubPicProvider)
-        __super::NonDelegatingQueryInterface(riid, ppv);
+    ASSERT(ppv);
+    if (riid == IID_IUnknown) { *ppv = static_cast<IUnknown*>(static_cast<CSubPicProviderImpl*>((this))); }// CSubPicProviderImpl is at Vtable location 0
+    else if (riid == __uuidof(CSubPicProviderImpl)) { *ppv = static_cast<CSubPicProviderImpl*>(this); }
+    else if (riid == IID_IPersist) { *ppv = static_cast<IPersist*>(this); }
+    else if (riid == __uuidof(ISubStream)) { *ppv = static_cast<ISubStream*>(this); }
+    else {
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
-// ISubPicProvider
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CVobSubFile::AddRef()
+{
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
+}
+
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CVobSubFile::Release()
+{
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
+
+        delete this;
+        return 0;
+    } else {
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
+    }
+}
+
+// CSubPicProviderImpl
 
 // TODO: return segments for the fade-in/out time (with animated set to "true" of course)
 
-STDMETHODIMP_(POSITION) CVobSubFile::GetStartPosition(REFERENCE_TIME rt, double fps)
+__declspec(nothrow noalias restrict) POSITION CVobSubFile::GetStartPosition(__in __int64 i64Time, __in double fps)
 {
-    rt /= 10000;
+    REFERENCE_TIME rtdiv = i64Time / 10000;
 
-    int i = GetFrameIdxByTimeStamp(rt);
+    int i = GetFrameIdxByTimeStamp(rtdiv);
 
     if (!GetFrame(i)) {
         return nullptr;
     }
 
-    if (rt >= (m_img.start + m_img.delay)) {
-        if (!GetFrame(++i)) {
+    if (rtdiv >= (m_img.start + m_img.delay)) {
+        if (!InspectFrame(++i)) {
             return nullptr;
         }
     }
@@ -1296,45 +1339,40 @@ STDMETHODIMP_(POSITION) CVobSubFile::GetStartPosition(REFERENCE_TIME rt, double 
     return (POSITION)(i + 1);
 }
 
-STDMETHODIMP_(POSITION) CVobSubFile::GetNext(POSITION pos)
+__declspec(nothrow noalias restrict) POSITION CVobSubFile::GetNext(__in POSITION pos) const
 {
-    int i = (int)pos;
-    return (GetFrame(i) ? (POSITION)(i + 1) : nullptr);
+    uintptr_t i = reinterpret_cast<uintptr_t>(pos);
+    return InspectFrame(i) ? reinterpret_cast<POSITION>(i + 1) : nullptr;
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CVobSubFile::GetStart(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CVobSubFile::GetStart(__in POSITION pos, __in double fps) const
 {
-    int i = (int)pos - 1;
-    return (GetFrame(i) ? 10000i64 * m_img.start : 0);
+    return InspectFrame(reinterpret_cast<uintptr_t>(pos) - 1) ? 10000i64 * m_img.start : 0;
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CVobSubFile::GetStop(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CVobSubFile::GetStop(__in POSITION pos, __in double fps) const
 {
-    int i = (int)pos - 1;
-    return (GetFrame(i) ? 10000i64 * (m_img.start + m_img.delay) : 0);
+    return InspectFrame(reinterpret_cast<uintptr_t>(pos) - 1) ? 10000i64 * (m_img.start + m_img.delay) : 0;
 }
 
-STDMETHODIMP_(bool) CVobSubFile::IsAnimated(POSITION pos)
+__declspec(nothrow noalias) bool CVobSubFile::IsAnimated(__in POSITION pos) const
 {
     return false;
 }
 
-STDMETHODIMP CVobSubFile::Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox)
+__declspec(nothrow noalias) HRESULT CVobSubFile::Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox)
 {
     if (spd.bpp != 32) {
         return E_INVALIDARG;
     }
 
-    rt /= 10000;
-
-    if (!GetFrame(GetFrameIdxByTimeStamp(rt))) {
+    REFERENCE_TIME rtdiv = i64Time / 10000;
+    if (!GetFrame(GetFrameIdxByTimeStamp(rtdiv))) {
         return E_FAIL;
     }
-
-    if (rt >= (m_img.start + m_img.delay)) {
+    if (rtdiv >= m_img.start + m_img.delay) {
         return E_FAIL;
     }
-
     return __super::Render(spd, bbox);
 }
 
@@ -1347,23 +1385,22 @@ STDMETHODIMP CVobSubFile::GetClassID(CLSID* pClassID)
 
 // ISubStream
 
-STDMETHODIMP_(int) CVobSubFile::GetStreamCount()
+__declspec(nothrow noalias) size_t CVobSubFile::GetStreamCount() const
 {
-    int iStreamCount = 0;
-    for (size_t i = 0; i < 32; i++) {
+    size_t iStreamCount = 0;
+    for (size_t i = 0; i < 32; ++i)
         if (m_langs[i].subpos.GetCount()) {
-            iStreamCount++;
+            ++iStreamCount;
         }
-    }
     return iStreamCount;
 }
 
-STDMETHODIMP CVobSubFile::GetStreamInfo(int iStream, WCHAR** ppName, LCID* pLCID)
+__declspec(nothrow noalias) HRESULT CVobSubFile::GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const
 {
-    for (size_t i = 0; i < 32; i++) {
-        SubLang& sl = m_langs[i];
+    for (size_t i = 0; i < 32; ++i) {
+        SubLang const& sl = m_langs[i];
 
-        if (sl.subpos.IsEmpty() || iStream-- > 0) {
+        if (sl.subpos.IsEmpty() || upStream-- > 0) {
             continue;
         }
 
@@ -1386,22 +1423,21 @@ STDMETHODIMP CVobSubFile::GetStreamInfo(int iStream, WCHAR** ppName, LCID* pLCID
     return E_FAIL;
 }
 
-STDMETHODIMP_(int) CVobSubFile::GetStream()
+__declspec(nothrow noalias) size_t CVobSubFile::GetStream() const
 {
-    int iStream = 0;
-
-    for (ptrdiff_t i = 0; i < m_iLang; i++) {
+    size_t upStream = 0;
+    for (size_t i = 0; i < m_iLang; ++i)
         if (!m_langs[i].subpos.IsEmpty()) {
-            iStream++;
+            ++upStream;
         }
-    }
 
-    return iStream;
+    return upStream;
 }
 
-STDMETHODIMP CVobSubFile::SetStream(int iStream)
+__declspec(nothrow noalias) HRESULT CVobSubFile::SetStream(__in size_t upStream)
 {
-    for (int i = 0; i < 32; i++) {
+    size_t iStream = upStream;
+    for (ptrdiff_t i = 0; i < 32; i++) {
         CAtlArray<SubPos>& sp = m_langs[i].subpos;
 
         if (sp.IsEmpty() || iStream-- > 0) {
@@ -1418,7 +1454,7 @@ STDMETHODIMP CVobSubFile::SetStream(int iStream)
     return iStream < 0 ? S_OK : E_FAIL;
 }
 
-STDMETHODIMP CVobSubFile::Reload()
+__declspec(nothrow noalias) HRESULT CVobSubFile::Reload()
 {
     if (!FileExists(m_title + _T(".idx"))) {
         return E_FAIL;
@@ -1427,6 +1463,8 @@ STDMETHODIMP CVobSubFile::Reload()
 }
 
 // StretchBlt
+
+#include <intrin.h>
 
 static void PixelAtBiLinear(RGBQUAD& c, int x, int y, CVobSubImage& src)
 {
@@ -1441,15 +1479,15 @@ static void PixelAtBiLinear(RGBQUAD& c, int x, int y, CVobSubImage& src)
     RGBQUAD c11 = ptr[y1 + x1], c12 = ptr[y1 + x2],
             c21 = ptr[y2 + x1], c22 = ptr[y2 + x2];
 
-    __int64 u2 = x & 0xffff,
-            v2 = y & 0xffff,
-            u1 = 0x10000 - u2,
-            v1 = 0x10000 - v2;
+    unsigned int    u2 = x & 0xffff,
+                    v2 = y & 0xffff,
+                    u1 = 0x10000 - u2,
+                    v1 = 0x10000 - v2;
 
-    int v1u1 = int(v1 * u1 >> 16) * c11.rgbReserved,
-        v1u2 = int(v1 * u2 >> 16) * c12.rgbReserved,
-        v2u1 = int(v2 * u1 >> 16) * c21.rgbReserved,
-        v2u2 = int(v2 * u2 >> 16) * c22.rgbReserved;
+    unsigned int    v1u1 = static_cast<unsigned int>(__emulu(v1, u1) >> 16) * c11.rgbReserved,
+                    v1u2 = static_cast<unsigned int>(__emulu(v1, u2) >> 16) * c12.rgbReserved,
+                    v2u1 = static_cast<unsigned int>(__emulu(v2, u1) >> 16) * c21.rgbReserved,
+                    v2u2 = static_cast<unsigned int>(__emulu(v2, u2) >> 16) * c22.rgbReserved;
 
     c.rgbRed = (c11.rgbRed * v1u1 + c12.rgbRed * v1u2
                 + c21.rgbRed * v2u1 + c22.rgbRed * v2u2) >> 24;
@@ -1503,11 +1541,11 @@ static void StretchBlt(SubPicDesc& spd, CRect dstrect, CVobSubImage& src)
     dw = dstrect.Width();
     dh = dstrect.Height();
 
-    for (int y = dstrect.top; y < dstrect.bottom; y++, srcy += (srcdy << 1)) {
+    for (ptrdiff_t y = dstrect.top; y < dstrect.bottom; y++, srcy += (srcdy << 1)) {
         RGBQUAD* ptr = (RGBQUAD*) & ((BYTE*)spd.bits)[y * spd.pitch] + dstrect.left;
         RGBQUAD* endptr = ptr + dw;
 
-        for (int sx = srcx; ptr < endptr; sx += (srcdx << 1), ptr++) {
+        for (ptrdiff_t sx = srcx; ptr < endptr; sx += (srcdx << 1), ptr++) {
             //          PixelAtBiLinear(*ptr,   sx,         srcy,       src);
             ////
             RGBQUAD cc[4];
@@ -1563,7 +1601,7 @@ void CVobSubSettings::SetCustomPal(RGBQUAD* cuspal, int tridx)
 {
     memcpy(m_cuspal, cuspal, sizeof(RGBQUAD) * 4);
     m_tridx = tridx & 0xf;
-    for (int i = 0; i < 4; i++) {
+    for (ptrdiff_t i = 0; i < 4; i++) {
         m_cuspal[i].rgbReserved = (tridx & (1 << i)) ? 0 : 0xff;
     }
     m_img.Invalidate();
@@ -1571,14 +1609,14 @@ void CVobSubSettings::SetCustomPal(RGBQUAD* cuspal, int tridx)
 
 void CVobSubSettings::GetDestrect(CRect& r)
 {
-    int w = MulDiv(m_img.rect.Width(), m_scale_x, 100);
-    int h = MulDiv(m_img.rect.Height(), m_scale_y, 100);
+    int w = m_img.rect.Width() * m_scale_x / 100;
+    int h = m_img.rect.Height() * m_scale_y / 100;
 
     if (!m_fAlign) {
-        r.left = MulDiv(m_img.rect.left, m_scale_x, 100);
-        r.right = MulDiv(m_img.rect.right, m_scale_x, 100);
-        r.top = MulDiv(m_img.rect.top, m_scale_y, 100);
-        r.bottom = MulDiv(m_img.rect.bottom, m_scale_y, 100);
+        r.left = m_img.rect.left * m_scale_x / 100;
+        r.right = m_img.rect.right * m_scale_x / 100;
+        r.top = m_img.rect.top * m_scale_y / 100;
+        r.bottom = m_img.rect.bottom * m_scale_y / 100;
     } else {
         switch (m_alignhor) {
             case 0:
@@ -1594,8 +1632,8 @@ void CVobSubSettings::GetDestrect(CRect& r)
                 r.right = 0;
                 break; // right
             default:
-                r.left = MulDiv(m_img.rect.left, m_scale_x, 100);
-                r.right = MulDiv(m_img.rect.right, m_scale_x, 100);
+                r.left = m_img.rect.left * m_scale_x / 100;
+                r.right = m_img.rect.right * m_scale_x / 100;
                 break;
         }
 
@@ -1613,8 +1651,8 @@ void CVobSubSettings::GetDestrect(CRect& r)
                 r.bottom = 0;
                 break; // bottom
             default:
-                r.top = MulDiv(m_img.rect.top, m_scale_y, 100);
-                r.bottom = MulDiv(m_img.rect.bottom, m_scale_y, 100);
+                r.top = m_img.rect.top * m_scale_y / 100;
+                r.bottom = m_img.rect.bottom * m_scale_y / 100;
                 break;
         }
     }
@@ -1626,25 +1664,27 @@ void CVobSubSettings::GetDestrect(CRect& r, int w, int h)
 {
     GetDestrect(r);
 
-    r.left = MulDiv(r.left, w, m_size.cx);
-    r.right = MulDiv(r.right, w, m_size.cx);
-    r.top = MulDiv(r.top, h, m_size.cy);
-    r.bottom = MulDiv(r.bottom, h, m_size.cy);
+    r.left = r.left * w / m_size.cx;
+    r.right = r.right * w / m_size.cx;
+    r.top = r.top * h / m_size.cy;
+    r.bottom = r.bottom * h / m_size.cy;
 }
 
 void CVobSubSettings::SetAlignment(bool fAlign, int x, int y, int hor, int ver)
 {
     m_fAlign = fAlign;
     if (fAlign) {
-        m_org.x = MulDiv(m_size.cx, x, 100);
-        m_org.y = MulDiv(m_size.cy, y, 100);
-        m_alignhor = min(max(hor, 0), 2);
-        m_alignver = min(max(ver, 0), 2);
+        m_org.x = m_size.cx * x / 100;
+        m_org.y = m_size.cy * y / 100;
+        m_alignhor = (hor < 0) ? 0 : (hor > 2) ? 2 : hor;
+        m_alignver = (ver < 0) ? 0 : (ver > 2) ? 2 : ver;
     } else {
         m_org.x = m_x;
         m_org.y = m_y;
     }
 }
+
+#include "RTS.h"
 
 HRESULT CVobSubSettings::Render(SubPicDesc& spd, RECT& bbox)
 {
@@ -1706,13 +1746,13 @@ bool CVobSubFile::SaveWinSubMux(CString fn, int delay)
 
     CAtlArray<SubPos>& sp = m_langs[m_iLang].subpos;
     for (size_t i = 0; i < sp.GetCount(); i++) {
-        if (!GetFrame((int)i)) {
+        if (!GetFrame(i)) {
             continue;
         }
 
         int pal[4] = {0, 1, 2, 3};
 
-        for (int j = 0; j < 5; j++) {
+        for (ptrdiff_t j = 0; j < 5; j++) {
             if (j == 4 || !m_img.pal[j].tr) {
                 j &= 3;
                 memset(p4bpp, (j << 4) | j, 720 * 576 / 2);
@@ -1766,7 +1806,7 @@ bool CVobSubFile::SaveWinSubMux(CString fn, int delay)
         }
 
         int t1 = (int)m_img.start + delay;
-        int t2 = t1 + (int)m_img.delay /*+ (m_size.cy==480?(1000/29.97+1):(1000/25))*/;
+        int t2 = t1 + (int)m_img.delay /*+ (m_size.cy==480?(1000/30.0*1.001+1):(1000/25))*/;
 
         ASSERT(t2 > t1);
 
@@ -1838,7 +1878,7 @@ bool CVobSubFile::SaveScenarist(CString fn, int delay)
         return false;
     }
 
-    CString fullpath = CString(buff).Left(int(pFilePart - buff));
+    CString fullpath = CString(buff).Left(pFilePart - buff);
     fullpath.TrimRight(_T("\\/"));
     if (fullpath.IsEmpty()) {
         return false;
@@ -1931,7 +1971,7 @@ bool CVobSubFile::SaveScenarist(CString fn, int delay)
             int dif = rdif * rdif + gdif * gdif + bdif * bdif;
             if (dif < maxdif) {
                 maxdif = dif;
-                idx = (int)j;
+                idx = j;
             }
         }
 
@@ -1942,11 +1982,11 @@ bool CVobSubFile::SaveScenarist(CString fn, int delay)
 
     CAtlArray<SubPos>& sp = m_langs[m_iLang].subpos;
     for (size_t i = 0, k = 0; i < sp.GetCount(); i++) {
-        if (!GetFrame((int)i)) {
+        if (!GetFrame(i)) {
             continue;
         }
 
-        for (int j = 0; j < 5; j++) {
+        for (ptrdiff_t j = 0; j < 5; j++) {
             if (j == 4 || !m_img.pal[j].tr) {
                 j &= 3;
                 memset(p4bpp, (j << 4) | j, (m_size.cy - 2) * 360);
@@ -1996,11 +2036,11 @@ bool CVobSubFile::SaveScenarist(CString fn, int delay)
 
         int t1 = (int)sp[i].start + delay;
         int h1 = t1 / 1000 / 60 / 60, m1 = (t1 / 1000 / 60) % 60, s1 = (t1 / 1000) % 60;
-        int f1 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t1 % 1000) / 1000);
+        int f1 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t1 % 1000) / 1000);
 
         int t2 = (int)sp[i].stop + delay;
         int h2 = t2 / 1000 / 60 / 60, m2 = (t2 / 1000 / 60) % 60, s2 = (t2 / 1000) % 60;
-        int f2 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t2 % 1000) / 1000);
+        int f2 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t2 % 1000) / 1000);
 
         if (t2 <= 0) {
             continue;
@@ -2028,7 +2068,7 @@ bool CVobSubFile::SaveScenarist(CString fn, int delay)
         if (i + 1 < sp.GetCount()) {
             int t3 = (int)sp[i + 1].start + delay;
             int h3 = t3 / 1000 / 60 / 60, m3 = (t3 / 1000 / 60) % 60, s3 = (t3 / 1000) % 60;
-            int f3 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t3 % 1000) / 1000);
+            int f3 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t3 % 1000) / 1000);
 
             if (h3 == h2 && m3 == m2 && s3 == s2 && f3 == f2) {
                 f2--;
@@ -2097,7 +2137,7 @@ bool CVobSubFile::SaveMaestro(CString fn, int delay)
         return false;
     }
 
-    CString fullpath = CString(buff).Left(int(pFilePart - buff));
+    CString fullpath = CString(buff).Left(pFilePart - buff);
     fullpath.TrimRight(_T("\\/"));
     if (fullpath.IsEmpty()) {
         return false;
@@ -2172,11 +2212,11 @@ bool CVobSubFile::SaveMaestro(CString fn, int delay)
 
     CAtlArray<SubPos>& sp = m_langs[m_iLang].subpos;
     for (size_t i = 0, k = 0; i < sp.GetCount(); i++) {
-        if (!GetFrame((int)i)) {
+        if (!GetFrame(i)) {
             continue;
         }
 
-        for (int j = 0; j < 5; j++) {
+        for (ptrdiff_t j = 0; j < 5; j++) {
             if (j == 4 || !m_img.pal[j].tr) {
                 j &= 3;
                 memset(p4bpp, (j << 4) | j, (m_size.cy - 2) * 360);
@@ -2224,11 +2264,11 @@ bool CVobSubFile::SaveMaestro(CString fn, int delay)
 
         int t1 = (int)sp[i].start + delay;
         int h1 = t1 / 1000 / 60 / 60, m1 = (t1 / 1000 / 60) % 60, s1 = (t1 / 1000) % 60;
-        int f1 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t1 % 1000) / 1000);
+        int f1 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t1 % 1000) / 1000);
 
         int t2 = (int)sp[i].stop + delay;
         int h2 = t2 / 1000 / 60 / 60, m2 = (t2 / 1000 / 60) % 60, s2 = (t2 / 1000) % 60;
-        int f2 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t2 % 1000) / 1000);
+        int f2 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t2 % 1000) / 1000);
 
         if (t2 <= 0) {
             continue;
@@ -2256,7 +2296,7 @@ bool CVobSubFile::SaveMaestro(CString fn, int delay)
         if (i < sp.GetCount() - 1) {
             int t3 = (int)sp[i + 1].start + delay;
             int h3 = t3 / 1000 / 60 / 60, m3 = (t3 / 1000 / 60) % 60, s3 = (t3 / 1000) % 60;
-            int f3 = (int)((m_size.cy == 480 ? 29.97 : 25) * (t3 % 1000) / 1000);
+            int f3 = (int)((m_size.cy == 480 ? 30 / 1.001 : 25) * (t3 % 1000) / 1000);
 
             if (h3 == h2 && m3 == m2 && s3 == s2 && f3 == f2) {
                 f2--;
@@ -2414,7 +2454,7 @@ void CVobSubStream::Add(REFERENCE_TIME tStart, REFERENCE_TIME tStop, BYTE* pData
     CAutoLock cAutoLock(&m_csSubPics);
     while (m_subpics.GetCount() && m_subpics.GetTail()->tStart >= tStart) {
         m_subpics.RemoveTail();
-        m_img.iIdx = -1;
+        m_img.iIdx = MAXSIZE_T;
     }
 
     // We can only render one subpicture at a time, thus if there is overlap
@@ -2433,31 +2473,75 @@ void CVobSubStream::RemoveAll()
 {
     CAutoLock cAutoLock(&m_csSubPics);
     m_subpics.RemoveAll();
-    m_img.iIdx = -1;
+    m_img.iIdx = MAXSIZE_T;
 }
 
-STDMETHODIMP CVobSubStream::NonDelegatingQueryInterface(REFIID riid, void** ppv)
-{
-    CheckPointer(ppv, E_POINTER);
-    *ppv = nullptr;
+// IUnknown
 
-    return
-        QI(IPersist)
-        QI(ISubStream)
-        QI(ISubPicProvider)
-        __super::NonDelegatingQueryInterface(riid, ppv);
+__declspec(nothrow noalias) STDMETHODIMP CVobSubStream::QueryInterface(REFIID riid, __deref_out void** ppv)
+{
+    ASSERT(ppv);
+    if (riid == IID_IUnknown) { *ppv = static_cast<IUnknown*>(static_cast<CSubPicProviderImpl*>((this))); }// CSubPicProviderImpl is at Vtable location 0
+    else if (riid == __uuidof(CSubPicProviderImpl)) { *ppv = static_cast<CSubPicProviderImpl*>(this); }
+    else if (riid == IID_IPersist) { *ppv = static_cast<IPersist*>(this); }
+    else if (riid == __uuidof(ISubStream)) { *ppv = static_cast<ISubStream*>(this); }
+    else {
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
-// ISubPicProvider
-
-STDMETHODIMP_(POSITION) CVobSubStream::GetStartPosition(REFERENCE_TIME rt, double fps)
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CVobSubStream::AddRef()
 {
-    CAutoLock cAutoLock(&m_csSubPics);
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
+}
+
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CVobSubStream::Release()
+{
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
+
+        delete this;
+        return 0;
+    } else {
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
+    }
+}
+
+// CSubPicProviderImpl
+
+__declspec(nothrow noalias restrict) POSITION CVobSubStream::GetStartPosition(__in __int64 i64Time, __in double fps)
+{
     POSITION pos = m_subpics.GetTailPosition();
     for (; pos; m_subpics.GetPrev(pos)) {
         SubPic* sp = m_subpics.GetAt(pos);
-        if (sp->tStart <= rt) {
-            if (sp->tStop <= rt) {
+        if (sp->tStart <= i64Time) {
+            if (sp->tStop <= i64Time) {
                 m_subpics.GetNext(pos);
             }
             break;
@@ -2466,31 +2550,29 @@ STDMETHODIMP_(POSITION) CVobSubStream::GetStartPosition(REFERENCE_TIME rt, doubl
     return pos;
 }
 
-STDMETHODIMP_(POSITION) CVobSubStream::GetNext(POSITION pos)
+__declspec(nothrow noalias restrict) POSITION CVobSubStream::GetNext(__in POSITION pos) const
 {
-    CAutoLock cAutoLock(&m_csSubPics);
-    m_subpics.GetNext(pos);
-    return pos;
+    POSITION npos = pos;
+    m_subpics.GetNext(npos);
+    return npos;
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CVobSubStream::GetStart(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CVobSubStream::GetStart(__in POSITION pos, __in double fps) const
 {
-    CAutoLock cAutoLock(&m_csSubPics);
     return m_subpics.GetAt(pos)->tStart;
 }
 
-STDMETHODIMP_(REFERENCE_TIME) CVobSubStream::GetStop(POSITION pos, double fps)
+__declspec(nothrow noalias) __int64 CVobSubStream::GetStop(__in POSITION pos, __in double fps) const
 {
-    CAutoLock cAutoLock(&m_csSubPics);
     return m_subpics.GetAt(pos)->tStop;
 }
 
-STDMETHODIMP_(bool) CVobSubStream::IsAnimated(POSITION pos)
+__declspec(nothrow noalias) bool CVobSubStream::IsAnimated(__in POSITION pos) const
 {
     return false;
 }
 
-STDMETHODIMP CVobSubStream::Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox)
+__declspec(nothrow noalias) HRESULT CVobSubStream::Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox)
 {
     if (spd.bpp != 32) {
         return E_INVALIDARG;
@@ -2499,13 +2581,13 @@ STDMETHODIMP CVobSubStream::Render(SubPicDesc& spd, REFERENCE_TIME rt, double fp
     POSITION pos = m_subpics.GetTailPosition();
     for (; pos; m_subpics.GetPrev(pos)) {
         SubPic* sp = m_subpics.GetAt(pos);
-        if (sp->tStart <= rt && rt < sp->tStop) {
-            if (m_img.iIdx != (int)pos) {
+        if (sp->tStart <= i64Time && i64Time < sp->tStop) {
+            if (m_img.iIdx != reinterpret_cast<uintptr_t>(pos)) {
                 BYTE* pData = sp->pData.GetData();
                 m_img.Decode(
                     pData, (pData[0] << 8) | pData[1], (pData[2] << 8) | pData[3],
                     m_fCustomPal, m_tridx, m_orgpal, m_cuspal, true);
-                m_img.iIdx = (int)pos;
+                m_img.iIdx = reinterpret_cast<uintptr_t>(pos);
             }
 
             return __super::Render(spd, bbox);
@@ -2524,15 +2606,13 @@ STDMETHODIMP CVobSubStream::GetClassID(CLSID* pClassID)
 
 // ISubStream
 
-STDMETHODIMP_(int) CVobSubStream::GetStreamCount()
+__declspec(nothrow noalias) size_t CVobSubStream::GetStreamCount() const
 {
     return 1;
 }
 
-STDMETHODIMP CVobSubStream::GetStreamInfo(int i, WCHAR** ppName, LCID* pLCID)
+__declspec(nothrow noalias) HRESULT CVobSubStream::GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const
 {
-    CAutoLock cAutoLock(&m_csSubPics);
-
     if (ppName) {
         *ppName = (WCHAR*)CoTaskMemAlloc((m_name.GetLength() + 1) * sizeof(WCHAR));
         if (!(*ppName)) {
@@ -2548,12 +2628,12 @@ STDMETHODIMP CVobSubStream::GetStreamInfo(int i, WCHAR** ppName, LCID* pLCID)
     return S_OK;
 }
 
-STDMETHODIMP_(int) CVobSubStream::GetStream()
+__declspec(nothrow noalias) size_t CVobSubStream::GetStream() const
 {
     return 0;
 }
 
-STDMETHODIMP CVobSubStream::SetStream(int iStream)
+__declspec(nothrow noalias) HRESULT CVobSubStream::SetStream(__in size_t upStream)
 {
-    return iStream == 0 ? S_OK : E_FAIL;
+    return (!upStream) ? S_OK : E_FAIL;
 }

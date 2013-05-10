@@ -25,7 +25,7 @@
 #include "IQTVideoSurface.h"
 #include "mplayerc.h"
 #include "MainFrm.h"
-#include "DSUtil.h"
+#include "../filters/renderer/VideoRenderers/QT9AllocatorPresenter.h"
 
 using namespace DSObjects;
 
@@ -45,16 +45,20 @@ CQuicktimeGraph::CQuicktimeGraph(HWND hWndParent, HRESULT& hr)
 
     DWORD dwStyle = WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
-    const CAppSettings& s = AfxGetAppSettings();
-
-    if (s.iQTVideoRendererType == VIDRNDT_QT_DX7) {
-        if (SUCCEEDED(CreateAP7(CLSID_QT7AllocatorPresenter, hWndParent, &m_pQTAP))) {
-            dwStyle &= ~WS_VISIBLE;
-        }
-    } else if (s.iQTVideoRendererType == VIDRNDT_QT_DX9) {
-        bool bFullscreen = (AfxGetApp()->m_pMainWnd != nullptr) && (((CMainFrame*)AfxGetApp()->m_pMainWnd)->IsD3DFullScreenMode());
-        if (SUCCEEDED(CreateAP9(CLSID_QT9AllocatorPresenter, hWndParent, bFullscreen, &m_pQTAP))) {
-            dwStyle &= ~WS_VISIBLE;
+    if (AfxGetAppSettings().iQTVideoRendererType == VIDRNDT_QT_DX9) {
+        void* pRawMem = _aligned_malloc(sizeof(CQT9AllocatorPresenter), 16);
+        if (!pRawMem) {
+            MessageBoxW(hWndParent, L"Out of memory for creating DirectX 9 QuickTime presenter", NULL, MB_OK | MB_ICONERROR);
+        } else {
+            CStringW strError;
+            CQT9AllocatorPresenter* pQT9r = new(pRawMem) CQT9AllocatorPresenter(hWndParent, &strError);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(hWndParent, strError, L"Error creating DirectX 9 QuickTime presenter", MB_OK | MB_ICONERROR);
+                pQT9r->Release();
+            } else {
+                m_pQTAP.Attach(pQT9r);// inherits the reference
+                dwStyle &= ~WS_VISIBLE;
+            }
         }
     }
 
@@ -98,7 +102,7 @@ STDMETHODIMP CQuicktimeGraph::NonDelegatingQueryInterface(REFIID riid, void** pp
 
     return
         QI(IVideoFrameStep)
-        (m_pQTAP && (riid == __uuidof(ISubPicAllocatorPresenter) || riid == __uuidof(IQTVideoSurface))) ? m_pQTAP->QueryInterface(riid, ppv) :
+        (m_pQTAP && (riid == __uuidof(CSubPicAllocatorPresenterImpl) || riid == __uuidof(IQTVideoSurface))) ? m_pQTAP->QueryInterface(riid, ppv) :
         __super::NonDelegatingQueryInterface(riid, ppv);
 }
 

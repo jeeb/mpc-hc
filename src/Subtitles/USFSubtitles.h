@@ -41,7 +41,7 @@ typedef struct {
 
 // style
 typedef struct {
-    CStringW alignment, relativeto, horizontal_margin, vertical_margin, rotate[3];
+    CStringW alignment, horizontal_margin, vertical_margin, rotate[3];
 } posattriblist_t;
 
 typedef struct {

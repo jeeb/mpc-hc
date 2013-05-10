@@ -78,7 +78,7 @@ void CPPageSync::InitDialogPrivate()
     const CAppSettings& s = AfxGetAppSettings();
     CMainFrame* pFrame;
     pFrame = (CMainFrame*)(AfxGetApp()->m_pMainWnd);
-    if ((s.iDSVideoRendererType == VIDRNDT_DS_SYNC) && (pFrame->GetPlaybackMode() == PM_NONE)) {
+    if ((s.iDSVideoRendererType == IDC_DSSYNC) && (pFrame->GetPlaybackMode() == PM_NONE)) {
         GetDlgItem(IDC_SYNCVIDEO)->EnableWindow(TRUE);
         GetDlgItem(IDC_SYNCDISPLAY)->EnableWindow(TRUE);
         GetDlgItem(IDC_SYNCNEAREST)->EnableWindow(TRUE);
@@ -88,7 +88,7 @@ void CPPageSync::InitDialogPrivate()
         GetDlgItem(IDC_SYNCNEAREST)->EnableWindow(FALSE);
     }
 
-    const CRenderersSettings::CAdvRendererSettings& ars = s.m_RenderersSettings.m_AdvRendSets;
+    CRenderersSettings const& ars = s.m_RenderersSettings;
     m_bSynchronizeVideo = ars.bSynchronizeVideo;
     m_bSynchronizeDisplay = ars.bSynchronizeDisplay;
     m_bSynchronizeNearest = ars.bSynchronizeNearest;
@@ -97,7 +97,6 @@ void CPPageSync::InitDialogPrivate()
     m_fCycleDelta = ars.fCycleDelta;
     m_fTargetSyncOffset = ars.fTargetSyncOffset;
     m_fControlLimit = ars.fControlLimit;
-
     UpdateData(FALSE);
 }
 
@@ -105,9 +104,7 @@ BOOL CPPageSync::OnApply()
 {
     UpdateData();
 
-    CAppSettings& s = AfxGetAppSettings();
-
-    CRenderersSettings::CAdvRendererSettings& ars = s.m_RenderersSettings.m_AdvRendSets;
+    CRenderersSettings& ars = AfxGetAppSettings().m_RenderersSettings;
     ars.bSynchronizeVideo = !!m_bSynchronizeVideo;
     ars.bSynchronizeDisplay = !!m_bSynchronizeDisplay;
     ars.bSynchronizeNearest = !!m_bSynchronizeNearest;

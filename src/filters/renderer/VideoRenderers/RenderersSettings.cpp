@@ -22,127 +22,177 @@
 #include "stdafx.h"
 #include "RenderersSettings.h"
 #include "../../../mpc-hc/mplayerc.h"
-#include "../../../DSUtil/SysVersion.h"
-#include "version.h"
-#include <d3dx9.h>
+#include <intrin.h>
 
-void CRenderersSettings::UpdateData(bool fSave)
+__declspec(nothrow noalias) void CRenderersSettings::UpdateData(bool bSave)
 {
-    AfxGetAppSettings().UpdateRenderersData(fSave);
+    reinterpret_cast<CAppSettings*>(reinterpret_cast<uintptr_t>(this) - offsetof(CAppSettings, m_RenderersSettings))->UpdateRenderersData(bSave);// inverse relationship with CAppSettings
 }
 
-void CRenderersSettings::CAdvRendererSettings::SetDefault()
+// always make sure that SetDefault() and SetOptimal() set up all values in the class
+__declspec(nothrow noalias) void CRenderersSettings::SetDefault()
 {
-    fVMR9AlterativeVSync              = 0;
-    iVMR9VSyncOffset                  = 0;
-    iVMR9VSyncAccurate                = 0;
-    iVMR9FullscreenGUISupport         = 0;
-    iVMR9VSync                        = !SysVersion::IsVistaOrLater();
-    iVMR9FullFloatingPointProcessing  = 0;
-    iVMR9HalfFloatingPointProcessing  = 0;
-    iVMR9ColorManagementEnable        = 0;
-    iVMR9ColorManagementInput         = VIDEO_SYSTEM_UNKNOWN;
-    iVMR9ColorManagementAmbientLight  = AMBIENT_LIGHT_BRIGHT;
-    iVMR9ColorManagementIntent        = COLOR_RENDERING_INTENT_PERCEPTUAL;
-    iVMRDisableDesktopComposition     = 0;
-    iVMRFlushGPUBeforeVSync           = 1;
-    iVMRFlushGPUAfterPresent          = 1;
-    iVMRFlushGPUWait                  = 0;
-    iEVRHighColorResolution           = 0;
-    iEVRForceInputHighColorResolution = 0;
-    iEVREnableFrameTimeCorrection     = 0;
-    iEVROutputRange                   = 0;
-    bSynchronizeVideo                 = 0;
-    bSynchronizeDisplay               = 0;
-    bSynchronizeNearest               = 1;
-    iLineDelta                        = 0;
-    iColumnDelta                      = 0;
-    fCycleDelta                       = 0.0012;
-    fTargetSyncOffset                 = 12.0;
-    fControlLimit                     = 2.0;
+    bD3DFullscreen = 0;
+    iVMR9HighColorResolution = 0;
+    iVMR9DisableInitialColorMixing = 0;
+    iVMR9ChromaFix = 1;
+    iVMR9SurfacesQuality = 0;
+    iVMRDisableDesktopComposition = 0;
+    iEVRAlternativeScheduler = 0;
+    iEVREnableFrameTimeCorrection = 0;
+
+    fVMR9AlterativeVSync = 0;
+    iVMR9VSyncOffset = 0;
+
+    iVMRFlushGPUBeforeVSync = 0;
+    iVMRFlushGPUWait = 0;
+
+    iVMR9ColorManagementEnable = 0;
+    iVMR9ColorManagementAmbientLight = AMBIENT_LIGHT_DIM;
+    iVMR9ColorManagementIntent = 3;
+    iVMR9ColorManagementWpAdaptState = WPADAPT_STATE_NONE;
+    iVMR9ColorManagementLookupQuality = 128;
+    iVMR9ColorManagementBPC = 1;
+
+    iVMR9DitheringLevels = 0;
+    iVMR9DitheringTestEnable = 0;
+
+    iVMR9FrameInterpolation = 0;
+    dRefreshRateAdjust = 1.0;
+
+    bSynchronizeVideo = 0;
+    bSynchronizeDisplay = 0;
+    bSynchronizeNearest = 1;
+    iLineDelta = 0;
+    iColumnDelta = 0;
+    fCycleDelta = 0.0012;
+    fTargetSyncOffset = 12.0;
+    fControlLimit = 2.0;
 }
 
-void CRenderersSettings::CAdvRendererSettings::SetOptimal()
+__declspec(nothrow noalias) void CRenderersSettings::SetOptimal()
 {
-    fVMR9AlterativeVSync              = 1;
-    iVMR9VSyncOffset                  = 0;
-    iVMR9VSyncAccurate                = 1;
-    iVMR9FullscreenGUISupport         = 0;
-    iVMR9VSync                        = 1;
-    iVMR9FullFloatingPointProcessing  = 1;
-    iVMR9HalfFloatingPointProcessing  = 0;
-    iVMR9ColorManagementEnable        = 0;
-    iVMR9ColorManagementInput         = VIDEO_SYSTEM_UNKNOWN;
-    iVMR9ColorManagementAmbientLight  = AMBIENT_LIGHT_BRIGHT;
-    iVMR9ColorManagementIntent        = COLOR_RENDERING_INTENT_PERCEPTUAL;
-    iVMRDisableDesktopComposition     = 1;
-    iVMRFlushGPUBeforeVSync           = 1;
-    iVMRFlushGPUAfterPresent          = 1;
-    iVMRFlushGPUWait                  = 0;
-    iEVRHighColorResolution           = 0;
-    iEVRForceInputHighColorResolution = 0;
-    iEVREnableFrameTimeCorrection     = 0;
-    iEVROutputRange                   = 0;
-    bSynchronizeVideo                 = 0;
-    bSynchronizeDisplay               = 0;
-    bSynchronizeNearest               = 1;
-    iLineDelta                        = 0;
-    iColumnDelta                      = 0;
-    fCycleDelta                       = 0.0012;
-    fTargetSyncOffset                 = 12.0;
-    fControlLimit                     = 2.0;
+    bD3DFullscreen = 0;
+    iVMR9HighColorResolution = 0;
+    iVMR9DisableInitialColorMixing = 0;
+    iVMR9ChromaFix = 10;
+    iVMR9SurfacesQuality = 3;
+    iVMRDisableDesktopComposition = 0;
+    iEVRAlternativeScheduler = 0;
+    iEVREnableFrameTimeCorrection = 0;
+
+    fVMR9AlterativeVSync = 0;
+    iVMR9VSyncOffset = 0;
+
+    iVMRFlushGPUBeforeVSync = 0;
+    iVMRFlushGPUWait = 0;
+
+    iVMR9ColorManagementEnable = 0;
+    iVMR9ColorManagementAmbientLight = AMBIENT_LIGHT_DIM;
+    iVMR9ColorManagementIntent = 3;
+    iVMR9ColorManagementWpAdaptState = WPADAPT_STATE_NONE;
+    iVMR9ColorManagementLookupQuality = 256;
+    iVMR9ColorManagementBPC = 1;
+
+    iVMR9DitheringLevels = 1;
+    iVMR9DitheringTestEnable = 0;
+
+    iVMR9FrameInterpolation = 0;
+    dRefreshRateAdjust = 1.0;
+
+    bSynchronizeVideo = 0;
+    bSynchronizeDisplay = 0;
+    bSynchronizeNearest = 1;
+    iLineDelta = 0;
+    iColumnDelta = 0;
+    fCycleDelta = 0.0012;
+    fTargetSyncOffset = 12.0;
+    fControlLimit = 2.0;
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// CRenderersData construction
-
-CRenderersData::CRenderersData()
+#ifndef _M_X64// external asm file for x64
+extern "C" __declspec(nothrow noalias) __int64 PerfCounter100ns()
 {
-    m_fTearingTest  = false;
-    m_fDisplayStats = false;
-    m_bResetStats   = false;
-    m_hD3DX9Dll     = nullptr;
-    m_nDXSdkRelease = 0;
+    ULARGE_INTEGER uc, uf;
+    QueryPerformanceFrequency(reinterpret_cast<LARGE_INTEGER*>(&uf));
+    QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&uc));
+    // TODO: replace this item like I did for the x64 version, this really isn't efficient
+    // note that unlike the LARGE_INTEGER parameter used by the above functions, these values are actually unsigned, that makes it a lot easier)
 
-    // Don't disable hardware features before initializing a renderer
-    m_bFP16Support  = true;
-    m_b10bitSupport = true;
-}
+    // compute 10000000*uc/uf, somewhat specialized from llMulDiv, only usable for 32-bit integer registers
+    // do long multiplication
+    ULARGE_INTEGER p0;
+    p0.QuadPart = __emulu(10000000, uc.LowPart);
 
-LONGLONG CRenderersData::GetPerfCounter() const
-{
-    LARGE_INTEGER i64Ticks100ns;
-    LARGE_INTEGER llPerfFrequency;
+    /* This next computation cannot overflow into p1.HighPart because the max number we can compute here is:
 
-    QueryPerformanceFrequency(&llPerfFrequency);
-    if (llPerfFrequency.QuadPart != 0) {
-        QueryPerformanceCounter(&i64Ticks100ns);
-        return llMulDiv(i64Ticks100ns.QuadPart, 10000000, llPerfFrequency.QuadPart, 0);
-    } else {
-        // ms to 100ns units
-        return timeGetTime() * 10000;
-    }
-}
+                 (2 ** 32 - 1) * (2 ** 32 - 1) +    // ua.LowPart * uc.LowPart
+    (2 ** 32) * (2 ** 31) * (2 ** 32 - 1) * 2       // x.LowPart * y.HighPart * 2
 
-HINSTANCE CRenderersData::GetD3X9Dll()
-{
-#if D3DX_SDK_VERSION < MPC_DX_SDK_NUMBER
-#pragma message("ERROR: DirectX SDK " MPC_DX_SDK_MONTH " " MAKE_STR(MPC_DX_SDK_YEAR) " (v" MAKE_STR(MPC_DX_SDK_NUMBER) ") or newer is required to build MPC-HC")
-#endif
+    == 2 ** 96 - 2 ** 64 + (2 ** 64 - 2 ** 33 + 1)
+    == 2 ** 96 - 2 ** 33 + 1
+    < 2 ** 96
+    */
 
-    if (m_hD3DX9Dll == nullptr) {
-        m_nDXSdkRelease = 0;
+    ULARGE_INTEGER x;
+    x.QuadPart = __emulu(10000000, uc.HighPart) + static_cast<unsigned __int64>(p0.HighPart);
+    p0.HighPart = x.LowPart;
 
-        // load latest compatible version of the DLL that is available
-        for (UINT i = D3DX_SDK_VERSION; i >= MPC_DX_SDK_NUMBER; i--) {
-            m_strD3DX9Version.Format(_T("d3dx9_%u.dll"), i);
-            m_hD3DX9Dll = LoadLibrary(m_strD3DX9Version);
-            if (m_hD3DX9Dll) {
-                m_nDXSdkRelease = i;
-                break;
-            }
+    // do the division
+    /* compiler uses an external call to __aulldiv for this case: not worth the trouble
+    // if the dividend is 64 bit or smaller, use the compiler
+    //if (!x.HighPart) return p0.QuadPart/uf.QuadPart;
+
+    compiler uses an external call to __aulldvrm and __aulldiv for this case: really not worth the trouble
+    // if the divisor is 32 bit then its simpler
+    if (!uf.HighPart) {
+        ULARGE_INTEGER uliDividend;
+        ULARGE_INTEGER uliResult;
+        DWORD dwDivisor = uf.LowPart;
+
+        ASSERT(x.HighPart < dwDivisor);
+        uliDividend.HighPart = x.HighPart;
+        uliDividend.LowPart = p0.HighPart;
+
+        uliResult.HighPart = static_cast<unsigned __int32>(uliDividend.QuadPart / dwDivisor);
+        p0.HighPart = static_cast<unsigned __int32>(uliDividend.QuadPart % dwDivisor);
+        uliResult.LowPart = 0;
+        uliResult.QuadPart = p0.QuadPart / dwDivisor + uliResult.QuadPart;
+
+        return uliResult.QuadPart;
+    }*/
+
+    ULARGE_INTEGER uliResult, p1;
+    p1.QuadPart = x.HighPart;
+    uliResult.QuadPart = 0;
+
+    // OK - do long division
+    unsigned __int32 i = 0x80000000;// most significant bit only
+    do {
+        // shift 128 bit p left by 1
+        p1.QuadPart <<= 1;
+        p1.QuadPart |= p0.QuadPart >> 63;
+        p0.QuadPart <<= 1;
+
+        // compare
+        if (uf.QuadPart <= p1.QuadPart) {
+            p1.QuadPart -= uf.QuadPart;
+            uliResult.HighPart |= i;
         }
-    }
+    } while (i >>= 1); // fill the 32 high bits, one at a time
+    i = 0x80000000;// most significant bit only
+    do {
+        // shift 128 bit p left by 1
+        p1.QuadPart = p1.QuadPart << 1 | p0.QuadPart >> 63;
+        p0.QuadPart <<= 1;
 
-    return m_hD3DX9Dll;
+        // compare
+        if (uf.QuadPart <= p1.QuadPart) {
+            p1.QuadPart -= uf.QuadPart;
+            uliResult.LowPart |= i;
+        }
+    } while (i >>= 1); // fill the 32 low bits, one at a time
+
+    return uliResult.QuadPart;
 }
+#endif

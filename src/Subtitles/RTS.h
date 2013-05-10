@@ -27,34 +27,39 @@
 
 class CMyFont : public CFont
 {
+    HDC m_hDC;
 public:
     int m_ascent, m_descent;
 
-    CMyFont(STSStyle& style);
+    CMyFont(HDC hDC, STSStyle& style);
 };
 
 class CPolygon;
 
-class CWord : public Rasterizer
+class __declspec(novtable) CWord : public Rasterizer
 {
     bool m_fDrawn;
+public:
+    bool const mk_bTextDerived;
+    bool m_fWhiteSpaceChar, m_fLineBreak;
+private:
     CPoint m_p;
 
     void Transform(CPoint org);
 
     void Transform_C(CPoint& org);
-    void Transform_SSE2(CPoint& org);
+    // void Transform_SSE2(CPoint& org);
     bool CreateOpaqueBox();
 
 protected:
+    HDC m_hDC;
     double m_scalex, m_scaley;
+
     CStringW m_str;
 
     virtual bool CreatePath() = 0;
 
 public:
-    bool m_fWhiteSpaceChar, m_fLineBreak;
-
     STSStyle m_style;
 
     CPolygon* m_pOpaqueBox;
@@ -63,7 +68,7 @@ public:
 
     int m_width, m_ascent, m_descent;
 
-    CWord(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley); // str[0] = 0 -> m_fLineBreak = true (in this case we only need and use the height of m_font from the whole class)
+    CWord(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, bool bTextDerived); // str[0] = 0 -> m_fLineBreak = true (in this case we only need and use the height of m_font from the whole class)
     virtual ~CWord();
 
     virtual CWord* Copy() = 0;
@@ -78,7 +83,7 @@ protected:
     virtual bool CreatePath();
 
 public:
-    CText(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley);
+    CText(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley);
 
     virtual CWord* Copy();
     virtual bool Append(CWord* w);
@@ -99,7 +104,7 @@ protected:
     virtual bool CreatePath();
 
 public:
-    CPolygon(STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, int baseline);
+    CPolygon(HDC hDC, STSStyle& style, CStringW str, int ktype, int kstart, int kend, double scalex, double scaley, int baseline);
     CPolygon(CPolygon&); // can't use a const reference because we need to use CAtlArray::Copy which expects a non-const reference
     virtual ~CPolygon();
 
@@ -114,12 +119,11 @@ private:
     virtual bool Append(CWord* w);
 
 public:
-    CClipper(CStringW str, CSize size, double scalex, double scaley, bool inverse, CPoint cpOffset);
+    CClipper(HDC hDC, CStringW str, CSize size, double scalex, double scaley, bool inverse);
     virtual ~CClipper();
 
     CSize m_size;
     bool m_inverse;
-    CPoint m_cpOffset;
     BYTE* m_pAlphaMask;
 };
 
@@ -157,6 +161,8 @@ public:
 
 class CSubtitle : public CAtlList<CLine*>
 {
+    HDC m_hDC;
+
     int GetFullWidth();
     int GetFullLineWidth(POSITION pos);
     int GetWrapWidth(POSITION pos, int maxwidth);
@@ -166,7 +172,6 @@ public:
     int m_scrAlignment;
     int m_wrapStyle;
     bool m_fAnimated;
-    int m_relativeTo;
 
     Effect* m_effects[EF_NUMBEROFEFFECTS];
 
@@ -181,7 +186,7 @@ public:
     double m_scalex, m_scaley;
 
 public:
-    CSubtitle();
+    CSubtitle(HDC hDC);
     virtual ~CSubtitle();
     virtual void Empty();
     void EmptyEffects();
@@ -209,9 +214,19 @@ public:
 };
 
 class __declspec(uuid("537DCACA-2812-4a4f-B2C6-1A34C17ADEB0"))
-    CRenderedTextSubtitle : public CSimpleTextSubtitle, public CSubPicProviderImpl, public ISubStream
+    CRenderedTextSubtitle
+    : public CSubPicProviderImpl
+    , public CSimpleTextSubtitle
+    , public ISubStream
 {
-    CAtlMap<int, CSubtitle*> m_subtitleCache;
+    // the original HDC was declared on a global scope, and failed proper initialization under strict aliasing rules everywhere
+    // this version doesn't declare it global, but will always re-create it on construction of every new CRenderedTextSubtitle and delete it afterwards
+    // todo: investigate how many times in a session the CRenderedTextSubtitle is re-constructed, and evaluate if it's worth the trouble to let the calling function to create the HDC instead, so a safe and usable HDC doesn't have to be re-created here every time
+    // the original warning for the globally declared version was:
+    // WARNING: this isn't very thread safe, use only one RTS a time. We should use TLS in future.
+    HDC m_hDC;
+
+    CAtlMap<size_t, CSubtitle*> m_subtitleCache;
 
     CScreenLayoutAllocator m_sla;
 
@@ -236,7 +251,7 @@ class __declspec(uuid("537DCACA-2812-4a4f-B2C6-1A34C17ADEB0"))
 
     double CalcAnimation(double dst, double src, bool fAnimate);
 
-    CSubtitle* GetSubtitle(int entry);
+    CSubtitle* GetSubtitle(size_t entry);
 
 protected:
     virtual void OnChanged();
@@ -260,24 +275,26 @@ public:
     bool Init(CSize size, CRect vidrect); // will call Deinit()
     void Deinit();
 
-    DECLARE_IUNKNOWN
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+    // IUnknown
+    __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
-    // ISubPicProvider
-    STDMETHODIMP_(POSITION) GetStartPosition(REFERENCE_TIME rt, double fps);
-    STDMETHODIMP_(POSITION) GetNext(POSITION pos);
-    STDMETHODIMP_(REFERENCE_TIME) GetStart(POSITION pos, double fps);
-    STDMETHODIMP_(REFERENCE_TIME) GetStop(POSITION pos, double fps);
-    STDMETHODIMP_(bool) IsAnimated(POSITION pos);
-    STDMETHODIMP Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox);
+    // CSubPicProviderImpl
+    __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 i64Time, __in double fps);
+    __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const;
+    __declspec(nothrow noalias) __int64 GetStart(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) __int64 GetStop(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) bool IsAnimated(__in POSITION pos) const;
+    __declspec(nothrow noalias) HRESULT Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox);
 
     // IPersist
     STDMETHODIMP GetClassID(CLSID* pClassID);
 
     // ISubStream
-    STDMETHODIMP_(int) GetStreamCount();
-    STDMETHODIMP GetStreamInfo(int i, WCHAR** ppName, LCID* pLCID);
-    STDMETHODIMP_(int) GetStream();
-    STDMETHODIMP SetStream(int iStream);
-    STDMETHODIMP Reload();
+    __declspec(nothrow noalias) size_t GetStreamCount() const;
+    __declspec(nothrow noalias) HRESULT GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const;
+    __declspec(nothrow noalias) size_t GetStream() const;
+    __declspec(nothrow noalias) HRESULT SetStream(__in size_t upStream);
+    __declspec(nothrow noalias) HRESULT Reload();
 };

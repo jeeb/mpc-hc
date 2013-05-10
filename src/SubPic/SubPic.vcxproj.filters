@@ -11,12 +11,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CoordGeom.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="DX7SubPic.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="DX9SubPic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -32,18 +26,12 @@
     <ClCompile Include="SubPicImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SubPicProviderImpl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SubPicQueueImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoordGeom.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DX7SubPic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX9SubPic.h">

@@ -1,5 +1,5 @@
 /*
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -33,28 +33,48 @@ namespace DSObjects
         : public CDX9AllocatorPresenter
         , public IRMAVideoSurface
     {
-        CComPtr<IDirect3DSurface9> m_pVideoSurfaceOff;
-        CComPtr<IDirect3DSurface9> m_pVideoSurfaceYUY2;
+        __declspec(nothrow noalias) __forceinline ~CRM9AllocatorPresenter() {
+            ULONG u;
+            if (m_pVideoSurfaceOff) {
+                u = m_pVideoSurfaceOff->Release();
+                ASSERT(!u);
+            }
+            if (m_pVideoSurfaceYUY2) {
+                u = m_pVideoSurfaceYUY2->Release();
+                ASSERT(!u);
+            }
+        }
 
+        IDirect3DSurface9* m_pVideoSurfaceOff, *m_pVideoSurfaceYUY2;
         RMABitmapInfoHeader m_bitmapInfo;
         RMABitmapInfoHeader m_lastBitmapInfo;
 
-    protected:
-        HRESULT AllocSurfaces();
-        void DeleteSurfaces();
-
     public:
-        CRM9AllocatorPresenter(HWND hWnd, bool bFullscreen, HRESULT& hr, CString& _Error);
+        // IUnknown
+        __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
-        DECLARE_IUNKNOWN
-        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+        // CSubPicAllocatorPresenterImpl
+        __declspec(nothrow noalias) void ResetDevice();
 
         // IRMAVideoSurface
-        STDMETHODIMP Blt(UCHAR* pImageData, RMABitmapInfoHeader* pBitmapInfo, REF(PNxRect) inDestRect, REF(PNxRect) inSrcRect);
-        STDMETHODIMP BeginOptimizedBlt(RMABitmapInfoHeader* pBitmapInfo);
-        STDMETHODIMP OptimizedBlt(UCHAR* pImageBits, REF(PNxRect) rDestRect, REF(PNxRect) rSrcRect);
-        STDMETHODIMP EndOptimizedBlt();
-        STDMETHODIMP GetOptimizedFormat(REF(RMA_COMPRESSION_TYPE) ulType);
-        STDMETHODIMP GetPreferredFormat(REF(RMA_COMPRESSION_TYPE) ulType);
+        __declspec(nothrow noalias) STDMETHODIMP Blt(UCHAR* pImageData, RMABitmapInfoHeader* pBitmapInfo, REF(PNxRect) inDestRect, REF(PNxRect) inSrcRect);
+        __declspec(nothrow noalias) STDMETHODIMP BeginOptimizedBlt(RMABitmapInfoHeader* pBitmapInfo);
+        __declspec(nothrow noalias) STDMETHODIMP OptimizedBlt(UCHAR* pImageBits, REF(PNxRect) rDestRect, REF(PNxRect) rSrcRect);
+        __declspec(nothrow noalias) STDMETHODIMP EndOptimizedBlt();
+        __declspec(nothrow noalias) STDMETHODIMP GetOptimizedFormat(REF(RMA_COMPRESSION_TYPE) ulType);
+        __declspec(nothrow noalias) STDMETHODIMP GetPreferredFormat(REF(RMA_COMPRESSION_TYPE) ulType);
+
+
+        __declspec(nothrow noalias) __forceinline CRM9AllocatorPresenter(__in HWND hWnd, __inout CStringW* pstrError)
+            : CDX9AllocatorPresenter(hWnd, pstrError, false)
+            , m_pVideoSurfaceOff(nullptr)
+            , m_pVideoSurfaceYUY2(nullptr) {
+            ASSERT(pstrError);
+
+            m_u8MixerSurfaceCount = mk_pRendererSettings->MixerBuffers;// set the number of buffers
+            // note; when expanding this function, handle the case for when CDX9AllocatorPresenter() fails
+        }
     };
 }

@@ -52,7 +52,7 @@ void CSaveDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CSaveDlg, CCmdUIDialog)
     ON_BN_CLICKED(IDCANCEL, OnBnClickedCancel)
-    ON_MESSAGE(WM_GRAPHNOTIFY, OnGraphNotify)
+    ON_MESSAGE_VOID(WM_GRAPHNOTIFY, OnGraphNotify)
     ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -204,7 +204,7 @@ void CSaveDlg::OnBnClickedCancel()
     OnCancel();
 }
 
-LRESULT CSaveDlg::OnGraphNotify(WPARAM wParam, LPARAM lParam)
+void CSaveDlg::OnGraphNotify(WPARAM wParam, LPARAM lParam)
 {
     LONG evCode, evParam1, evParam2;
     while (pME && SUCCEEDED(pME->GetEvent(&evCode, (LONG_PTR*)&evParam1, (LONG_PTR*)&evParam2, 0))) {
@@ -218,8 +218,6 @@ LRESULT CSaveDlg::OnGraphNotify(WPARAM wParam, LPARAM lParam)
             m_report.SetWindowText(_T("Copying unexpectedly terminated!"));
         }
     }
-
-    return 0;
 }
 
 static unsigned int AdaptUnit(double& val, size_t unitsNb)

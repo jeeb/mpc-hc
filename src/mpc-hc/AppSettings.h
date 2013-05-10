@@ -23,7 +23,7 @@
 
 #include "SettingsDefines.h"
 #include "FilterEnum.h"
-#include "RenderersSettings.h"
+#include "../filters/renderer/VideoRenderers/RenderersSettings.h"
 #include "../Subtitles/STS.h"
 #include "MediaFormats.h"
 #include "DVBChannel.h"
@@ -85,23 +85,6 @@ enum {
     MODE_BORDERLESS,
     MODE_COUNT
 }; // flags for Caption & Menu Mode
-
-enum {
-    VIDRNDT_DS_DEFAULT,
-    VIDRNDT_DS_OLDRENDERER,
-    VIDRNDT_DS_OVERLAYMIXER,
-    VIDRNDT_DS_VMR7WINDOWED,
-    VIDRNDT_DS_VMR9WINDOWED,
-    VIDRNDT_DS_VMR7RENDERLESS,
-    VIDRNDT_DS_VMR9RENDERLESS,
-    VIDRNDT_DS_DXR,
-    VIDRNDT_DS_NULL_COMP,
-    VIDRNDT_DS_NULL_UNCOMP,
-    VIDRNDT_DS_EVR,
-    VIDRNDT_DS_EVR_CUSTOM,
-    VIDRNDT_DS_MADVR,
-    VIDRNDT_DS_SYNC
-};
 
 // Enumeration for MCE remote control (careful : add 0x010000 for all keys!)
 enum MCE_RAW_INPUT {
@@ -437,7 +420,6 @@ public:
     int             iQTVideoRendererType;
 
     CStringW        strAudioRendererDisplayName;
-    bool            fD3DFullscreen;
 
     // Fullscreen
     bool            fLaunchfullscreen;
@@ -563,11 +545,6 @@ public:
     // Save Thumbnails...
     int             iThumbRows, iThumbCols, iThumbWidth;
     // Shader Editor
-    struct Shader {
-        CString     label;
-        CString     target;
-        CString     srcdata;
-    };
     CAtlList<Shader> m_shaders;
     // Shader Combiner
     bool            fToggleShader;
@@ -595,7 +572,6 @@ public:
 
     HWND            hMasterWnd;
 
-    bool            IsD3DFullscreen() const;
     CString         SelectedAudioRenderer() const;
 
 private:

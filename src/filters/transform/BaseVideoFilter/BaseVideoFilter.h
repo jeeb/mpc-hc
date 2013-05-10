@@ -45,13 +45,13 @@ protected:
     int m_w, m_h, m_arx, m_ary;
 
     HRESULT GetDeliveryBuffer(int w, int h, IMediaSample** ppOut);
-    HRESULT CopyBuffer(BYTE* pOut, BYTE* pIn, int w, int h, int pitchIn, const GUID& subtype, bool fInterlaced = false);
-    HRESULT CopyBuffer(BYTE* pOut, BYTE** ppIn, int w, int h, int pitchIn, const GUID& subtype, bool fInterlaced = false);
+    HRESULT CopyBuffer(BYTE* pOut, BYTE* pIn, unsigned int w, int h, ptrdiff_t pitchIn, DWORD subtype, bool fInterlaced = false);
+    HRESULT CopyBuffer(BYTE* pOut, BYTE** ppIn, unsigned int w, int h, ptrdiff_t pitchIn, DWORD subtype, bool fInterlaced = false);
 
     virtual void GetOutputSize(int& w, int& h, int& arx, int& ary, int& RealWidth, int& RealHeight, int& vsfilter) {}
     virtual HRESULT Transform(IMediaSample* pIn) = 0;
     virtual bool IsVideoInterlaced() { return false; }
-    virtual void GetOutputFormats(int& nNumber, VIDEO_OUTPUT_FORMATS** ppFormats);
+    virtual int GetOutputFormats(VIDEO_OUTPUT_FORMATS const** ppFormats);
 
 public:
     CBaseVideoFilter(TCHAR* pName, LPUNKNOWN lpunk, HRESULT* phr, REFCLSID clsid, long cBuffers = 1);

@@ -1,17 +1,15 @@
-sampler s0 : register(s0);
-float4 p0 :  register(c0);
-float4 p1 :  register(c1);
+// default pass-trough, clear all text to insert other code
 
-#define width   (p0[0])
-#define height  (p0[1])
-#define counter (p0[2])
-#define clock   (p0[3])
-#define one_over_width  (p1[0])
-#define one_over_height (p1[1])
-#define PI acos(-1)
+sampler s0;// sampler register based on the previous texture in the renderer chain, higher sampler registers are undefined
+float4 c0 : register(c0);// c0.x == texture width, c0.y == texture height, c0.z == frame counter, c0.w == clock in seconds
+// the frame counter and clock count from the start of the renderer initialization and continue to count while the player is paused or seeking
+// the frame counter resets every 8388608 frames on newer hardware (PS level 3.0 or above) and every 65536 frames on older hardware
+// the clock resets every 8388.608 seconds on newer hardware (PS level 3.0 or above) and every 65.536 seconds on older hardware
+float4 c1 : register(c1);// c1.x == 1/texture width, c1.y == 1/texture height, post-resize only: c1.zw == left and top offsets of the window on the monitor in pixels
+float4 c2 : register(c2);// post-resize only: c2.xyzw == left, top, right and bottom normalized coordinates of the video area on the window area, measured from the pixel outlines
+#define PI acos(-1)// this will generate the number PI with full precision, it is useful for example with the sin, cos and tan functions
 
-float4 main(float2 tex : TEXCOORD0) : COLOR {
-	float4 c0 = tex2D(s0, tex);
-
-	return c0;
+float4 main(float2 tex : TEXCOORD0) : COLOR
+{
+	return tex2D(s0, tex);// output default pass-trough
 }

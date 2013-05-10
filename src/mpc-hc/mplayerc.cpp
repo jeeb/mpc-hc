@@ -2361,36 +2361,6 @@ void CMPlayerCApp::UpdateColorControlRange(bool isEVR)
     }
 }
 
-VMR9ProcAmpControlRange* CMPlayerCApp::GetVMR9ColorControl(ControlType nFlag)
-{
-    switch (nFlag) {
-        case ProcAmp_Brightness:
-            return &m_VMR9ColorControl[0];
-        case ProcAmp_Contrast:
-            return &m_VMR9ColorControl[1];
-        case ProcAmp_Hue:
-            return &m_VMR9ColorControl[2];
-        case ProcAmp_Saturation:
-            return &m_VMR9ColorControl[3];
-    }
-    return nullptr;
-}
-
-DXVA2_ValueRange* CMPlayerCApp::GetEVRColorControl(ControlType nFlag)
-{
-    switch (nFlag) {
-        case ProcAmp_Brightness:
-            return &m_EVRColorControl[0];
-        case ProcAmp_Contrast:
-            return &m_EVRColorControl[1];
-        case ProcAmp_Hue:
-            return &m_EVRColorControl[2];
-        case ProcAmp_Saturation:
-            return &m_EVRColorControl[3];
-    }
-    return nullptr;
-}
-
 const LanguageResource& CMPlayerCApp::GetLanguageResourceByResourceID(UINT resourceID)
 {
     size_t defaultResource = 0;
@@ -2531,10 +2501,10 @@ void CMPlayerCApp::RunAsAdministrator(LPCTSTR strCommand, LPCTSTR strArgs, bool 
 
 CRenderersData* GetRenderersData()
 {
-    return &AfxGetMyApp()->m_Renderers;
+    return &static_cast<CMPlayerCApp*>(AfxGetApp())->m_Renderers;
 }
 
-CRenderersSettings& GetRenderersSettings()
+CRenderersSettings const* GetRenderersSettings()
 {
-    return AfxGetAppSettings().m_RenderersSettings;
+    return &static_cast<CMPlayerCApp*>(AfxGetApp())->m_s.m_RenderersSettings;
 }

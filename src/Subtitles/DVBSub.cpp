@@ -32,30 +32,21 @@
 #define BUFFER_CHUNK_GROW 0x1000
 
 CDVBSub::CDVBSub()
-    : CBaseSub(ST_DVB)
-    , m_nBufferReadPos(0)
+    : m_nBufferReadPos(0)
     , m_nBufferWritePos(0)
     , m_nBufferSize(0)
     , m_pBuffer(nullptr)
 {
 }
 
-CDVBSub::~CDVBSub()
-{
-    Reset();
-    SAFE_DELETE(m_pBuffer);
-}
-
-CDVBSub::DVB_PAGE* CDVBSub::FindPage(REFERENCE_TIME rt)
+CDVBSub::DVB_PAGE* CDVBSub::FindPage(__in const REFERENCE_TIME rt) const
 {
     POSITION pos = m_Pages.GetHeadPosition();
 
     while (pos) {
         DVB_PAGE* pPage = m_Pages.GetNext(pos);
 
-        if (rt >= pPage->rtStart && rt < pPage->rtStop) {
-            return pPage;
-        }
+        if (rt >= pPage->rtStart && rt < pPage->rtStop) { return pPage; }
     }
 
     return nullptr;
@@ -89,7 +80,7 @@ CDVBSub::DVB_CLUT* CDVBSub::FindClut(DVB_PAGE* pPage, BYTE bClutId)
     return nullptr;
 }
 
-CompositionObject* CDVBSub::FindObject(DVB_PAGE* pPage, short sObjectId)
+CompositionObject* CDVBSub::FindObject(__in const DVB_PAGE* pPage, __in const SHORT sObjectId) const
 {
     if (pPage != nullptr) {
         POSITION pos = pPage->objects.GetHeadPosition();
@@ -147,7 +138,15 @@ HRESULT CDVBSub::AddToBuffer(BYTE* pData, int nSize)
         return E_FAIL;      \
     }
 
-HRESULT CDVBSub::ParseSample(IMediaSample* pSample)
+// IBaseSub
+
+__declspec(nothrow noalias) void CDVBSub::Destructor()
+{
+    Reset();
+    SAFE_DELETE(m_pBuffer);
+}
+
+__declspec(nothrow noalias) HRESULT CDVBSub::ParseSample(__inout IMediaSample* pSample)
 {
     CheckPointer(pSample, E_POINTER);
     HRESULT hr;
@@ -317,7 +316,7 @@ HRESULT CDVBSub::ParseSample(IMediaSample* pSample)
     return hr;
 }
 
-void CDVBSub::EndOfStream()
+__declspec(nothrow noalias) void CDVBSub::EndOfStream()
 {
     // Enqueue the last page if necessary.
     TRACE_DVB(_T("DVB - EndOfStream"));
@@ -329,11 +328,12 @@ void CDVBSub::EndOfStream()
     }
 }
 
-void CDVBSub::Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox)
-{
-    RemoveOldPages(rt);
 
-    DVB_PAGE* pPage = FindPage(rt);
+__declspec(nothrow noalias) void CDVBSub::Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox)
+{
+    RemoveOldPages(i64Time);
+
+    DVB_PAGE* pPage = FindPage(i64Time);
 
     if (pPage != nullptr) {
         pPage->rendered = true;
@@ -366,23 +366,22 @@ void CDVBSub::Render(SubPicDesc& spd, REFERENCE_TIME rt, RECT& bbox)
     }
 }
 
-HRESULT CDVBSub::GetTextureSize(POSITION pos, SIZE& MaxTextureSize, SIZE& VideoSize, POINT& VideoTopLeft)
+__declspec(nothrow noalias) unsigned __int64 CDVBSub::GetTextureSize(__in POSITION pos) const
 {
-    MaxTextureSize.cx = VideoSize.cx = m_Display.width;
-    MaxTextureSize.cy = VideoSize.cy = m_Display.height;
+    UNREFERENCED_PARAMETER(pos);
 
-    VideoTopLeft.x = 0;
-    VideoTopLeft.y = 0;
-
-    return S_OK;
+    ULARGE_INTEGER size;
+    size.LowPart = m_Display.width;
+    size.HighPart = m_Display.height;
+    return size.QuadPart;
 }
 
-POSITION CDVBSub::GetStartPosition(REFERENCE_TIME rt, double fps)
+__declspec(nothrow noalias restrict) POSITION CDVBSub::GetStartPosition(__in __int64 i64Time, __in double fps)
 {
     POSITION pos = m_Pages.GetHeadPosition();
     while (pos) {
         DVB_PAGE* pPage = m_Pages.GetAt(pos);
-        if (pPage->rtStop < rt) {
+        if (pPage->rtStop < i64Time) {
             m_Pages.GetNext(pos);
         } else {
             break;
@@ -392,25 +391,26 @@ POSITION CDVBSub::GetStartPosition(REFERENCE_TIME rt, double fps)
     return pos;
 }
 
-POSITION CDVBSub::GetNext(POSITION pos)
+__declspec(nothrow noalias restrict) POSITION CDVBSub::GetNext(__in POSITION pos) const
 {
-    m_Pages.GetNext(pos);
-    return pos;
+    POSITION npos = pos;
+    m_Pages.GetNext(npos);
+    return npos;
 }
 
-REFERENCE_TIME CDVBSub::GetStart(POSITION nPos)
+__declspec(nothrow noalias) __int64 CDVBSub::GetStart(__in POSITION nPos) const
 {
-    DVB_PAGE* pPage = m_Pages.GetAt(nPos);
-    return pPage != nullptr ? pPage->rtStart : INVALID_TIME;
+    DVB_PAGE const* const& pPage = m_Pages.GetAt(nPos);// the called function for requesing const objects is different
+    return pPage ? pPage->rtStart : INVALID_TIME;
 }
 
-REFERENCE_TIME CDVBSub::GetStop(POSITION nPos)
+__declspec(nothrow noalias) __int64 CDVBSub::GetStop(__in POSITION nPos) const
 {
-    DVB_PAGE* pPage = m_Pages.GetAt(nPos);
-    return pPage != nullptr ? pPage->rtStop : INVALID_TIME;
+    DVB_PAGE const* const& pPage = m_Pages.GetAt(nPos);// the called function for requesing const objects is different
+    return pPage ? pPage->rtStop : INVALID_TIME;
 }
 
-void CDVBSub::Reset()
+__declspec(nothrow noalias) void CDVBSub::Reset()
 {
     m_nBufferReadPos  = 0;
     m_nBufferWritePos = 0;

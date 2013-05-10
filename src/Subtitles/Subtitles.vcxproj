@@ -94,7 +94,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BaseSub.cpp" />
     <ClCompile Include="CCDecoder.cpp" />
     <ClCompile Include="CompositionObject.cpp" />
     <ClCompile Include="DVBSub.cpp" />
@@ -117,7 +116,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\Utf8.h" />
-    <ClInclude Include="BaseSub.h" />
     <ClInclude Include="CCDecoder.h" />
     <ClInclude Include="CompositionObject.h" />
     <ClInclude Include="DVBSub.h" />

@@ -1,5 +1,5 @@
 /*
- * (C) 2006-2013 see Authors.txt
+ * (C) 2006-2012 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -19,501 +19,292 @@
  */
 
 #include "stdafx.h"
-#include "VMROSD.h"
-#include "mplayerc.h"
+#include "MainFrm.h"
+#include <d3d9.h>
+#include <vmr9.h>
+#include <evr9.h>
 
-#define SEEKBAR_MARGIN       10
-#define SEEKBAR_HEIGHT       60
-#define SLIDER_BAR_MARGIN    10
-#define SLIDER_BAR_HEIGHT    10
-#define SLIDER_CURSOR_HEIGHT 30
-#define SLIDER_CURSOR_WIDTH  15
-
-
-CVMROSD::CVMROSD()
-    : m_pWnd(nullptr)
-    , m_llSeekMin(0)
-    , m_llSeekMax(0)
-    , m_llSeekPos(0)
-    , m_nMessagePos(OSD_NOMESSAGE)
-    , m_bShowSeekBar(false)
-    , m_bSeekBarVisible(false)
-    , m_bCursorMoving(false)
-    , m_pMFVMB(nullptr)
-    , m_pVMB(nullptr)
-    , m_pMVTO(nullptr)
-    , m_iFontSize(0)
-    , m_fontName(_T(""))
-    , m_bShowMessage(true)
+// WAITORTIMERCALLBACK implementation
+// note: the timer handle has to be closed afterwards by DeleteTimerQueueTimer(), but it may not be closed by the queue timer's thread itself
+__declspec(nothrow noalias) VOID CALLBACK CVMROSD::TimerFunc(__in PVOID lpParameter, __in BOOLEAN TimerOrWaitFired)
 {
-    m_colors[OSD_TRANSPARENT] = RGB(0,     0,   0);
-    m_colors[OSD_BACKGROUND]  = RGB(32,   40,  48);
-    m_colors[OSD_BORDER]      = RGB(48,   56,  62);
-    m_colors[OSD_TEXT]        = RGB(224, 224, 224);
-    m_colors[OSD_BAR]         = RGB(64,   72,  80);
-    m_colors[OSD_CURSOR]      = RGB(192, 200, 208);
-    m_colors[OSD_DEBUGCLR]    = RGB(128, 136, 144);
+    UNREFERENCED_PARAMETER(TimerOrWaitFired);
 
-    m_penBorder.CreatePen(PS_SOLID, 1, m_colors[OSD_BORDER]);
-    m_penCursor.CreatePen(PS_SOLID, 4, m_colors[OSD_CURSOR]);
-    m_brushBack.CreateSolidBrush(m_colors[OSD_BACKGROUND]);
-    m_brushBar.CreateSolidBrush(m_colors[OSD_BAR]);
-    m_debugBrushBack.CreateSolidBrush(m_colors[OSD_DEBUGCLR]);
-    m_debugPenBorder.CreatePen(PS_SOLID, 1, m_colors[OSD_BORDER]);
-
-    memset(&m_bitmapInfo, 0, sizeof(m_bitmapInfo));
+    TRACE(L"OSD TimerFunc\n");
+    CVMROSD* pVMROSD = reinterpret_cast<CVMROSD*>(lpParameter);
+    pVMROSD->ClearMessageInternal();
 }
 
-CVMROSD::~CVMROSD()
+__declspec(nothrow noalias) void CVMROSD::DisplayMessage(OSD_MESSAGEPOS nPos, CStringW const& strMsg, DWORD dwDuration)
 {
-    Stop();
-    m_memDC.DeleteDC();
-}
-
-void CVMROSD::SetSize(CRect wndRect, CRect videoRect)
-{
-    if (m_pWnd && (m_pVMB || m_pMFVMB)) {
-        if (m_bSeekBarVisible) {
-            m_bCursorMoving   = false;
-            m_bSeekBarVisible = false;
-            Invalidate();
-        }
-
-        // Vanilla VMR9/EVR renderers draw the OSD relative to the video frame
-        const CAppSettings& s = AfxGetAppSettings();
-        m_rectWnd = (s.iDSVideoRendererType != VIDRNDT_DS_VMR9WINDOWED
-                     && s.iDSVideoRendererType != VIDRNDT_DS_EVR) ? wndRect : videoRect;
-        m_rectWnd.MoveToXY(0, 0);
-
-        m_rectSeekBar.left   = m_rectWnd.left    + SEEKBAR_MARGIN;
-        m_rectSeekBar.right  = m_rectWnd.right   - SEEKBAR_MARGIN;
-        m_rectSeekBar.top    = m_rectWnd.bottom  - SEEKBAR_HEIGHT;
-        m_rectSeekBar.bottom = m_rectSeekBar.top + SEEKBAR_HEIGHT;
-
-        UpdateBitmap();
-    }
-}
-
-void CVMROSD::UpdateBitmap()
-{
-    CAutoLock lock(&m_csLock);
-    CRect rc;
-    CWindowDC dc(m_pWnd);
-
-    m_memDC.DeleteDC();
-    memset(&m_bitmapInfo, 0, sizeof(m_bitmapInfo));
-
-    if (m_memDC.CreateCompatibleDC(&dc)) {
-        BITMAPINFO bmi;
-        HBITMAP    hbmpRender;
-
-        ZeroMemory(&bmi.bmiHeader, sizeof(BITMAPINFOHEADER));
-        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = m_rectWnd.Width();
-        bmi.bmiHeader.biHeight = - m_rectWnd.Height(); // top-down
-        bmi.bmiHeader.biPlanes = 1;
-        bmi.bmiHeader.biBitCount = 32;
-        bmi.bmiHeader.biCompression = BI_RGB;
-
-        hbmpRender = CreateDIBSection(m_memDC, &bmi, DIB_RGB_COLORS, nullptr, nullptr, 0);
-        m_memDC.SelectObject(hbmpRender);
-
-        if (::GetObject(hbmpRender, sizeof(BITMAP), &m_bitmapInfo) != 0) {
-            // Configure the VMR's bitmap structure
-            if (m_pVMB) {
-                ZeroMemory(&m_VMR9AlphaBitmap, sizeof(m_VMR9AlphaBitmap));
-                m_VMR9AlphaBitmap.dwFlags      = VMRBITMAP_HDC | VMRBITMAP_SRCCOLORKEY;
-                m_VMR9AlphaBitmap.hdc          = m_memDC;
-                m_VMR9AlphaBitmap.rSrc         = m_rectWnd;
-                m_VMR9AlphaBitmap.rDest.left   = 0;
-                m_VMR9AlphaBitmap.rDest.top    = 0;
-                m_VMR9AlphaBitmap.rDest.right  = 1.0;
-                m_VMR9AlphaBitmap.rDest.bottom = 1.0;
-                m_VMR9AlphaBitmap.fAlpha       = 1.0;
-                m_VMR9AlphaBitmap.clrSrcKey    = m_colors[OSD_TRANSPARENT];
-            } else if (m_pMFVMB) {
-                ZeroMemory(&m_MFVideoAlphaBitmap, sizeof(m_MFVideoAlphaBitmap));
-                m_MFVideoAlphaBitmap.params.dwFlags        = MFVideoAlphaBitmap_SrcColorKey;
-                m_MFVideoAlphaBitmap.params.clrSrcKey      = m_colors[OSD_TRANSPARENT];
-                m_MFVideoAlphaBitmap.params.rcSrc          = m_rectWnd;
-                m_MFVideoAlphaBitmap.params.nrcDest.right  = 1;
-                m_MFVideoAlphaBitmap.params.nrcDest.bottom = 1;
-                m_MFVideoAlphaBitmap.GetBitmapFromDC       = TRUE;
-                m_MFVideoAlphaBitmap.bitmap.hdc            = m_memDC;
-            }
-            m_memDC.SetTextColor(m_colors[OSD_TEXT]);
-            m_memDC.SetBkMode(TRANSPARENT);
-        }
-
-        if (m_mainFont.GetSafeHandle()) {
-            m_memDC.SelectObject(m_mainFont);
-        }
-
-        DeleteObject(hbmpRender);
-    }
-}
-
-void CVMROSD::Start(CWnd* pWnd, IVMRMixerBitmap9* pVMB, bool bShowSeekBar)
-{
-    m_pVMB   = pVMB;
-    m_pMFVMB = nullptr;
-    m_pMVTO  = nullptr;
-    m_pWnd   = pWnd;
-    m_bShowSeekBar = bShowSeekBar;
-    UpdateBitmap();
-}
-
-void CVMROSD::Start(CWnd* pWnd, IMFVideoMixerBitmap* pMFVMB, bool bShowSeekBar)
-{
-    m_pMFVMB = pMFVMB;
-    m_pVMB   = nullptr;
-    m_pMVTO  = nullptr;
-    m_pWnd   = pWnd;
-    m_bShowSeekBar = bShowSeekBar;
-    UpdateBitmap();
-}
-
-void CVMROSD::Start(CWnd* pWnd, IMadVRTextOsd* pMVTO)
-{
-    m_pMFVMB = nullptr;
-    m_pVMB   = nullptr;
-    m_pMVTO  = pMVTO;
-    m_pWnd   = pWnd;
-}
-
-void CVMROSD::Stop()
-{
-    m_pVMB.Release();
-    m_pMFVMB.Release();
-    m_pMVTO.Release();
-    if (m_pWnd) {
-        m_pWnd->KillTimer((UINT_PTR)this);
-        m_pWnd = nullptr;
-    }
-}
-
-void CVMROSD::DrawRect(CRect* rect, CBrush* pBrush, CPen* pPen)
-{
-    if (pPen) {
-        m_memDC.SelectObject(pPen);
-    } else {
-        m_memDC.SelectStockObject(NULL_PEN);
-    }
-
-    if (pBrush) {
-        m_memDC.SelectObject(pBrush);
-    } else {
-        m_memDC.SelectStockObject(HOLLOW_BRUSH);
-    }
-
-    m_memDC.Rectangle(rect);
-}
-
-void CVMROSD::DrawSlider(CRect* rect, __int64 llMin, __int64 llMax, __int64 llPos)
-{
-    m_rectBar.left   = rect->left    + SLIDER_BAR_MARGIN;
-    m_rectBar.right  = rect->right   - SLIDER_BAR_MARGIN;
-    m_rectBar.top    = rect->top     + (rect->Height() - SLIDER_BAR_HEIGHT) / 2;
-    m_rectBar.bottom = m_rectBar.top + SLIDER_BAR_HEIGHT;
-
-    if (llMax == llMin) {
-        m_rectCursor.left = m_rectBar.left;
-    } else {
-        m_rectCursor.left = m_rectBar.left + (long)((m_rectBar.Width() - SLIDER_CURSOR_WIDTH) * llPos / (llMax - llMin));
-    }
-    m_rectCursor.right  = m_rectCursor.left + SLIDER_CURSOR_WIDTH;
-    m_rectCursor.top    = rect->top + (rect->Height() - SLIDER_CURSOR_HEIGHT) / 2;
-    m_rectCursor.bottom = m_rectCursor.top + SLIDER_CURSOR_HEIGHT;
-
-    DrawRect(rect, &m_brushBack, &m_penBorder);
-    DrawRect(&m_rectBar, &m_brushBar);
-    DrawRect(&m_rectCursor, nullptr, &m_penCursor);
-}
-
-void CVMROSD::DrawMessage()
-{
-    if (!m_bitmapInfo.bmWidth || !m_bitmapInfo.bmHeight || !m_bitmapInfo.bmBitsPixel) {
-        return;
-    }
-    if (m_nMessagePos != OSD_NOMESSAGE) {
-        CRect rectText(0, 0, 0, 0);
-        CRect rectMessages;
-
-        m_memDC.DrawText(m_strMessage, &rectText, DT_CALCRECT);
-        rectText.InflateRect(20, 10);
-        switch (m_nMessagePos) {
-            case OSD_TOPLEFT:
-                rectMessages = CRect(10, 10, min((rectText.right + 10), (m_rectWnd.right - 10)), (rectText.bottom + 10));
-                break;
-            case OSD_TOPRIGHT:
-            default:
-                rectMessages = CRect(max(10, m_rectWnd.right - 10 - rectText.Width()), 10, m_rectWnd.right - 10, rectText.bottom + 10);
-                break;
-        }
-        DrawRect(&rectMessages, &m_brushBack, &m_penBorder);
-        DWORD uFormat = DT_SINGLELINE | DT_CENTER | DT_VCENTER | DT_NOPREFIX;
-        if (rectText.right > (m_rectWnd.right - 20)) {
-            m_strMessage = _T(" ") + m_strMessage;
-            uFormat = uFormat | DT_END_ELLIPSIS;
-        }
-        m_memDC.DrawText(m_strMessage, &rectMessages, uFormat);
-    }
-}
-
-void CVMROSD::DrawDebug()
-{
-    if (!m_debugMessages.IsEmpty()) {
-        CString msg, tmp;
-        POSITION pos;
-        pos = m_debugMessages.GetHeadPosition();
-        msg.Format(_T("%s"), m_debugMessages.GetNext(pos));
-
-        while (pos) {
-            tmp = m_debugMessages.GetNext(pos);
-            if (!tmp.IsEmpty()) {
-                msg.AppendFormat(_T("\r\n%s"), tmp);
-            }
-        }
-
-        CRect rectText(0, 0, 0, 0);
-        CRect rectMessages;
-        m_memDC.DrawText(msg, &rectText, DT_CALCRECT);
-        rectText.InflateRect(20, 10);
-
-        int l, r, t, b;
-        l = (m_rectWnd.Width()  >> 1) - (rectText.Width()  >> 1) - 10;
-        r = (m_rectWnd.Width()  >> 1) + (rectText.Width()  >> 1) + 10;
-        t = (m_rectWnd.Height() >> 1) - (rectText.Height() >> 1) - 10;
-        b = (m_rectWnd.Height() >> 1) + (rectText.Height() >> 1) + 10;
-        rectMessages = CRect(l, t, r, b);
-        DrawRect(&rectMessages, &m_debugBrushBack, &m_debugPenBorder);
-        m_memDC.DrawText(msg, &rectMessages, DT_CENTER | DT_VCENTER);
-    }
-}
-
-void CVMROSD::Invalidate()
-{
-    CAutoLock lock(&m_csLock);
-    if (!m_bitmapInfo.bmWidth || !m_bitmapInfo.bmHeight || !m_bitmapInfo.bmBitsPixel) {
-        return;
-    }
-    memsetd(m_bitmapInfo.bmBits, 0xff000000, m_bitmapInfo.bmWidth * m_bitmapInfo.bmHeight * (m_bitmapInfo.bmBitsPixel / 8));
-
-    if (m_bSeekBarVisible) {
-        DrawSlider(&m_rectSeekBar, m_llSeekMin, m_llSeekMax, m_llSeekPos);
-    }
-    DrawMessage();
-    DrawDebug();
-
-    if (m_pVMB) {
-        m_VMR9AlphaBitmap.dwFlags &= ~VMRBITMAP_DISABLE;
-        m_pVMB->SetAlphaBitmap(&m_VMR9AlphaBitmap);
-    } else if (m_pMFVMB) {
-        m_pMFVMB->SetAlphaBitmap(&m_MFVideoAlphaBitmap);
-    }
-}
-
-void CVMROSD::UpdateSeekBarPos(CPoint point)
-{
-    m_llSeekPos = (point.x - m_rectBar.left) * (m_llSeekMax - m_llSeekMin) / (m_rectBar.Width() - SLIDER_CURSOR_WIDTH);
-    m_llSeekPos = max(m_llSeekPos, m_llSeekMin);
-    m_llSeekPos = min(m_llSeekPos, m_llSeekMax);
-
-    if (m_pWnd) {
-        AfxGetApp()->GetMainWnd()->PostMessage(WM_HSCROLL, MAKEWPARAM((short)m_llSeekPos, SB_THUMBTRACK), (LPARAM)m_pWnd->m_hWnd);
-    }
-}
-
-bool CVMROSD::OnMouseMove(UINT nFlags, CPoint point)
-{
-    bool bRet = false;
-
-    if (m_pVMB || m_pMFVMB) {
-        if (m_bCursorMoving) {
-            UpdateSeekBarPos(point);
-            Invalidate();
-        } else if (!m_bSeekBarVisible && m_bShowSeekBar && m_rectSeekBar.PtInRect(point)) {
-            m_bSeekBarVisible = true;
-            Invalidate();
-        } else if (m_bSeekBarVisible && !m_rectSeekBar.PtInRect(point)) {
-            m_bSeekBarVisible = false;
-            // Add new timer for removing any messages
-            if (m_pWnd) {
-                m_pWnd->KillTimer((UINT_PTR)this);
-                m_pWnd->SetTimer((UINT_PTR)this, 1000, (TIMERPROC)TimerFunc);
-            }
-            Invalidate();
-        } else {
-            bRet = false;
-        }
-    }
-
-    return bRet;
-}
-
-bool CVMROSD::OnLButtonDown(UINT nFlags, CPoint point)
-{
-    bool bRet = false;
-    if (m_pVMB || m_pMFVMB) {
-        if (m_rectCursor.PtInRect(point)) {
-            m_bCursorMoving = true;
-            bRet = true;
-        } else if (m_rectSeekBar.PtInRect(point)) {
-            bRet = true;
-            UpdateSeekBarPos(point);
-            Invalidate();
-        }
-    }
-
-    return bRet;
-}
-
-bool CVMROSD::OnLButtonUp(UINT nFlags, CPoint point)
-{
-    bool bRet = false;
-
-    if (m_pVMB || m_pMFVMB) {
-        m_bCursorMoving = false;
-
-        bRet = (m_rectCursor.PtInRect(point) || m_rectSeekBar.PtInRect(point));
-    }
-    return bRet;
-}
-
-__int64 CVMROSD::GetPos() const
-{
-    return m_llSeekPos;
-}
-
-void CVMROSD::SetPos(__int64 pos)
-{
-    m_llSeekPos = pos;
-}
-
-void CVMROSD::SetRange(__int64 start,  __int64 stop)
-{
-    m_llSeekMin = start;
-    m_llSeekMax = stop;
-}
-
-void CVMROSD::GetRange(__int64& start, __int64& stop)
-{
-    start = m_llSeekMin;
-    stop  = m_llSeekMax;
-}
-
-void CVMROSD::TimerFunc(HWND hWnd, UINT nMsg, UINT nIDEvent, DWORD dwTime)
-{
-    CVMROSD* pVMROSD = (CVMROSD*)nIDEvent;
-    if (pVMROSD) {
-        pVMROSD->ClearMessage();
-    }
-    KillTimer(hWnd, nIDEvent);
-}
-
-void CVMROSD::ClearMessage(bool hide)
-{
-    CAutoLock lock(&m_csLock);
-    if (m_bSeekBarVisible) {
-        return;
-    }
-
-    if (!hide) {
-        m_nMessagePos = OSD_NOMESSAGE;
-    }
-
-    if (m_pVMB) {
-        DWORD dwBackup = (m_VMR9AlphaBitmap.dwFlags | VMRBITMAP_DISABLE);
-        m_VMR9AlphaBitmap.dwFlags = VMRBITMAP_DISABLE;
-        m_pVMB->SetAlphaBitmap(&m_VMR9AlphaBitmap);
-        m_VMR9AlphaBitmap.dwFlags = dwBackup;
-    } else if (m_pMFVMB) {
-        m_pMFVMB->ClearAlphaBitmap();
-    } else if (m_pMVTO) {
-        m_pMVTO->OsdClearMessage();
-    }
-}
-
-void CVMROSD::DisplayMessage(OSD_MESSAGEPOS nPos, LPCTSTR strMsg, int nDuration, int iFontSize, CString fontName)
-{
+    TRACE(L"OSD DisplayMessage: %s, duration: %u\n", strMsg, dwDuration);
     if (!m_bShowMessage) {
+        TRACE(L"OSD DisplayMessage suppressed\n");
         return;
     }
 
     if (m_pVMB || m_pMFVMB) {
-        if (nPos != OSD_DEBUG) {
-            m_nMessagePos = nPos;
-            m_strMessage  = strMsg;
-        } else {
-            m_debugMessages.AddTail(strMsg);
-            if (m_debugMessages.GetCount() > 20) {
-                m_debugMessages.RemoveHead();
-            }
-            nDuration = -1;
-        }
+        m_nMessagePos = nPos;
+        m_strMessage = strMsg;
 
-        int iOldFontSize = m_iFontSize;
-        CString oldFontName = m_fontName;
-        const CAppSettings& s = AfxGetAppSettings();
-
-        if (iFontSize == 0) {
+        CAppSettings& s = AfxGetAppSettings();
+        if ((m_iFontSize != s.nOSDSize) || (m_strFontMain != s.strOSDFont)) {// initialize or renew font handle, m_strFontMain will be empty on initialization, this will also initialize m_iFontSize
             m_iFontSize = s.nOSDSize;
-        } else {
-            m_iFontSize = iFontSize;
-        }
-        if (m_iFontSize < 10 || m_iFontSize > 26) {
-            m_iFontSize = 20;
-        }
-        if (fontName.IsEmpty()) {
-            m_fontName = s.strOSDFont;
-        } else {
-            m_fontName = fontName;
-        }
+            m_strFontMain = s.strOSDFont;
 
-        if (iOldFontSize != m_iFontSize || oldFontName != m_fontName) {
-            if (m_mainFont.GetSafeHandle()) {
-                m_mainFont.DeleteObject();
-            }
-
-            m_mainFont.CreatePointFont(m_iFontSize * 10, m_fontName);
-            m_memDC.SelectObject(m_mainFont);
-        }
-
-        if (m_pWnd) {
-            m_pWnd->KillTimer((UINT_PTR)this);
-            if (nDuration != -1) {
-                m_pWnd->SetTimer((UINT_PTR)this, nDuration, (TIMERPROC)TimerFunc);
+            HFONT hFontMain = CreateFontW(m_iFontSize, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_NATURAL_QUALITY, FF_DONTCARE, m_strFontMain);
+            ASSERT(hFontMain);
+            if (hFontMain) {
+                if (m_hFontMain) {
+                    EXECUTE_ASSERT(DeleteObject(m_hFontMain));
+                }
+                m_hFontMain = hFontMain;
+                SelectObject(m_hdcMain, hFontMain);
             }
         }
-        Invalidate();
+
+        Paint(dwDuration);
     } else if (m_pMVTO) {
-        m_pMVTO->OsdDisplayMessage(strMsg, nDuration);
+        HRESULT hr = m_pMVTO->OsdDisplayMessage(strMsg, dwDuration);
+        ASSERT(SUCCEEDED(hr));
     }
 }
 
-void CVMROSD::DebugMessage(LPCTSTR format, ...)
+__declspec(nothrow noalias) void CVMROSD::ClearMessageInternal()
 {
-    CString msg;
-    va_list argList;
-    va_start(argList, format);
-    msg.FormatV(format, argList);
-    va_end(argList);
+    ASSERT(!m_pMVTO);// can not be used when IMadVRTextOsd is active
+    TRACE(L"OSD ClearMessageInternal\n");
+    m_nMessagePos = OSD_NOMESSAGE;
 
-    DisplayMessage(OSD_DEBUG, msg);
-}
+    if (m_bSeekBarVisible) {
+        TRACE(L"OSD ClearMessageInternal suppressed because of seekbar\n");
+        return;
+    }
 
-void CVMROSD::HideMessage(bool hide)
-{
-    if (m_pVMB || m_pMFVMB) {
-        if (hide) {
-            ClearMessage(true);
+    CAutoLock Lock(&m_csExternalInterfacesLock);
+    if (m_bOSDVisible) {
+        m_bOSDVisible = false;
+        if (m_pVMB) {
+            DWORD dwBackup = m_VMR9AlphaBitmap.dwFlags | VMRBITMAP_DISABLE;
+            m_VMR9AlphaBitmap.dwFlags = VMRBITMAP_DISABLE;
+            HRESULT hr = m_pVMB->SetAlphaBitmap(&m_VMR9AlphaBitmap);
+            ASSERT(SUCCEEDED(hr));
+            m_VMR9AlphaBitmap.dwFlags = dwBackup;
         } else {
-            Invalidate();
+            ASSERT(m_pMFVMB);
+            HRESULT hr = m_pMFVMB->ClearAlphaBitmap();
+            ASSERT(SUCCEEDED(hr));
         }
     }
 }
 
-void CVMROSD::EnableShowMessage(bool enabled)
+__declspec(nothrow noalias) void CVMROSD::UpdateBitmap()
 {
-    m_bShowMessage = enabled;
+    ASSERT(!m_pMVTO);// can not be used when IMadVRTextOsd is active
+    TRACE(L"OSD UpdateBitmap\n");
+    ZeroMemory(&m_BitmapInfo, sizeof(m_BitmapInfo));
+    if (m_hdcMain) {// remove the old one
+        EXECUTE_ASSERT(DeleteDC(m_hdcMain));
+        m_hdcMain = nullptr;
+    }
+
+    HDC hdcWnd = GetWindowDC(m_hWnd);
+    ASSERT(hdcWnd);
+    if (hdcWnd) {
+        HDC hdcUtil = CreateCompatibleDC(hdcWnd);// always make a copy, as we will not be painting on the actual window area
+        ASSERT(hdcUtil);
+        EXECUTE_ASSERT(ReleaseDC(m_hWnd, hdcWnd));
+        if (hdcUtil) {
+            EXECUTE_ASSERT(SetICMMode(hdcUtil, ICM_DONE_OUTSIDEDC));// leave ICM to the receiving renderer
+
+            BITMAPINFO bmi;
+            *reinterpret_cast<__int32*>(bmi.bmiColors) = 0;
+            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = m_rectSeekBar.right;
+            bmi.bmiHeader.biHeight = -m_rectSeekBar.bottom;// biHeight for RGB is bottom-to-top ordered for a DIB, but we will draw a regular top-down image here
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+            bmi.bmiHeader.biSizeImage = 0;
+            bmi.bmiHeader.biXPelsPerMeter = 0;
+            bmi.bmiHeader.biYPelsPerMeter = 0;
+            bmi.bmiHeader.biClrUsed = 0;
+            bmi.bmiHeader.biClrImportant = 0;
+
+            HBITMAP hbmpRender = CreateDIBSection(hdcUtil, &bmi, DIB_RGB_COLORS, nullptr, nullptr, 0);
+            ASSERT(hbmpRender);
+            if (hbmpRender) {
+                m_hdcMain = hdcUtil;
+                SelectObject(hdcUtil, hbmpRender);
+                EXECUTE_ASSERT(GetObjectW(hbmpRender, sizeof(BITMAP), &m_BitmapInfo));
+
+                if (m_pVMB) {
+                    // Configure the VMR's bitmap structure
+                    m_VMR9AlphaBitmap.dwFlags      = VMRBITMAP_HDC | VMRBITMAP_SRCCOLORKEY;
+                    m_VMR9AlphaBitmap.hdc          = hdcUtil;
+                    m_VMR9AlphaBitmap.pDDS         = nullptr;
+                    m_VMR9AlphaBitmap.rSrc.left    = 0;
+                    m_VMR9AlphaBitmap.rSrc.top     = 0;
+                    m_VMR9AlphaBitmap.rSrc.right   = m_rectSeekBar.right;
+                    m_VMR9AlphaBitmap.rSrc.bottom  = m_rectSeekBar.bottom;
+                    m_VMR9AlphaBitmap.rDest.left   = 0.0f;
+                    m_VMR9AlphaBitmap.rDest.top    = 0.0f;
+                    m_VMR9AlphaBitmap.rDest.right  = 1.0f;
+                    m_VMR9AlphaBitmap.rDest.bottom = 1.0f;
+                    m_VMR9AlphaBitmap.fAlpha       = 1.0f;
+                    m_VMR9AlphaBitmap.clrSrcKey    = OSD_TRANSPARENT;
+                    m_VMR9AlphaBitmap.dwFilterMode = 0;
+                } else {
+                    ASSERT(m_pMFVMB);
+                    // Configure the MF type bitmap structure
+                    m_MFVideoAlphaBitmap.GetBitmapFromDC       = TRUE;
+                    m_MFVideoAlphaBitmap.bitmap.hdc            = hdcUtil;
+                    m_MFVideoAlphaBitmap.params.dwFlags        = MFVideoAlphaBitmap_SrcColorKey;
+                    m_MFVideoAlphaBitmap.params.clrSrcKey      = OSD_TRANSPARENT;
+                    m_MFVideoAlphaBitmap.params.rcSrc.left     = 0;
+                    m_MFVideoAlphaBitmap.params.rcSrc.top      = 0;
+                    m_MFVideoAlphaBitmap.params.rcSrc.right    = m_rectSeekBar.right;
+                    m_MFVideoAlphaBitmap.params.rcSrc.bottom   = m_rectSeekBar.bottom;
+                    m_MFVideoAlphaBitmap.params.nrcDest.left   = 0.0f;
+                    m_MFVideoAlphaBitmap.params.nrcDest.top    = 0.0f;
+                    m_MFVideoAlphaBitmap.params.nrcDest.right  = 1.0f;
+                    m_MFVideoAlphaBitmap.params.nrcDest.bottom = 1.0f;
+                    m_MFVideoAlphaBitmap.params.fAlpha         = 1.0f;
+                    m_MFVideoAlphaBitmap.params.dwFilterMode   = 0;
+                }
+
+                SetTextColor(hdcUtil, OSD_TEXT);
+                SetBkMode(hdcUtil, TRANSPARENT);
+                SelectObject(hdcUtil, m_hFontMain);
+
+                EXECUTE_ASSERT(DeleteObject(hbmpRender));
+            }
+        }
+    }
+}
+
+__declspec(nothrow noalias) void CVMROSD::UpdateSeekBarPos(__int32 x)
+{
+    ASSERT(m_pVMB);// can only be used with IVMRMixerBitmap9
+    ASSERT(m_bShowSeekBar);
+    __int64 i64SeekPos;
+    if (x <= 0) {
+        i64SeekPos = 0;
+    } else if (x >= m_rectSeekBar.right - OSD_SLIDER_CURSOR_WIDTH) {
+        i64SeekPos = m_i64SeekMax;
+    } else {
+        i64SeekPos = x * m_i64SeekMax / (m_rectSeekBar.right - OSD_SLIDER_CURSOR_WIDTH);
+    }
+    m_i64SeekPos = i64SeekPos;
+
+    CMainFrame* pMainWindow = reinterpret_cast<CMainFrame*>(reinterpret_cast<uintptr_t>(this) - offsetof(CMainFrame, m_OSD));
+    EXECUTE_ASSERT(S_OK == pMainWindow->SendMessageW(WM_HSCROLL, 0xFFFFFFFF, 0));// this will also redraw the OSD
+}
+
+__declspec(nothrow noalias) void CVMROSD::Paint(DWORD dwDuration)
+{
+    ASSERT(!m_pMVTO);// can not be used when IMadVRTextOsd is active
+
+    HANDLE hTimer(m_hTimer);
+    if (hTimer) {
+        m_hTimer = nullptr;
+        EXECUTE_ASSERT(DeleteTimerQueueTimer(nullptr, hTimer, INVALID_HANDLE_VALUE));
+    }
+    if (!m_bOSDSuppressed && m_hdcMain && (m_bSeekBarVisible || ((m_nMessagePos != OSD_NOMESSAGE) && !m_strMessage.IsEmpty()))) {// test for availability and activity
+        // clear the image to transparent
+        __declspec(align(16)) static __int32 const iFillVal[4] = {0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000};
+        __m128 xFillVal = _mm_load_ps(reinterpret_cast<float const*>(iFillVal));
+        ULONG ulCount = static_cast<ULONG>(m_BitmapInfo.bmWidth) * static_cast<ULONG>(m_BitmapInfo.bmHeight);// expression in 4-byte units
+        // the GDI functions will allocate its surfaces in non-shared memory at system allocation granulatity
+        float* pDst = reinterpret_cast<float*>(m_BitmapInfo.bmBits);
+        ASSERT(!(reinterpret_cast<uintptr_t>(pDst) & 15)); // if not 16-byte aligned, _mm_stream_ps will fail
+        ULONG i = (ulCount + 3) >> 2;// expression in 16-byte units, rounded up, so this loop could possibly write 12 extra bytes
+        // aligned writes can't go past system allocation granulatity boundaries, so rounding up is fine in this case
+        do {
+            _mm_stream_ps(pDst, xFillVal);
+            pDst += 4;
+        } while (--i); // 16 aligned bytes are written every time
+
+        if (m_bSeekBarVisible) {
+            TRACE(L"OSD Draw Slider\n");
+            ASSERT(!m_rectSeekBar.left);
+            ASSERT(m_rectSeekBar.bottom - m_rectSeekBar.top);
+            ASSERT(m_rectSeekBar.right);
+            ASSERT(m_rectCursor.top == m_rectSeekBar.top + ((OSD_SEEKBAR_HEIGHT - OSD_SLIDER_CURSOR_HEIGHT) >> 1));
+            ASSERT(m_rectCursor.bottom == m_rectSeekBar.bottom - ((OSD_SEEKBAR_HEIGHT - OSD_SLIDER_CURSOR_HEIGHT) >> 1));
+            LONG lCl = 0;
+            if (m_i64SeekMax) {
+                lCl = static_cast<LONG>((m_rectSeekBar.right - OSD_SLIDER_CURSOR_WIDTH) * m_i64SeekPos / m_i64SeekMax);
+            }
+            m_rectCursor.left = lCl;
+            m_rectCursor.right = lCl + OSD_SLIDER_CURSOR_WIDTH;
+
+            SelectObject(m_hdcMain, m_hBrushBack);
+            SelectObject(m_hdcMain, m_hPenBorder);
+            EXECUTE_ASSERT(Rectangle(m_hdcMain, 0, m_rectSeekBar.top, m_rectSeekBar.right, m_rectSeekBar.bottom));
+
+            SelectObject(m_hdcMain, m_hBrushBar);
+            HPEN hPenNull = static_cast<HPEN>(GetStockObject(NULL_PEN));
+            ASSERT(hPenNull);
+            SelectObject(m_hdcMain, hPenNull);
+            EXECUTE_ASSERT(Rectangle(m_hdcMain, 1, m_rectSeekBar.top + 15, m_rectSeekBar.right - 1, m_rectSeekBar.bottom - 15));// 2 pixels less in width, 30 less in height
+
+            HBRUSH hBrushHollow = static_cast<HBRUSH>(GetStockObject(HOLLOW_BRUSH));
+            ASSERT(hBrushHollow);
+            SelectObject(m_hdcMain, hBrushHollow);
+            SelectObject(m_hdcMain, m_hPenCursor);
+            EXECUTE_ASSERT(Rectangle(m_hdcMain, m_rectCursor.left, m_rectCursor.top, m_rectCursor.right, m_rectCursor.bottom));
+        }
+
+        if ((m_nMessagePos != OSD_NOMESSAGE) && !m_strMessage.IsEmpty()) {
+            TRACE(L"OSD Draw Message: %s\n", m_strMessage);
+
+            __declspec(align(16)) RECT rectText;
+            _mm_store_ps(reinterpret_cast<float*>(&rectText), _mm_setzero_ps());// the rectangle is expanded by the next function, not just overwritten
+            EXECUTE_ASSERT(DrawTextW(m_hdcMain, m_strMessage, m_strMessage.GetLength(), &rectText, DT_CALCRECT));
+
+            LONG lTh = rectText.bottom + 10;
+            if (lTh > static_cast<LONG>(m_rectSeekBar.bottom)) {
+                lTh = m_rectSeekBar.bottom;
+            }
+            rectText.bottom = lTh;// messages always go on top
+
+            LONG lTw = rectText.right + 20;
+            DWORD dwFormat = DT_SINGLELINE | DT_CENTER | DT_VCENTER | DT_NOPREFIX;
+            if (lTw > static_cast<LONG>(m_rectSeekBar.right)) {
+                dwFormat |= DT_END_ELLIPSIS;
+                lTw = m_rectSeekBar.right;
+            }
+
+            // position top left or top right
+            rectText.right = lTw;// top left default
+            if (m_nMessagePos == OSD_TOPRIGHT) {
+                rectText.left  = m_rectSeekBar.right - lTw;
+                rectText.right = m_rectSeekBar.right;
+            }
+
+            SelectObject(m_hdcMain, m_hBrushBack);
+            SelectObject(m_hdcMain, m_hPenBorder);
+            EXECUTE_ASSERT(Rectangle(m_hdcMain, rectText.left, rectText.top, rectText.right, rectText.bottom));
+            EXECUTE_ASSERT(DrawTextW(m_hdcMain, m_strMessage, m_strMessage.GetLength(), &rectText, dwFormat));
+        }
+
+        m_csExternalInterfacesLock.Lock();
+        m_bOSDVisible = true;
+        if (m_pVMB) {
+            m_VMR9AlphaBitmap.dwFlags &= ~VMRBITMAP_DISABLE;
+            HRESULT hr = m_pVMB->SetAlphaBitmap(&m_VMR9AlphaBitmap);
+            ASSERT(SUCCEEDED(hr));
+        } else {
+            ASSERT(m_pMFVMB);
+            HRESULT hr = m_pMFVMB->SetAlphaBitmap(&m_MFVideoAlphaBitmap);
+            ASSERT(SUCCEEDED(hr));
+        }
+        m_csExternalInterfacesLock.Unlock();
+
+        // note: the timer handle has to be closed afterwards by DeleteTimerQueueTimer(), but it may not be closed by the queue timer's thread itself
+        EXECUTE_ASSERT(CreateTimerQueueTimer(&m_hTimer, nullptr, TimerFunc, this, dwDuration, 0, WT_EXECUTEONLYONCE | WT_EXECUTEINTIMERTHREAD));
+    } else {// for in case the working set is empty
+        ClearMessageInternal();
+    }
 }

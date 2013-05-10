@@ -71,8 +71,8 @@ typedef enum {
     CDROM_DVDVideo,
     CDROM_Unknown
 } cdrom_t;
-extern cdrom_t GetCDROMType(TCHAR drive, CAtlList<CString>& files);
-extern CString GetDriveLabel(TCHAR drive);
+extern cdrom_t GetCDROMType(CString const& path, CAtlList<CString>& files);// warning: the path needs to include _T('\\') at the end
+extern CString GetDriveLabel(CString const& path);// warning: the path needs to include _T('\\') at the end
 extern bool GetKeyFrames(CString fn, CUIntArray& kfs);
 extern DVD_HMSF_TIMECODE RT2HMSF(REFERENCE_TIME rt, double fps = 0); // used to remember the current position
 extern DVD_HMSF_TIMECODE RT2HMS_r(REFERENCE_TIME rt);                // used only for information (for display on the screen)
@@ -91,7 +91,7 @@ extern HRESULT LoadExternalObject(LPCTSTR path, REFCLSID clsid, REFIID iid, void
 extern HRESULT LoadExternalFilter(LPCTSTR path, REFCLSID clsid, IBaseFilter** ppBF);
 extern HRESULT LoadExternalPropertyPage(IPersist* pP, REFCLSID clsid, IPropertyPage** ppPP);
 extern void UnloadExternalObjects();
-extern CString MakeFullPath(LPCTSTR path);
+extern CString MakeFullPath(CString const& path);// warning: can not canonicalize paths over MAX_PATH length, but can pass them
 extern CString GetMediaTypeName(const GUID& guid);
 extern GUID GUIDFromCString(CString str);
 extern HRESULT GUIDFromCString(CString str, GUID& guid);
@@ -115,7 +115,7 @@ extern bool SetRegKeyValue(LPCTSTR pszKey, LPCTSTR pszSubkey, LPCTSTR pszValue);
 extern void RegisterSourceFilter(const CLSID& clsid, const GUID& subtype2, LPCTSTR chkbytes, LPCTSTR ext = NULL, ...);
 extern void RegisterSourceFilter(const CLSID& clsid, const GUID& subtype2, const CAtlList<CString>& chkbytes, LPCTSTR ext = NULL, ...);
 extern void UnRegisterSourceFilter(const GUID& subtype);
-extern LPCTSTR GetDXVAMode(const GUID* guidDecoder);
+extern LPCTSTR GetDXVAMode(GUID const* pkGuidDecoder, size_t* pupStringLength);
 extern void DumpBuffer(BYTE* pBuffer, int nSize);
 extern CString ReftimeToString(const REFERENCE_TIME& rtVal);
 extern CString ReftimeToString2(const REFERENCE_TIME& rtVal);

@@ -33,7 +33,6 @@ class __declspec(uuid("E5FB6957-65E6-491B-BB37-B25C9FE3BEA7"))
 
     ditype m_ditype;
     float m_procamp[4];
-    bool m_planaryuv;
     bool m_interlaced;
     bool m_forcedsubs;
     bool m_readARFromStream;
@@ -59,7 +58,6 @@ class __declspec(uuid("E5FB6957-65E6-491B-BB37-B25C9FE3BEA7"))
     CStatic m_procamp_value[4];
     CButton m_procamp_tv2pc;
     CButton m_procamp_reset;
-    CButton m_planaryuv_check;
     CButton m_interlaced_check;
     CButton m_forcedsubs_check;
     CButton m_readARFromStream_check;

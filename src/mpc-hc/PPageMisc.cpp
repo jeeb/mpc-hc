@@ -81,6 +81,7 @@ BEGIN_MESSAGE_MAP(CPPageMisc, CPPageBase)
     ON_BN_CLICKED(IDC_EXPORT_KEYS, OnExportKeys)
     ON_UPDATE_COMMAND_UI(IDC_EDIT1, OnUpdateDelayEditBox)
     ON_UPDATE_COMMAND_UI(IDC_SPIN1, OnUpdateDelayEditBox)
+    ON_BN_CLICKED(IDC_BACKGROUNDCOLOR, OnBackgroundcolor)
 END_MESSAGE_MAP()
 
 
@@ -277,4 +278,27 @@ void CPPageMisc::OnCancel()
 
     ((CMainFrame*)AfxGetMyApp()->GetMainWnd())->SetColorControl(ProcAmp_All, s.iBrightness, s.iContrast, s.iHue, s.iSaturation);
     __super::OnCancel();
+}
+
+void CPPageMisc::OnBackgroundcolor()
+{
+    // the ChooseColor systems work with XBGR ordering, while XRGB is standard for the renderer parts
+    // _byteswap_ulong(x) >> 8; 0xAABBCCDD to 0xDDCCBBAA to 0x00DDCCBB, the cheap x86 bswap instruction is more suitable for such a conversion than set of values that are individually masked, shifted and bitwise OR'd together
+    CRenderersSettings& s = AfxGetAppSettings().m_RenderersSettings;
+
+    DWORD dwBPresetCustomColors[16];
+    ptrdiff_t i = 15;
+    do {
+        dwBPresetCustomColors[i] = _byteswap_ulong(s.dwBPresetCustomColors[i]) >> 8;
+    } while (--i >= 0);
+    DWORD dwBackgoundColor = _byteswap_ulong(s.dwBackgoundColor) >> 8;
+
+    CHOOSECOLORW cc = {sizeof(CHOOSECOLORW), m_hWnd, NULL, dwBackgoundColor, dwBPresetCustomColors, CC_FULLOPEN | CC_RGBINIT, NULL, NULL, NULL};
+    if (ChooseColorW(&cc)) {
+        ptrdiff_t j = 15;
+        do {
+            s.dwBPresetCustomColors[j] = _byteswap_ulong(dwBPresetCustomColors[j]) >> 8;
+        } while (--j >= 0);
+        s.dwBackgoundColor = _byteswap_ulong(cc.rgbResult) >> 8;
+    }
 }

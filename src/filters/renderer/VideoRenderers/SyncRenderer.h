@@ -1,5 +1,6 @@
 /*
- * (C) 2010-2012 see Authors.txt
+ * (C) 2003-2006 Gabest
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -19,55 +20,22 @@
  */
 
 #pragma once
-#include "../../../SubPic/ISubPic.h"
+
+#include "../../../SubPic/DX9SubPic.h"
 #include "RenderersSettings.h"
 #include "SyncAllocatorPresenter.h"
 #include "AllocatorCommon.h"
-#include <dxva2api.h>
+#include <D3Dcompiler.h>
+#include <mfapi.h>
+#include <vmr9.h>
+#include <evr9.h>
 
 #define VMRBITMAP_UPDATE 0x80000000
-#define MAX_PICTURE_SLOTS (60 + 2) // Last 2 for pixels shader!
-#define NB_JITTER 126
+#define MAX_PICTURE_SLOTS (16+2) // Last 2 for pixels shader!
+#define NB_JITTER 128// keep this one at a convienient value to allow modulo action by low bitmask
 
 extern bool g_bNoDuration; // Defined in MainFrm.cpp
 extern bool g_bExternalSubtitleTime;
-
-// Possible messages to the PowerStrip API. PowerStrip is used to control
-// the display frequency in one of the video - display synchronization modes.
-// Powerstrip can also through a CGenlock object give very accurate timing data
-// (given) that the gfx board is supported by PS.
-#define UM_SETCUSTOMTIMING     (WM_USER + 200)
-#define UM_SETREFRESHRATE      (WM_USER + 201)
-#define UM_SETPOLARITY         (WM_USER + 202)
-#define UM_REMOTECONTROL       (WM_USER + 210)
-#define UM_SETGAMMARAMP        (WM_USER + 203)
-#define UM_CREATERESOLUTION    (WM_USER + 204)
-#define UM_GETTIMING           (WM_USER + 205)
-#define UM_SETCUSTOMTIMINGFAST (WM_USER + 211) // Sets timing without writing to file. Faster
-
-#define PositiveHorizontalPolarity  0x00
-#define PositiveVerticalPolarity    0x00
-#define NegativeHorizontalPolarity  0x02
-#define NegativeVerticalPolarity    0x04
-#define HideTrayIcon    0x00
-#define ShowTrayIcon    0x01
-#define ClosePowerStrip 0x63
-
-#define HACTIVE     0
-#define HFRONTPORCH 1
-#define HSYNCWIDTH  2
-#define HBACKPORCH  3
-#define VACTIVE     4
-#define VFRONTPORCH 5
-#define VSYNCWIDTH  6
-#define VBACKPORCH  7
-#define PIXELCLOCK  8
-#define UNKNOWN     9
-
-#define MAX_FIFO_SIZE 1024
-
-// Guid to tag IMFSample with DirectX surface index
-static const GUID GUID_SURFACE_INDEX = { 0x30c8e9f6, 0x415, 0x4b81, { 0xa3, 0x15, 0x1, 0xa, 0xc6, 0xa9, 0xda, 0x19 } };
 
 namespace GothSync
 {
@@ -77,48 +45,53 @@ namespace GothSync
         MSG_ERROR
     } EVR_STATS_MSG;
 
-#pragma pack(push, 1)
-
-    template<int texcoords>
+#pragma pack(push, 4)
+    template<size_t texcoords>
     struct MYD3DVERTEX {
         float x, y, z, rhw;
         struct {
             float u, v;
         } t[texcoords];
     };
-
     template<>
     struct MYD3DVERTEX<0> {
         float x, y, z, rhw;
         DWORD Diffuse;
     };
-
 #pragma pack(pop)
 
     class CGenlock;
     class CSyncRenderer;
 
     // Base allocator-presenter
-    class CBaseAP:
+    class __declspec(novtable) CBaseAP:
         public CSubPicAllocatorPresenterImpl
     {
     protected:
-        CRenderersSettings::CAdvRendererSettings m_LastRendererSettings;
+        // section begin of aligned requirements, operator new has to be overloaded to force alignment on x86
+        // to facilitate easy SSE writing with the dedicated functions, keep the next few sets aligned and counted
+        __declspec(align(16))// if CSubPicAllocatorPresenterImpl doesn't align well (for a 'Release' build), this line will give a warning during compiling
+        double                              m_dVideoWidth;// split here, as m_dVideoHeight should not get 16-byte alignment
+        double                              m_dVideoHeight;
+        float                               m_fVideoWidth, m_fVideoHeight, m_fVideoWidthr, m_fVideoHeightr;// use for the constant data input in the shader passes, not for math (except for SSE)
+        double                              m_dWindowWidth, m_dWindowHeight;
+        float                               m_fWindowWidth, m_fWindowHeight, m_fWindowWidthr, m_fWindowHeightr;// use for the constant data input in the shader passes, not for math (except for SSE)
+        // section end of aligned requirements
 
-        HMODULE m_hDWMAPI;
-        HRESULT(__stdcall* m_pDwmIsCompositionEnabled)(__out BOOL* pfEnabled);
-        HRESULT(__stdcall* m_pDwmEnableComposition)(UINT uCompositionAction);
-        HMODULE m_hD3D9;
-        HRESULT(__stdcall* m_pDirect3DCreate9Ex)(UINT SDKVersion, IDirect3D9Ex**);
+        HANDLE m_hEvtQuit;// stop rendering thread event
+        LPCSTR m_pProfile;// points to external
+        unsigned __int16 m_u16DXSdkRelease;
+        bool m_bVMR9HighColorResolutionCurrent;
+        HINSTANCE m_hDWMAPI, m_hD3D9, m_hD3DX9Dll, m_hD3DCompiler;// m_hD3D9 must be freed last, absolutely no D3D resource may remain at that point
 
-        CCritSec m_allocatorLock;
+        CCritSec m_csAllocatorLock;
         CComPtr<IDirect3D9Ex> m_pD3DEx;
         CComPtr<IDirect3D9> m_pD3D;
         CComPtr<IDirect3DDevice9Ex> m_pD3DDevEx;
         CComPtr<IDirect3DDevice9> m_pD3DDev;
 
-        CComPtr<IDirect3DTexture9> m_pVideoTexture[MAX_PICTURE_SLOTS];
-        CComPtr<IDirect3DSurface9> m_pVideoSurface[MAX_PICTURE_SLOTS];
+        CComPtr<IDirect3DTexture9> m_apVideoTexture[MAX_PICTURE_SLOTS];
+        CComPtr<IDirect3DSurface9> m_apVideoSurface[MAX_PICTURE_SLOTS];
         CComPtr<IDirect3DTexture9> m_pOSDTexture;
         CComPtr<IDirect3DSurface9> m_pOSDSurface;
         CComPtr<ID3DXLine> m_pLine;
@@ -126,32 +99,22 @@ namespace GothSync
         CComPtr<ID3DXSprite> m_pSprite;
         CSyncRenderer* m_pOuterEVR;
 
-        class CExternalPixelShader
-        {
-        public:
-            CComPtr<IDirect3DPixelShader9> m_pPixelShader;
-            CStringA m_SourceData;
-            CStringA m_SourceTarget;
-            HRESULT Compile(CPixelShaderCompiler* pCompiler) {
-                HRESULT hr = pCompiler->CompileShader(m_SourceData, "main", m_SourceTarget, 0, &m_pPixelShader);
-                if (FAILED(hr)) {
-                    return hr;
-                }
-                return S_OK;
-            }
-        };
-
-        CAutoPtr<CPixelShaderCompiler> m_pPSC;
-        CAtlList<CExternalPixelShader> m_pPixelShaders;
-        CAtlList<CExternalPixelShader> m_pPixelShadersScreenSpace;
-        CComPtr<IDirect3DPixelShader9> m_pResizerPixelShader[4]; // bl, bc1, bc2_1, bc2_2
+        struct EXTERNALSHADER {IDirect3DPixelShader9* pPixelShader; char* strSrcData; UINT uiSrcLen;};
+        CAtlList<EXTERNALSHADER> m_apCustomPixelShaders[2];
+        CComPtr<IDirect3DPixelShader9> m_pResizerPixelShaderX, m_pResizerPixelShaderY;
+        RECT                                m_rcClearTop, m_rcClearLeft, m_rcClearRight, m_rcClearBottom;// if the resizer render target is full screen or more, no clearing is needed
+        bool                                m_bNoXresize, m_bNoYresize;// for activating the resizer section
+        size_t                              m_upResizerN;
+        size_t m_upDX9ResizerTest;
+        RECT m_rcVideoRectTest;
+        XForm m_xformTest;
+        CComPtr<IDirect3DTexture9> m_pIntermediateResizeTexture;
+        CComPtr<IDirect3DSurface9> m_pIntermediateResizeSurface;
         CComPtr<IDirect3DTexture9> m_pScreenSizeTemporaryTexture[2];
 
-        D3DFORMAT m_SurfaceType;
-        D3DFORMAT m_BackbufferType;
-        D3DFORMAT m_DisplayType;
-        D3DTEXTUREFILTERTYPE m_filter;
-        D3DCAPS9 m_caps;
+        D3DFORMAT m_dfSurfaceType;
+        D3DFORMAT m_dfDisplayType;
+        D3DCAPS9 m_dcCaps;
         D3DPRESENT_PARAMETERS pp;
 
         bool SettingsNeedResetDevice();
@@ -160,13 +123,12 @@ namespace GothSync
         virtual HRESULT ResetDXDevice(CString& _Error);
         virtual HRESULT AllocSurfaces(D3DFORMAT Format = D3DFMT_A8R8G8B8);
         virtual void DeleteSurfaces();
+        UINT GetAdapter(IDirect3D9* pD3D);
 
-        HANDLE m_hEvtQuit; // Stop rendering thread event
-        LONGLONG m_LastAdapterCheck;
-        UINT m_CurrentAdapter;
+        LONGLONG m_llLastAdapterCheck;
+        UINT m_uiCurrentAdapter;
 
-        float m_bicubicA;
-        HRESULT InitResizers(float bicubicA, bool bNeedScreenSizeTexture);
+        HRESULT InitResizers(const int iDX9Resizer);
 
         // Functions to trace timing performance
         void SyncStats(LONGLONG syncTime);
@@ -174,10 +136,6 @@ namespace GothSync
         void DrawText(const RECT& rc, const CString& strText, int _Priority);
         void DrawStats();
 
-        template<int texcoords>
-        void AdjustQuad(MYD3DVERTEX<texcoords>* v, double dx, double dy);
-        template<int texcoords>
-        HRESULT TextureBlt(IDirect3DDevice9* pD3DDev, MYD3DVERTEX<texcoords> v[4], D3DTEXTUREFILTERTYPE filter);
         MFOffset GetOffset(float v);
         MFVideoArea GetArea(float x, float y, DWORD width, DWORD height);
         bool ClipToSurface(IDirect3DSurface9* pSurface, CRect& s, CRect& d);
@@ -185,153 +143,138 @@ namespace GothSync
         HRESULT DrawRectBase(IDirect3DDevice9* pD3DDev, MYD3DVERTEX<0> v[4]);
         HRESULT DrawRect(DWORD _Color, DWORD _Alpha, const CRect& _Rect);
         HRESULT TextureCopy(IDirect3DTexture9* pTexture);
-        HRESULT TextureResize(IDirect3DTexture9* pTexture, Vector dst[4], D3DTEXTUREFILTERTYPE filter, const CRect& SrcRect);
-        HRESULT TextureResizeBilinear(IDirect3DTexture9* pTexture, Vector dst[4], const CRect& SrcRect);
-        HRESULT TextureResizeBicubic1pass(IDirect3DTexture9* pTexture, Vector dst[4], const CRect& SrcRect);
-        HRESULT TextureResizeBicubic2pass(IDirect3DTexture9* pTexture, Vector dst[4], const CRect& SrcRect);
+        HRESULT TextureResize(IDirect3DTexture9* pTexture, const Vector dst[4], const CRect& srcRect);
+        HRESULT TextureResize2pass(IDirect3DTexture9* pTexture, const Vector dst[4], const CRect& srcRect);
 
-        typedef HRESULT(WINAPI* D3DXLoadSurfaceFromMemoryPtr)(
-            LPDIRECT3DSURFACE9 pDestSurface,
-            CONST PALETTEENTRY* pDestPalette,
-            CONST RECT* pDestRect,
-            LPCVOID pSrcMemory,
-            D3DFORMAT SrcFormat,
-            UINT SrcPitch,
-            CONST PALETTEENTRY* pSrcPalette,
-            CONST RECT* pSrcRect,
-            DWORD Filter,
-            D3DCOLOR ColorKey);
+        __forceinline HRESULT CompileShader(__in char const* szSrcData, __in size_t srcDataLen, __in char const* szFunctionName, __out_opt IDirect3DPixelShader9** ppPixelShader) const;
 
-        typedef HRESULT(WINAPI* D3DXCreateLinePtr)
-        (LPDIRECT3DDEVICE9 pDevice,
-         LPD3DXLINE* ppLine);
+        // d3dx9_??.dll
+        typedef HRESULT(WINAPI* D3DXCreateSpritePtr)(LPDIRECT3DDEVICE9 pDevice, LPD3DXSPRITE* ppSprite); // remove this one, it's useless
+        typedef HRESULT(WINAPI* D3DXLoadSurfaceFromMemoryPtr)(__in  LPDIRECT3DSURFACE9 pDestSurface, __in  const PALETTEENTRY* pDestPalette, __in  const RECT* pDestRect, __in  LPCVOID pSrcMemory, __in  D3DFORMAT SrcFormat, __in  UINT SrcPitch, __in  const PALETTEENTRY* pSrcPalette, __in  const RECT* pSrcRect, __in  DWORD Filter, __in  D3DCOLOR ColorKey);
+        typedef HRESULT(WINAPI* D3DXLoadSurfaceFromSurfacePtr)(__in LPDIRECT3DSURFACE9 pDestSurface, __in PALETTEENTRY const* pDestPalette, __in RECT const* pDestRect, __in LPDIRECT3DSURFACE9 pSrcSurface, __in PALETTEENTRY const* pSrcPalette, __in RECT const* pSrcRect, __in DWORD Filter, __in D3DCOLOR ColorKey);
+        typedef LPCSTR(WINAPI* D3DXGetPixelShaderProfilePtr)(__in LPDIRECT3DDEVICE9 pDevice);
+        typedef HRESULT(WINAPI* D3DXCreateLinePtr)(__in LPDIRECT3DDEVICE9 pDevice, __out LPD3DXLINE* ppLine);
+        typedef HRESULT(WINAPI* D3DXCreateFontWPtr)(__in LPDIRECT3DDEVICE9 pDevice, __in INT Height, __in UINT Width, __in UINT Weight, __in UINT MipLevels, __in BOOL Italic, __in DWORD CharSet, __in DWORD OutputPrecision, __in DWORD Quality, __in DWORD PitchAndFamily, __in LPCTSTR pFacename, __out LPD3DXFONT* ppFont);
+        // D3DCompiler_??.dll
+        typedef HRESULT(WINAPI* D3DCompilePtr)(__in_bcount(SrcDataSize) LPCVOID pSrcData, __in SIZE_T SrcDataSize, __in_opt LPCSTR pSourceName, __in_xcount_opt(pDefines->Name != nullptr) CONST D3D_SHADER_MACRO* pDefines, __in_opt ID3DInclude* pInclude, __in LPCSTR pEntrypoint, __in LPCSTR pTarget, __in UINT Flags1, __in UINT Flags2, __out ID3DBlob** ppCode, __out_opt ID3DBlob** ppErrorMsgs);
+        // dwmapi.dll
+        typedef HRESULT(WINAPI* DwmIsCompositionEnabledPtr)(__out BOOL* pfEnabled);
+        typedef HRESULT(WINAPI* DwmEnableCompositionPtr)(__in UINT uCompositionAction);
 
-        typedef HRESULT(WINAPI* D3DXCreateFontPtr)(
-            LPDIRECT3DDEVICE9 pDevice,
-            int Height,
-            UINT Width,
-            UINT Weight,
-            UINT MipLevels,
-            bool Italic,
-            DWORD CharSet,
-            DWORD OutputPrecision,
-            DWORD Quality,
-            DWORD PitchAndFamily,
-            LPCWSTR pFaceName,
-            LPD3DXFONT* ppFont);
+        // d3dx9_??.dll
+        D3DXCreateSpritePtr                 m_pD3DXCreateSprite;// remove this one, it's useless
+        D3DXLoadSurfaceFromMemoryPtr        m_pD3DXLoadSurfaceFromMemory;
+        D3DXLoadSurfaceFromSurfacePtr       m_pD3DXLoadSurfaceFromSurface;
+        D3DXGetPixelShaderProfilePtr        m_pD3DXGetPixelShaderProfile;
+        D3DXCreateLinePtr                   m_pD3DXCreateLine;
+        D3DXCreateFontWPtr                  m_pD3DXCreateFontW;
+        // D3DCompiler_??.dll
+        D3DCompilePtr                       m_fnD3DCompile;
+        // dwmapi.dll
+        DwmIsCompositionEnabledPtr          m_pDwmIsCompositionEnabled;
+        DwmEnableCompositionPtr             m_pDwmEnableComposition;
 
+        __declspec(nothrow noalias) void Paint(__in bool fAll);
         HRESULT AlphaBlt(RECT* pSrc, RECT* pDst, IDirect3DTexture9* pTexture);
 
         virtual void OnResetDevice() {};
+        bool m_bPendingResetDevice, m_bDeviceResetRequested;
 
-        int m_nTearingPos;
-        VMR9AlphaBitmap m_VMR9AlphaBitmap;
-        CAutoVectorPtr<BYTE> m_VMR9AlphaBitmapData;
-        CRect m_VMR9AlphaBitmapRect;
-        int m_VMR9AlphaBitmapWidthBytes;
+        ptrdiff_t m_ipTearingPos;
+        VMR9AlphaBitmap m_abVMR9AlphaBitmap;
+        CAutoVectorPtr<BYTE> m_avVMR9AlphaBitmapData;
+        long m_lVMR9AlphaBitmapWidthBytes;
 
-        D3DXLoadSurfaceFromMemoryPtr m_pD3DXLoadSurfaceFromMemory;
-        D3DXCreateLinePtr m_pD3DXCreateLine;
-        D3DXCreateFontPtr m_pD3DXCreateFont;
-        HRESULT(__stdcall* m_pD3DXCreateSprite)(LPDIRECT3DDEVICE9 pDevice, LPD3DXSPRITE* ppSprite);
-
-        int m_nDXSurface;   // Total number of DX Surfaces
-        int m_nVMR9Surfaces;
-        int m_iVMR9Surface;
-        int m_nCurSurface; // Surface currently displayed
-        long m_nUsedBuffer;
+        size_t m_nDXSurface; // Total number of DX Surfaces
+        size_t m_nVMR9Surfaces;
+        size_t m_iVMR9Surface;
+        size_t m_nCurSurface; // Surface currently displayed
+        size_t m_nUsedBuffer;
 
         LONG m_lNextSampleWait; // Waiting time for next sample in EVR
-        bool m_bSnapToVSync;    // True if framerate is low enough so that snap to vsync makes sense
+        bool m_bSnapToVSync; // True if framerate is low enough so that snap to vsync makes sense
 
-        UINT m_uScanLineEnteringPaint;      // The active scan line when entering Paint()
-        REFERENCE_TIME m_llEstVBlankTime;   // Next vblank start time in reference clock "coordinates"
+        UINT m_uScanLineEnteringPaint; // The active scan line when entering Paint()
+        REFERENCE_TIME m_llEstVBlankTime; // Next vblank start time in reference clock "coordinates"
 
-        double m_fAvrFps;       // Estimate the true FPS as given by the distance between vsyncs when a frame has been presented
-        double m_fJitterStdDev; // VSync estimate std dev
-        double m_fJitterMean;   // Means time between two syncpulses when a frame has been presented (i.e. when Paint() has been called
+        double m_dAverageFrameRate; // Estimate the true FPS as given by the distance between vsyncs when a frame has been presented
+        double m_dJitterStdDev; // VSync estimate std dev
+        double m_dJitterMean; // Mean time between two syncpulses when a frame has been presented (i.e. when Paint() has been called
 
-        double m_fSyncOffsetAvr;    // Means time between the call of Paint() and vsync. To avoid tearing this should be several ms at least
-        double m_fSyncOffsetStdDev; // The std dev of the above
+        double m_dSyncOffsetAvr; // Mean time between the call of Paint() and vsync. To avoid tearing this should be several ms at least
+        double m_dSyncOffsetStdDev; // The std dev of the above
 
-        bool m_bHighColorResolution;
-        bool m_bCompositionEnabled;
-        bool m_bDesktopCompositionDisabled;
-        bool m_bIsFullscreen;
-        bool m_bNeedCheckSample;
+        size_t m_upHighColorResolution;
+        size_t m_upDesktopCompositionDisabled;
+        size_t m_upIsFullscreen;
+        BOOL m_boCompositionEnabled;
         DWORD m_dMainThreadId;
 
         CSize m_ScreenSize;
 
         // Display and frame rates and cycles
         double m_dDetectedScanlineTime; // Time for one (horizontal) scan line. Extracted at stream start and used to calculate vsync time
-        UINT m_uD3DRefreshRate;         // As got when creating the d3d device
-        double m_dD3DRefreshCycle;      // Display refresh cycle ms
-        double m_dEstRefreshCycle;      // As estimated from scan lines
-        double m_dFrameCycle;           // Average sample time, extracted from the samples themselves
+        double m_dD3DRefreshRate; // As set when creating the d3d device
+        double m_dD3DRefreshCycle; // Display refresh cycle ms
+        double m_dEstRefreshCycle; // As estimated from scan lines
+        double m_dFrameCycle; // Average sample time, extracted from the samples themselves
         // double m_fps is defined in ISubPic.h
-        double m_dOptimumDisplayCycle;  // The display cycle that is closest to the frame rate. A multiple of the actual display cycle
-        double m_dCycleDifference;      // Difference in video and display cycle time relative to the video cycle time
+        double m_dOptimumDisplayCycle; // The display cycle that is closest to the frame rate. A multiple of the actual display cycle
+        double m_dCycleDifference; // Difference in video and display cycle time relative to the video cycle time
 
         UINT m_pcFramesDropped;
         UINT m_pcFramesDuplicated;
         UINT m_pcFramesDrawn;
 
-        LONGLONG m_pllJitter [NB_JITTER];     // Vertical sync time stats
-        LONGLONG m_pllSyncOffset [NB_JITTER]; // Sync offset time stats
-        int m_nNextJitter;
-        int m_nNextSyncOffset;
-        LONGLONG m_JitterStdDev;
+        LONGLONG m_llJitter[NB_JITTER]; // Vertical sync time stats
+        LONGLONG m_llSyncOffset[NB_JITTER]; // Sync offset time stats
+        size_t m_upNextJitter;
+        size_t m_upNextSyncOffset;
 
         LONGLONG m_llLastSyncTime;
 
-        LONGLONG m_MaxJitter;
-        LONGLONG m_MinJitter;
-        LONGLONG m_MaxSyncOffset;
-        LONGLONG m_MinSyncOffset;
-        UINT m_uSyncGlitches;
+        LONGLONG m_llMaxJitter;
+        LONGLONG m_llMinJitter;
+        LONGLONG m_llMaxSyncOffset;
+        LONGLONG m_llMinSyncOffset;
+        size_t m_upSyncGlitches;
 
         LONGLONG m_llSampleTime, m_llLastSampleTime; // Present time for the current sample
-        LONG m_lSampleLatency, m_lLastSampleLatency; // Time between intended and actual presentation time
-        LONG m_lMinSampleLatency, m_lLastMinSampleLatency;
+        long m_lSampleLatency, m_lLastSampleLatency; // Time between intended and actual presentation time
+        long m_lMinSampleLatency, m_lLastMinSampleLatency;
         LONGLONG m_llHysteresis;
-        LONG m_lHysteresis;
-        LONG m_lShiftToNearest, m_lShiftToNearestPrev;
+        long m_lHysteresis;
+        long m_lShiftToNearest, m_lShiftToNearestPrev;
         bool m_bVideoSlowerThanDisplay;
 
-        int m_bInterlaced;
+        size_t m_upInterlaced;
         double m_TextScale;
         CString  m_strStatsMsg[10];
 
-        CGenlock* m_pGenlock;                 // The video - display synchronizer class
+        CGenlock* m_pGenlock; // The video - display synchronizer class
         CComPtr<IReferenceClock> m_pRefClock; // The reference clock. Used in Paint()
         CComPtr<IAMAudioRendererStats> m_pAudioStats; // Audio statistics from audio renderer. To check so that audio is in sync
-        DWORD m_lAudioLag;                    // Time difference between audio and video when the audio renderer is matching rate to the external reference clock
-        long m_lAudioLagMin, m_lAudioLagMax;  // The accumulated difference between the audio renderer and the master clock
-        DWORD m_lAudioSlaveMode;              // To check whether the audio renderer matches rate with SyncClock (returns the value 4 if it does)
+        DWORD m_lAudioLag; // Time difference between audio and video when the audio renderer is matching rate to the external reference clock
+        long m_lAudioLagMin, m_lAudioLagMax; // The accumulated difference between the audio renderer and the master clock
+        DWORD m_lAudioSlaveMode; // To check whether the audio renderer matches rate with SyncClock (returns the value 4 if it does)
 
-        double GetRefreshRate();              // Get the best estimate of the display refresh rate in Hz
-        double GetDisplayCycle();             // Get the best estimate of the display cycle time in milliseconds
-        double GetCycleDifference();          // Get the difference in video and display cycle times.
-        void EstimateRefreshTimings();        // Estimate the times for one scan line and one frame respectively from the actual refresh data
-        bool ExtractInterlaced(const AM_MEDIA_TYPE* pmt);
+        double GetRefreshRate(); // Get the best estimate of the display refresh rate in Hz
+        double GetDisplayCycle(); // Get the best estimate of the display cycle time in milliseconds
+        double GetCycleDifference(); // Get the difference in video and display cycle times.
+        void EstimateRefreshTimings(); // Estimate the times for one scan line and one frame respectively from the actual refresh data
 
     public:
-        CBaseAP(HWND hWnd, bool bFullscreen, HRESULT& hr, CString& _Error);
+        CBaseAP(HWND hWnd, HRESULT* phr, CString& _Error);
         ~CBaseAP();
 
-        CCritSec m_VMR9AlphaBitmapLock;
+        CCritSec m_csVMR9AlphaBitmapLock;
         void UpdateAlphaBitmap();
         void ResetStats();
+        void ResetLocalDevice();
 
         // ISubPicAllocatorPresenter
-        STDMETHODIMP CreateRenderer(IUnknown** ppRenderer);
-        STDMETHODIMP_(bool) Paint(bool fAll);
-        STDMETHODIMP GetDIB(BYTE* lpDib, DWORD* size);
-        STDMETHODIMP SetPixelShader(LPCSTR pSrcData, LPCSTR pTarget);
-        STDMETHODIMP SetPixelShader2(LPCSTR pSrcData, LPCSTR pTarget, bool bScreenSpace);
-        STDMETHODIMP_(bool) ResetDevice();
-        STDMETHODIMP_(bool) DisplayChange();
+        __declspec(nothrow noalias)             HRESULT     GetDIB(__out_opt void* pDib, __inout size_t* pSize);
+        __declspec(nothrow noalias)             HRESULT     SetPixelShader(__in CStringW const* pstrSrcData, __in unsigned __int8 u8RenderStage);
     };
 
     class CSyncAP:
@@ -347,20 +290,22 @@ namespace GothSync
         public IMFVideoDisplayControl,
         public IEVRTrustedVideoPlugin,
         public ISyncClockAdviser
-
     {
     public:
-        CSyncAP(HWND hWnd, bool bFullscreen, HRESULT& hr, CString& _Error);
+        CSyncAP(HWND hWnd, HRESULT* phr, CString& _Error);
         ~CSyncAP();
 
-        DECLARE_IUNKNOWN;
-        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+        // IUnknown
+        __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
-        STDMETHODIMP CreateRenderer(IUnknown** ppRenderer);
-        STDMETHODIMP_(bool) Paint(bool fAll);
-        STDMETHODIMP GetNativeVideoSize(LONG* lpWidth, LONG* lpHeight, LONG* lpARWidth, LONG* lpARHeight);
-        STDMETHODIMP InitializeDevice(AM_MEDIA_TYPE* pMediaType);
-        STDMETHODIMP_(bool) ResetDevice();
+        // ISubPicAllocatorPresenter
+        __declspec(nothrow noalias)             HRESULT     CreateRenderer(__out_opt IBaseFilter** ppRenderer);
+        __declspec(nothrow noalias)             void        ResetDevice();
+
+        STDMETHODIMP GetNativeVideoSize(long* lpWidth, long* lpHeight, long* lpARWidth, long* lpARHeight);
+        HRESULT InitializeDevice();
 
         // IMFClockStateSink
         STDMETHODIMP OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset);
@@ -388,7 +333,7 @@ namespace GothSync
 
         // IMFVideoPresenter
         STDMETHODIMP ProcessMessage(MFVP_MESSAGE_TYPE eMessage, ULONG_PTR ulParam);
-        STDMETHODIMP GetCurrentMediaType(__deref_out  IMFVideoMediaType** ppMediaType);
+        STDMETHODIMP GetCurrentMediaType(__deref_out IMFVideoMediaType** ppMediaType);
 
         // IMFTopologyServiceLookupClient
         STDMETHODIMP InitServicePointers(__in  IMFTopologyServiceLookup* pLookup);
@@ -439,50 +384,47 @@ namespace GothSync
 
     protected:
         void OnResetDevice();
-        MFCLOCK_STATE m_LastClockState;
+        //        MFCLOCK_STATE m_LastClockState;
 
     private:
         // dxva.dll
-        typedef HRESULT(__stdcall* PTR_DXVA2CreateDirect3DDeviceManager9)(UINT* pResetToken, IDirect3DDeviceManager9** ppDeviceManager);
+        typedef HRESULT(WINAPI* PTR_DXVA2CreateDirect3DDeviceManager9)(UINT* pResetToken, IDirect3DDeviceManager9** ppDeviceManager);
         // mf.dll
-        typedef HRESULT(__stdcall* PTR_MFCreatePresentationClock)(IMFPresentationClock** ppPresentationClock);
+        typedef HRESULT(WINAPI* PTR_MFCreatePresentationClock)(IMFPresentationClock** ppPresentationClock);
         // evr.dll
-        typedef HRESULT(__stdcall* PTR_MFCreateDXSurfaceBuffer)(REFIID riid, IUnknown* punkSurface, BOOL fBottomUpWhenLinear, IMFMediaBuffer** ppBuffer);
-        typedef HRESULT(__stdcall* PTR_MFCreateVideoSampleFromSurface)(IUnknown* pUnkSurface, IMFSample** ppSample);
-        typedef HRESULT(__stdcall* PTR_MFCreateVideoMediaType)(const MFVIDEOFORMAT* pVideoFormat, IMFVideoMediaType** ppIVideoMediaType);
+        typedef HRESULT(WINAPI* PTR_MFCreateDXSurfaceBuffer)(REFIID riid, IUnknown* punkSurface, BOOL fBottomUpWhenLinear, IMFMediaBuffer** ppBuffer);
+        typedef HRESULT(WINAPI* PTR_MFCreateVideoSampleFromSurface)(IUnknown* pUnkSurface, IMFSample** ppSample);
         // avrt.dll
-        typedef HANDLE(__stdcall* PTR_AvSetMmThreadCharacteristicsW)(LPCWSTR TaskName, LPDWORD TaskIndex);
-        typedef BOOL (__stdcall* PTR_AvSetMmThreadPriority)(HANDLE AvrtHandle, AVRT_PRIORITY Priority);
-        typedef BOOL (__stdcall* PTR_AvRevertMmThreadCharacteristics)(HANDLE AvrtHandle);
+        typedef HANDLE(WINAPI* PTR_AvSetMmThreadCharacteristicsW)(LPCWSTR TaskName, LPDWORD TaskIndex);
+        typedef BOOL (WINAPI* PTR_AvSetMmThreadPriority)(HANDLE AvrtHandle, AVRT_PRIORITY Priority);
+        typedef BOOL (WINAPI* PTR_AvRevertMmThreadCharacteristics)(HANDLE AvrtHandle);
 
         typedef enum {
-            Started  = State_Running,
-            Stopped  = State_Stopped,
-            Paused   = State_Paused,
+            Started = State_Running,
+            Stopped = State_Stopped,
+            Paused = State_Paused,
             Shutdown = State_Running + 1
         } RENDER_STATE;
 
-        CComPtr<IMFClock> m_pClock;
-        CComPtr<IDirect3DDeviceManager9> m_pD3DManager;
-        CComPtr<IMFTransform> m_pMixer;
-        CComPtr<IMediaEventSink> m_pSink;
-        CComPtr<IMFVideoMediaType> m_pMediaType;
-        MFVideoAspectRatioMode m_dwVideoAspectRatioMode;
+        IMFTransform* m_pMixer;
+        IMFMediaType* m_pMixerType;
+        IMediaEventSink* m_pSink;
+        IMFClock* m_pClock;
+        IDirect3DDeviceManager9* m_pD3DManager;
         MFVideoRenderPrefs m_dwVideoRenderPrefs;
         COLORREF m_BorderColor;
 
-        HANDLE m_hEvtQuit;  // Stop rendering thread event
-        bool m_bEvtQuit;
+        HANDLE m_hEvtQuit; // Stop rendering thread event
         HANDLE m_hEvtFlush; // Discard all buffers
+        HANDLE m_hEvtSkip; // Skip frame
+        bool m_bEvtQuit;
         bool m_bEvtFlush;
-        HANDLE m_hEvtSkip;  // Skip frame
         bool m_bEvtSkip;
 
         bool m_bUseInternalTimer;
-        INT32 m_LastSetOutputRange;
         bool m_bPendingRenegotiate;
         bool m_bPendingMediaFinished;
-        bool m_bPrerolled;  // true if first sample has been displayed.
+        bool m_bPrerolled; // true if first sample has been displayed.
 
         HANDLE m_hRenderThread;
         HANDLE m_hMixerThread;
@@ -494,7 +436,6 @@ namespace GothSync
 
         CInterfaceList<IMFSample, &IID_IMFSample> m_FreeSamples;
         CInterfaceList<IMFSample, &IID_IMFSample> m_ScheduledSamples;
-        IMFSample* m_pCurrentDisplaydSample;
         UINT m_nResetToken;
         int m_nStepCount;
 
@@ -510,7 +451,10 @@ namespace GothSync
         void CompleteFrameStep(bool bCancel);
 
         void RemoveAllSamples();
-        STDMETHODIMP AdviseSyncClock(ISyncClock* sC);
+
+        // ISyncClockAdviser
+        __declspec(nothrow noalias) void AdviseSyncClock(__inout ISyncClock* sC);
+
         HRESULT BeginStreaming();
         HRESULT GetFreeSample(IMFSample** ppSample);
         HRESULT GetScheduledSample(IMFSample** ppSample, int& _Count);
@@ -519,21 +463,13 @@ namespace GothSync
         void FlushSamples();
         void FlushSamplesInternal();
 
-        LONGLONG GetMediaTypeMerit(IMFMediaType* pMediaType);
+        __declspec(nothrow noalias) __int8 GetMediaTypeMerit(IMFMediaType* pMixerType);
         HRESULT RenegotiateMediaType();
-        HRESULT IsMediaTypeSupported(IMFMediaType* pMixerType);
-        HRESULT CreateProposedOutputType(IMFMediaType* pMixerType, IMFMediaType** pType);
-        HRESULT SetMediaType(IMFMediaType* pType);
 
         // Functions pointers for Vista/.NET3 specific library
-        HMODULE m_hDXVA2Lib;
-        HMODULE m_hEVRLib;
-        HMODULE m_hAVRTLib;
-
         PTR_DXVA2CreateDirect3DDeviceManager9 pfDXVA2CreateDirect3DDeviceManager9;
         PTR_MFCreateDXSurfaceBuffer pfMFCreateDXSurfaceBuffer;
         PTR_MFCreateVideoSampleFromSurface pfMFCreateVideoSampleFromSurface;
-        PTR_MFCreateVideoMediaType pfMFCreateVideoMediaType;
 
         PTR_AvSetMmThreadCharacteristicsW pfAvSetMmThreadCharacteristicsW;
         PTR_AvSetMmThreadPriority pfAvSetMmThreadPriority;
@@ -542,7 +478,7 @@ namespace GothSync
 
     class CSyncRenderer:
         public CUnknown,
-        public IVMRffdshow9,
+        public IVMRffdshow9,// uses default function declared for IVMRffdshow9
         public IVMRMixerBitmap9,
         public IBaseFilter
     {
@@ -568,18 +504,40 @@ namespace GothSync
         virtual HRESULT STDMETHODCALLTYPE GetSyncSource(__deref_out_opt  IReferenceClock** pClock);
         virtual HRESULT STDMETHODCALLTYPE GetClassID(__RPC__out CLSID* pClassID);
 
-        // IVMRffdshow9
-        virtual HRESULT STDMETHODCALLTYPE support_ffdshow();
-
         // IVMRMixerBitmap9
         STDMETHODIMP GetAlphaBitmapParameters(VMR9AlphaBitmap* pBmpParms);
         STDMETHODIMP SetAlphaBitmap(const VMR9AlphaBitmap*  pBmpParms);
         STDMETHODIMP UpdateAlphaBitmapParameters(const VMR9AlphaBitmap* pBmpParms);
 
-        DECLARE_IUNKNOWN;
-        virtual HRESULT STDMETHODCALLTYPE NonDelegatingQueryInterface(REFIID riid, void** ppvObject);
+        // IUnknown
+        __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv) {
+            return GetOwner()->QueryInterface(riid, ppv);
+        }
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef() {
+            return GetOwner()->AddRef();
+        }
+        __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release() {
+            return GetOwner()->Release();
+        }
+        __declspec(nothrow noalias) STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, __deref_out void** ppv) {
+            ASSERT(ppv);
+
+            __assume(this);// fix assembly: the compiler generated tests for null pointer input on static_cast<T>(this)
+            ASSERT(m_pEVR);
+            HRESULT hr;
+            if (riid == IID_IVMRMixerBitmap9) { *ppv = static_cast<IVMRMixerBitmap9*>(this); }
+            else if (riid == IID_IVMRffdshow9) { *ppv = static_cast<IVMRffdshow9*>(this); }
+            else if (riid == IID_IBaseFilter) { *ppv = static_cast<IBaseFilter*>(this); }
+            else if (riid == IID_IMediaFilter) { *ppv = static_cast<IMediaFilter*>(this); }
+            else if (riid == IID_IPersist) { *ppv = static_cast<IPersist*>(this); }
+            else if (SUCCEEDED(hr = m_pEVR->QueryInterface(riid, ppv))) { return hr; }
+            else { return __super::NonDelegatingQueryInterface(riid, ppv); }
+            GetOwner()->AddRef();
+            return NOERROR;
+        }
     };
 
+#define GENLOCK_MAX_FIFO_SIZE 1024
     class CGenlock
     {
     public:
@@ -590,10 +548,10 @@ namespace GothSync
                 fifoSize(size),
                 oldestSample(0),
                 sum(0) {
-                if (fifoSize > MAX_FIFO_SIZE) {
-                    fifoSize = MAX_FIFO_SIZE;
+                if (fifoSize > GENLOCK_MAX_FIFO_SIZE) {
+                    fifoSize = GENLOCK_MAX_FIFO_SIZE;
                 }
-                for (int i = 0; i < MAX_FIFO_SIZE; i++) {
+                for (int i = 0; i < GENLOCK_MAX_FIFO_SIZE; i++) {
                     fifo[i] = 0;
                 }
             }
@@ -612,43 +570,47 @@ namespace GothSync
             }
 
         private:
-            int fifoSize;
-            double fifo[MAX_FIFO_SIZE];
-            int oldestSample;
+            double fifo[GENLOCK_MAX_FIFO_SIZE];
             double sum;
+            int fifoSize;
+            int oldestSample;
         };
 
-        CGenlock(double target, double limit, int rowD, int colD, double clockD, UINT mon);
+        CGenlock(CRenderersSettings const* pkRendererSettings, double target, double limit, int rowD, int colD, double clockD, UINT mon);
         ~CGenlock();
 
-        BOOL PowerstripRunning();   // TRUE if PowerStrip is running
-        HRESULT GetTiming();        // Get the string representing the display's current timing parameters
-        HRESULT ResetTiming();      // Reset timing to what was last registered by GetTiming()
-        HRESULT ResetClock();       // Reset reference clock speed to nominal
+        BOOL PowerstripRunning(); // TRUE if PowerStrip is running
+        HRESULT GetTiming(); // Get the string representing the display's current timing parameters
+        HRESULT ResetTiming(); // Reset timing to what was last registered by GetTiming()
+        HRESULT ResetClock(); // Reset reference clock speed to nominal
         HRESULT SetTargetSyncOffset(double targetD);
         HRESULT GetTargetSyncOffset(double* targetD);
         HRESULT SetControlLimit(double cL);
         HRESULT GetControlLimit(double* cL);
         HRESULT SetDisplayResolution(UINT columns, UINT lines);
-        HRESULT AdviseSyncClock(ISyncClock* sC);
+
+        // ISyncClockAdviser
+        __declspec(nothrow noalias) void AdviseSyncClock(__inout ISyncClock* sC);
+
         HRESULT SetMonitor(UINT mon); // Set the number of the monitor to synchronize
-        HRESULT ResetStats();         // Reset timing statistics
+        HRESULT ResetStats(); // Reset timing statistics
 
         HRESULT ControlDisplay(double syncOffset, double frameCycle); // Adjust the frequency of the display if needed
-        HRESULT ControlClock(double syncOffset, double frameCycle);   // Adjust the frequency of the clock if needed
-        HRESULT UpdateStats(double syncOffset, double frameCycle);    // Don't adjust anything, just update the syncOffset stats
+        HRESULT ControlClock(double syncOffset, double frameCycle); // Adjust the frequency of the clock if needed
+        HRESULT UpdateStats(double syncOffset, double frameCycle); // Don't adjust anything, just update the syncOffset stats
 
-        BOOL powerstripTimingExists;        // TRUE if display timing has been got through Powerstrip
-        BOOL liveSource;                    // TRUE if live source -> display sync is the only option
-        int adjDelta;                       // -1 for display slower in relation to video, 0 for keep, 1 for faster
-        int lineDelta;                      // The number of rows added or subtracted when adjusting display fps
-        int columnDelta;                    // The number of colums added or subtracted when adjusting display fps
-        double cycleDelta;                  // Adjustment factor for cycle time as fraction of nominal value
-        UINT displayAdjustmentsMade;        // The number of adjustments made to display refresh rate
-        UINT clockAdjustmentsMade;          // The number of adjustments made to clock frequency
+        BOOL powerstripTimingExists; // TRUE if display timing has been got through Powerstrip
+        BOOL liveSource; // TRUE if live source -> display sync is the only option
+        int adjDelta; // -1 for display slower in relation to video, 0 for keep, 1 for faster
+        int lineDelta; // The number of rows added or subtracted when adjusting display fps
+        int columnDelta; // The number of colums added or subtracted when adjusting display fps
+        double cycleDelta; // Adjustment factor for cycle time as fraction of nominal value
+        UINT displayAdjustmentsMade; // The number of adjustments made to display refresh rate
+        UINT clockAdjustmentsMade; // The number of adjustments made to clock frequency
 
-        UINT totalLines, totalColumns;      // Including the porches and sync widths
-        UINT visibleLines, visibleColumns;  // The nominal resolution
+        UINT totalLines, totalColumns; // Including the porches and sync widths
+        UINT visibleLines, visibleColumns; // The nominal resolution
+        CRenderersSettings const* const mk_pRendererSettings;
         MovingAverage* syncOffsetFifo;
         MovingAverage* frameCycleFifo;
         double minSyncOffset, maxSyncOffset;
@@ -656,28 +618,30 @@ namespace GothSync
         double minFrameCycle, maxFrameCycle;
         double frameCycleAvg;
 
-        UINT pixelClock;                // In pixels/s
-        double displayFreqCruise;       // Nominal display frequency in frames/s
+        UINT pixelClock; // In pixels/s
+        double displayFreqCruise;  // Nominal display frequency in frames/s
         double displayFreqSlower;
         double displayFreqFaster;
-        double curDisplayFreq;          // Current (adjusted) display frequency
-        double controlLimit;            // How much the sync offset is allowed to drift from target sync offset
-        WPARAM monitor;                 // The monitor to be controlled. 0-based.
-        CComPtr<ISyncClock> syncClock;  // Interface to an adjustable reference clock
+        double curDisplayFreq; // Current (adjusted) display frequency
+        double controlLimit; // How much the sync offset is allowed to drift from target sync offset
+        WPARAM monitor; // The monitor to be controlled. 0-based.
+        CComPtr<ISyncClock> syncClock; // Interface to an adjustable reference clock
 
     private:
         HWND psWnd; // PowerStrip window
         const static int TIMING_PARAM_CNT = 10;
         const static int MAX_LOADSTRING = 100;
-        UINT displayTiming[TIMING_PARAM_CNT];       // Display timing parameters
-        UINT displayTimingSave[TIMING_PARAM_CNT];   // So that we can reset the display at exit
-        TCHAR faster[MAX_LOADSTRING];       // String corresponding to faster display frequency
-        TCHAR cruise[MAX_LOADSTRING];       // String corresponding to nominal display frequency
-        TCHAR slower[MAX_LOADSTRING];       // String corresponding to slower display frequency
-        TCHAR savedTiming[MAX_LOADSTRING];  // String version of saved timing (to be restored upon exit)
-        double lowSyncOffset;               // The closest we want to let the scheduled render time to get to the next vsync. In % of the frame time
-        double targetSyncOffset;            // Where we want the scheduled render time to be in relation to the next vsync
-        double highSyncOffset;              // The furthers we want to let the scheduled render time to get to the next vsync
+        UINT displayTiming[TIMING_PARAM_CNT]; // Display timing parameters
+        UINT displayTimingSave[TIMING_PARAM_CNT]; // So that we can reset the display at exit
+        TCHAR faster[MAX_LOADSTRING]; // String corresponding to faster display frequency
+        TCHAR cruise[MAX_LOADSTRING]; // String corresponding to nominal display frequency
+        TCHAR slower[MAX_LOADSTRING]; // String corresponding to slower display frequency
+        TCHAR savedTiming[MAX_LOADSTRING]; // String version of saved timing (to be restored upon exit)
+        double lowSyncOffset; // The closest we want to let the scheduled render time to get to the next vsync. In % of the frame time
+        double targetSyncOffset; // Where we want the scheduled render time to be in relation to the next vsync
+        double highSyncOffset; // The furthers we want to let the scheduled render time to get to the next vsync
         CCritSec csGenlockLock;
     };
 }
+
+__declspec(nothrow noalias) HRESULT CreateEVRS(HWND hWnd, GothSync::CSyncAP** ppAP);
