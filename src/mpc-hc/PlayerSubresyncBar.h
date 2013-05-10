@@ -42,7 +42,7 @@ private:
     CCritSec* m_pSubLock;
     CComPtr<ISubStream> m_pSubStream;
 
-    int m_lastSegment;
+    size_t m_lastSegment;
     __int64 m_rt;
 
     enum {

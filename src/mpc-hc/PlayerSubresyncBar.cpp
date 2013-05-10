@@ -33,7 +33,7 @@ CPlayerSubresyncBar::CPlayerSubresyncBar()
     , m_mode(0)
     , m_rt(0)
     , m_fUnlink(false)
-    , m_lastSegment(-1)
+    , m_lastSegment(MAXSIZE_T)
 {
 }
 
@@ -43,7 +43,9 @@ CPlayerSubresyncBar::~CPlayerSubresyncBar()
 
 BOOL CPlayerSubresyncBar::Create(CWnd* pParentWnd, UINT defDockBarID, CCritSec* pSubLock)
 {
-    if (!__super::Create(ResStr(IDS_SUBRESYNC_CAPTION), pParentWnd, ID_VIEW_SUBRESYNC, defDockBarID, _T("Subresync"))) {
+    LPCTSTR name;
+    LoadString(NULL, IDS_SUBRESYNC_CAPTION, reinterpret_cast<LPTSTR>(&name), 0);// get const pointer to resource
+    if (!__super::Create(name, pParentWnd, ID_VIEW_SUBRESYNC, defDockBarID, _T("Subresync"))) {
         return FALSE;
     }
 
@@ -87,10 +89,10 @@ BOOL CPlayerSubresyncBar::PreTranslateMessage(MSG* pMsg)
 void CPlayerSubresyncBar::SetTime(__int64 rt)
 {
     m_rt = rt;
-    int curSegment;
+    size_t curSegment;
 
-    if (!m_sts.SearchSubs((int)(rt / 10000), 25, &curSegment)) {
-        curSegment = -1;
+    if (!m_sts.SearchSubs(rt / 10000, 25.0, &curSegment)) {
+        curSegment = MAXSIZE_T;
     }
 
     if (m_lastSegment != curSegment) {
@@ -103,7 +105,7 @@ void CPlayerSubresyncBar::SetSubtitle(ISubStream* pSubStream, double fps)
 {
     m_pSubStream = pSubStream;
     m_mode = NONE;
-    m_lastSegment = -1;
+    m_lastSegment = MAXSIZE_T;
     m_sts.Empty();
 
     ResetSubtitle();
@@ -256,7 +258,7 @@ void CPlayerSubresyncBar::SaveSubtitle()
         return;
     }
 
-    pFrame->InvalidateSubtitle();
+    pFrame->InvalidateSubtitlePic();
 }
 
 void CPlayerSubresyncBar::UpdatePreview()
@@ -786,17 +788,29 @@ void CPlayerSubresyncBar::OnRclickList(NMHDR* pNMHDR, LRESULT* pResult)
             case COL_START:
                 if (m_mode == VOBSUB || m_mode == TEXTSUB) {
                     m.AppendMenu(MF_SEPARATOR);
-                    m.AppendMenu(MF_STRING | MF_ENABLED, RESETS, ResStr(IDS_SUBRESYNC_RESET) + _T("\tF1"));
-                    m.AppendMenu(MF_STRING | MF_ENABLED, SETOS, ResStr(IDS_SUBRESYNC_ORIGINAL) + _T("\tF3"));
-                    m.AppendMenu(MF_STRING | MF_ENABLED, SETCS, ResStr(IDS_SUBRESYNC_CURRENT) + _T("\tF5"));
+                    CString menutext(MAKEINTRESOURCE(IDS_SUBRESYNC_RESET));
+                    menutext += _T("\tF1");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, RESETS, menutext);
+                    menutext.SetString(MAKEINTRESOURCE(IDS_SUBRESYNC_ORIGINAL));
+                    menutext += _T("\tF3");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, SETOS, menutext);
+                    menutext.SetString(MAKEINTRESOURCE(IDS_SUBRESYNC_CURRENT));
+                    menutext += _T("\tF5");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, SETCS, menutext);
                 }
                 break;
             case COL_END:
                 if (m_mode == TEXTSUB) {
                     m.AppendMenu(MF_SEPARATOR);
-                    m.AppendMenu(MF_STRING | MF_ENABLED, RESETE, ResStr(IDS_SUBRESYNC_RESET) + _T("\tF2"));
-                    m.AppendMenu(MF_STRING | MF_ENABLED, SETOE, ResStr(IDS_SUBRESYNC_ORIGINAL) + _T("\tF4"));
-                    m.AppendMenu(MF_STRING | MF_ENABLED, SETCE, ResStr(IDS_SUBRESYNC_CURRENT) + _T("\tF6"));
+                    CString menutext(MAKEINTRESOURCE(IDS_SUBRESYNC_RESET));
+                    menutext += _T("\tF2");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, RESETE, menutext);
+                    menutext.SetString(MAKEINTRESOURCE(IDS_SUBRESYNC_ORIGINAL));
+                    menutext += _T("\tF4");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, SETOE, menutext);
+                    menutext.SetString(MAKEINTRESOURCE(IDS_SUBRESYNC_CURRENT));
+                    menutext += _T("\tF6");
+                    m.AppendMenu(MF_STRING | MF_ENABLED, SETCE, menutext);
                 }
                 break;
             case COL_STYLE:

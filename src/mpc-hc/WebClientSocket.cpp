@@ -853,74 +853,89 @@ bool CWebClientSocket::OnSnapShotJpeg(CStringA& hdr, CStringA& body, CStringA& m
 {
     // TODO: add quality control and return logo when nothing is loaded
 
-    bool fRet = false;
+    void* pData = NULL;
+    if (!m_pMainFrame->GetDIB(&pData, true)) {
+        return false;
+    }
+    BITMAPINFOHEADER* bih = reinterpret_cast<BITMAPINFOHEADER*>(pData);
 
-    BYTE* pData = nullptr;
-    long size = 0;
-    if (m_pMainFrame->GetDIB(&pData, size, true)) {
-        PBITMAPINFO bi = reinterpret_cast<PBITMAPINFO>(pData);
-        PBITMAPINFOHEADER bih = &bi->bmiHeader;
+    ULONG w = bih->biWidth;
+    ptrdiff_t srcpitch = w;
+    size_t bpp = bih->biBitCount;
+    if (bpp == 16) {
+        srcpitch <<= 1;
+    } else if (bpp == 24) {
+        srcpitch += srcpitch << 1;
+    } else if (bpp == 32) {
+        srcpitch <<= 2;
+    } else {
+        _aligned_free(pData);
+        return false;
+    }
 
-        int bpp = bih->biBitCount;
-        if (bpp != 16 && bpp != 24 && bpp != 32) {
+    ULONG h = abs(bih->biHeight);
+    BYTE* p = reinterpret_cast<BYTE*>(malloc(w * h * 4));
+    if (!p) {
+        _aligned_free(pData);
+        return false;
+    }
+    size_t dstpitch = w << 2;
+    BYTE* src = reinterpret_cast<BYTE*>(bih + 1);
+
+    BitBltFromRGBToRGB(w, h, p, dstpitch, 32, src + srcpitch * (h - 1), -srcpitch, bpp);
+    _aligned_free(pData);
+
+    IStream* pStream;
+    {
+        CBitmap bmp;
+        BOOL b = bmp.CreateBitmap(w, h, bih->biPlanes, bpp, p);
+        free(p);
+        if (!b) {
             return false;
         }
-        int w = bih->biWidth;
-        int h = abs(bih->biHeight);
-        BYTE* p = DEBUG_NEW BYTE[w * h * 4];
 
-        const BYTE* src = pData + sizeof(*bih);
-        if (bpp <= 8) {
-            if (bih->biClrUsed) {
-                src += bih->biClrUsed * sizeof(bi->bmiColors[0]);
-            } else {
-                src += (1 << bpp) * DWORD(sizeof(bi->bmiColors[0]));
-            }
+        CImage img;
+        img.Attach(bmp);
+
+        if (FAILED(CreateStreamOnHGlobal(nullptr, TRUE, &pStream))) {
+            return false;
         }
 
-        int srcpitch = w * (bpp >> 3);
-        int dstpitch = w * 4;
-
-        BitBltFromRGBToRGB(w, h, p, dstpitch, 32, (BYTE*)src + srcpitch * (h - 1), -srcpitch, bpp);
-
-        {
-            CBitmap bmp;
-            bmp.CreateBitmap(w, h, bih->biPlanes, bpp, p);
-            delete [] p;
-
-            CImage img;
-            img.Attach(bmp);
-            IStream* pStream = nullptr;
-            CByteArray ba;
-            if (SUCCEEDED(CreateStreamOnHGlobal(nullptr, TRUE, &pStream))) {
-                if (SUCCEEDED(img.Save(pStream, Gdiplus::ImageFormatJPEG))) {
-                    ULARGE_INTEGER ulnSize;
-                    LARGE_INTEGER lnOffset;
-                    lnOffset.QuadPart = 0;
-                    if (SUCCEEDED(pStream->Seek(lnOffset, STREAM_SEEK_END, &ulnSize))) {
-                        if (SUCCEEDED(pStream->Seek(lnOffset, STREAM_SEEK_SET, 0))) {
-                            ULONG ulBytesRead;
-                            ba.SetSize((INT_PTR)ulnSize.QuadPart);
-                            pStream->Read(ba.GetData(), (INT_PTR)ulnSize.QuadPart, &ulBytesRead);
-                        }
-                    }
-                }
-            }
-
+        if (FAILED(img.Save(pStream, Gdiplus::ImageFormatJPEG))) {
             pStream->Release();
-            delete [] pData;
-
-            hdr +=
-                "Expires: Thu, 19 Nov 1981 08:52:00 GMT\r\n"
-                "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0\r\n"
-                "Pragma: no-cache\r\n";
-            body = CStringA((char*)ba.GetData(), (int)ba.GetCount());
-            mime = "image/jpeg";
-            fRet = true;
+            return false;
         }
     }
 
-    return fRet;
+    ULARGE_INTEGER ulnSize;
+    LARGE_INTEGER lnOffset;
+    lnOffset.QuadPart = 0;
+    if (FAILED(pStream->Seek(lnOffset, STREAM_SEEK_END, &ulnSize))) {
+        pStream->Release();
+        return false;
+    }
+
+    if (FAILED(pStream->Seek(lnOffset, STREAM_SEEK_SET, 0))) {
+        pStream->Release();
+        return false;
+    }
+
+    CByteArray ba;
+    ULONG ulBytesRead;
+    ba.SetSize((INT_PTR)ulnSize.QuadPart);
+    HRESULT hr = pStream->Read(ba.GetData(), (INT_PTR)ulnSize.QuadPart, &ulBytesRead);
+    pStream->Release();
+    if (FAILED(hr)) {
+        return false;
+    }
+
+    hdr +=
+        "Expires: Thu, 19 Nov 1981 08:52:00 GMT\r\n"
+        "Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0\r\n"
+        "Pragma: no-cache\r\n";
+    body = CStringA((char*)ba.GetData(), ba.GetCount());
+    mime = "image/jpeg";
+    return true;
 }
 
 bool CWebClientSocket::OnViewRes(CStringA& hdr, CStringA& body, CStringA& mime)

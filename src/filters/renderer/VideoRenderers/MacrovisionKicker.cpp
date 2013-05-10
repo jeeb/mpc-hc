@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -22,70 +22,113 @@
 #include "stdafx.h"
 #include "MacrovisionKicker.h"
 
-
 //
 // CMacrovisionKicker
 //
 
-CMacrovisionKicker::CMacrovisionKicker(const TCHAR* pName, LPUNKNOWN pUnk)
-    : CUnknown(pName, pUnk)
-{
-}
+// IUnknown
 
-CMacrovisionKicker::~CMacrovisionKicker()
+__declspec(nothrow noalias) STDMETHODIMP CMacrovisionKicker::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-}
+    ASSERT(ppv);
+    __assume(this);// fix assembly: the compiler generated tests for null pointer input on static_cast<T>(this)
 
-void CMacrovisionKicker::SetInner(IUnknown* pUnk)
-{
-    m_pInner = pUnk;
-}
-
-STDMETHODIMP CMacrovisionKicker::NonDelegatingQueryInterface(REFIID riid, void** ppv)
-{
-    if (riid == __uuidof(IUnknown)) {
-        return __super::NonDelegatingQueryInterface(riid, ppv);
+    __int64 lo = reinterpret_cast<__int64 const*>(&riid)[0], hi = reinterpret_cast<__int64 const*>(&riid)[1];
+    void* pv = static_cast<IUnknown*>(this);// m_pInner may not take IUnknown
+    if (lo == reinterpret_cast<__int64 const*>(&IID_IUnknown)[0] && hi == reinterpret_cast<__int64 const*>(&IID_IUnknown)[1]) {
+        goto exit;
     }
-    if (riid == __uuidof(IKsPropertySet) && CComQIPtr<IKsPropertySet>(m_pInner)) {
-        return GetInterface((IKsPropertySet*)this, ppv);
+    pv = static_cast<IKsPropertySet*>(this);
+    if (lo == reinterpret_cast<__int64 const*>(&IID_IKsPropertySet)[0] && hi == reinterpret_cast<__int64 const*>(&IID_IKsPropertySet)[1]) {
+        goto exit;
     }
+    // lastly, try the external renderer
+    if (!m_pInner) {
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+    return m_pInner->QueryInterface(riid, ppv);
+exit:
+    *ppv = pv;
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
+}
 
-    HRESULT hr = m_pInner ? m_pInner->QueryInterface(riid, ppv) : E_NOINTERFACE;
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CMacrovisionKicker::AddRef()
+{
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
+}
 
-    return SUCCEEDED(hr) ? hr : __super::NonDelegatingQueryInterface(riid, ppv);
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CMacrovisionKicker::Release()
+{
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
+
+        delete this;
+        return 0;
+    } else {
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
+    }
 }
 
 // IKsPropertySet
 
-STDMETHODIMP CMacrovisionKicker::Set(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength)
+__declspec(nothrow noalias) STDMETHODIMP CMacrovisionKicker::Set(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength)
 {
-    if (CComQIPtr<IKsPropertySet> pKsPS = m_pInner) {
-        if (PropSet == AM_KSPROPSETID_CopyProt && Id == AM_PROPERTY_COPY_MACROVISION
-                /*&& DataLength == 4 && *(DWORD*)pPropertyData*/) {
-            TRACE(_T("Oops, no-no-no, no macrovision please\n"));
-            return S_OK;
-        }
-
-        return pKsPS->Set(PropSet, Id, pInstanceData, InstanceLength, pPropertyData, DataLength);
+    IKsPropertySet* pKsPS;
+    if (SUCCEEDED(m_pInner->QueryInterface(IID_IKsPropertySet, reinterpret_cast<void**>(&pKsPS)))) {
+        HRESULT hr;
+        if (PropSet == AM_KSPROPSETID_CopyProt && Id == AM_PROPERTY_COPY_MACROVISION) {
+            TRACE(L"Oops, no-no-no, no macrovision please\n");
+            hr = S_OK;
+        } else { hr = pKsPS->Set(PropSet, Id, pInstanceData, InstanceLength, pPropertyData, DataLength); }
+        pKsPS->Release();
+        return hr;
     }
-
     return E_UNEXPECTED;
 }
 
-STDMETHODIMP CMacrovisionKicker::Get(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength, ULONG* pBytesReturned)
+__declspec(nothrow noalias) STDMETHODIMP CMacrovisionKicker::Get(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength, ULONG* pBytesReturned)
 {
-    if (CComQIPtr<IKsPropertySet> pKsPS = m_pInner) {
-        return pKsPS->Get(PropSet, Id, pInstanceData, InstanceLength, pPropertyData, DataLength, pBytesReturned);
+    IKsPropertySet* pKsPS;
+    if (SUCCEEDED(m_pInner->QueryInterface(IID_IKsPropertySet, reinterpret_cast<void**>(&pKsPS)))) {
+        HRESULT hr = pKsPS->Get(PropSet, Id, pInstanceData, InstanceLength, pPropertyData, DataLength, pBytesReturned);
+        pKsPS->Release();
+        return hr;
     }
-
     return E_UNEXPECTED;
 }
 
-STDMETHODIMP CMacrovisionKicker::QuerySupported(REFGUID PropSet, ULONG Id, ULONG* pTypeSupport)
+__declspec(nothrow noalias) STDMETHODIMP CMacrovisionKicker::QuerySupported(REFGUID PropSet, ULONG Id, ULONG* pTypeSupport)
 {
-    if (CComQIPtr<IKsPropertySet> pKsPS = m_pInner) {
-        return pKsPS->QuerySupported(PropSet, Id, pTypeSupport);
+    IKsPropertySet* pKsPS;
+    if (SUCCEEDED(m_pInner->QueryInterface(IID_IKsPropertySet, reinterpret_cast<void**>(&pKsPS)))) {
+        HRESULT hr = pKsPS->QuerySupported(PropSet, Id, pTypeSupport);
+        pKsPS->Release();
+        return hr;
     }
-
     return E_UNEXPECTED;
 }

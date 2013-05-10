@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2012 see Authors.txt
+ * (C) 2010-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -20,13 +20,10 @@
 
 #pragma once
 
-// {F9F62627-E3EF-4a2e-B6C9-5D4C0DC3326B}
-DEFINE_GUID(CLSID_SyncAllocatorPresenter, 0xf9f62627, 0xe3ef, 0x4a2e, 0xb6, 0xc9, 0x5d, 0x4c, 0xd, 0xc3, 0x32, 0x6b);
+#include "..\SyncClock\Interfaces.h"
 
-interface __declspec(uuid("F891C2A9-1DFF-45e0-9129-30C0990C5A9F"))
+interface __declspec(uuid("F891C2A9-1DFF-45E0-9129-30C0990C5A9F") novtable)
 ISyncClockAdviser :
 public IUnknown {
-    STDMETHOD(AdviseSyncClock)(ISyncClock * sC) PURE;
+    virtual __declspec(nothrow noalias) void AdviseSyncClock(__inout ISyncClock * sC) = 0;
 };
-
-HRESULT CreateSyncRenderer(const CLSID& clsid, HWND hWnd, bool bFullscreen, ISubPicAllocatorPresenter** ppAP);

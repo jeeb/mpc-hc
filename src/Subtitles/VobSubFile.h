@@ -23,7 +23,7 @@
 
 #include <atlcoll.h>
 #include "VobSubImage.h"
-#include "../SubPic/SubPicProviderImpl.h"
+#include "../SubPic/ISubPic.h"
 
 #define VOBSUBIDXVER 7
 
@@ -57,7 +57,7 @@ public:
     int m_fadein, m_fadeout;    // ms
     bool m_fAlign;
     int m_alignhor, m_alignver; // 0: left/top, 1: center, 2: right/bottom
-    unsigned int m_toff;        // ms
+    unsigned int m_toff;                // ms
     bool m_fOnlyShowForcedSubs;
     bool m_fCustomPal;
     int m_tridx;
@@ -78,7 +78,10 @@ public:
 };
 
 class __declspec(uuid("998D4C9A-460F-4de6-BDCD-35AB24F94ADF"))
-    CVobSubFile : public CVobSubSettings, public ISubStream, public CSubPicProviderImpl
+    CVobSubFile
+    : public CSubPicProviderImpl
+    , public CVobSubSettings
+    , public ISubStream
 {
 protected:
     CString m_title;
@@ -90,9 +93,10 @@ protected:
     CMemFile m_sub;
 
     BYTE* GetPacket(int idx, int& packetsize, int& datasize, int iLang = -1);
-    bool GetFrame(int idx, int iLang = -1);
+    bool InspectFrame(__in const uintptr_t idx) const;// lighter version of "GetFrame", only for inspector class types
+    bool GetFrame(__in const uintptr_t idx);
     bool GetFrameByTimeStamp(__int64 time);
-    int GetFrameIdxByTimeStamp(__int64 time);
+    int GetFrameIdxByTimeStamp(__int64 time) const;
 
     bool SaveVobSub(CString fn, int delay);
     bool SaveWinSubMux(CString fn, int delay);
@@ -138,30 +142,35 @@ public:
 
     CString GetTitle() { return m_title; }
 
-    DECLARE_IUNKNOWN
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+    // IUnknown
+    __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
-    // ISubPicProvider
-    STDMETHODIMP_(POSITION) GetStartPosition(REFERENCE_TIME rt, double fps);
-    STDMETHODIMP_(POSITION) GetNext(POSITION pos);
-    STDMETHODIMP_(REFERENCE_TIME) GetStart(POSITION pos, double fps);
-    STDMETHODIMP_(REFERENCE_TIME) GetStop(POSITION pos, double fps);
-    STDMETHODIMP_(bool) IsAnimated(POSITION pos);
-    STDMETHODIMP Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox);
+    // CSubPicProviderImpl
+    __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 rt, __in double fps);
+    __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const;
+    __declspec(nothrow noalias) __int64 GetStart(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) __int64 GetStop(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) bool IsAnimated(__in POSITION pos) const;
+    __declspec(nothrow noalias) HRESULT Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox);
 
     // IPersist
     STDMETHODIMP GetClassID(CLSID* pClassID);
 
     // ISubStream
-    STDMETHODIMP_(int) GetStreamCount();
-    STDMETHODIMP GetStreamInfo(int i, WCHAR** ppName, LCID* pLCID);
-    STDMETHODIMP_(int) GetStream();
-    STDMETHODIMP SetStream(int iStream);
-    STDMETHODIMP Reload();
+    __declspec(nothrow noalias) size_t GetStreamCount() const;
+    __declspec(nothrow noalias) HRESULT GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const;
+    __declspec(nothrow noalias) size_t GetStream() const;
+    __declspec(nothrow noalias) HRESULT SetStream(__in size_t upStream);
+    __declspec(nothrow noalias) HRESULT Reload();
 };
 
 class __declspec(uuid("D7FBFB45-2D13-494F-9B3D-FFC9557D5C45"))
-    CVobSubStream : public CVobSubSettings, public ISubStream, public CSubPicProviderImpl
+    CVobSubStream
+    : public CSubPicProviderImpl
+    , public CVobSubSettings
+    , public ISubStream
 {
     CString m_name;
 
@@ -181,24 +190,26 @@ public:
     void Add(REFERENCE_TIME tStart, REFERENCE_TIME tStop, BYTE* pData, int len);
     void RemoveAll();
 
-    DECLARE_IUNKNOWN
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+    // IUnknown
+    __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
     // ISubPicProvider
-    STDMETHODIMP_(POSITION) GetStartPosition(REFERENCE_TIME rt, double fps);
-    STDMETHODIMP_(POSITION) GetNext(POSITION pos);
-    STDMETHODIMP_(REFERENCE_TIME) GetStart(POSITION pos, double fps);
-    STDMETHODIMP_(REFERENCE_TIME) GetStop(POSITION pos, double fps);
-    STDMETHODIMP_(bool) IsAnimated(POSITION pos);
-    STDMETHODIMP Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox);
+    __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 rt, __in double fps);
+    __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const;
+    __declspec(nothrow noalias) __int64 GetStart(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) __int64 GetStop(__in POSITION pos, __in double fps) const;
+    __declspec(nothrow noalias) bool IsAnimated(__in POSITION pos) const;
+    __declspec(nothrow noalias) HRESULT Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox);
 
     // IPersist
     STDMETHODIMP GetClassID(CLSID* pClassID);
 
     // ISubStream
-    STDMETHODIMP_(int) GetStreamCount();
-    STDMETHODIMP GetStreamInfo(int i, WCHAR** ppName, LCID* pLCID);
-    STDMETHODIMP_(int) GetStream();
-    STDMETHODIMP SetStream(int iStream);
-    STDMETHODIMP Reload() { return E_NOTIMPL; }
+    __declspec(nothrow noalias) size_t GetStreamCount() const;
+    __declspec(nothrow noalias) HRESULT GetStreamInfo(__in size_t upStream, __out_opt WCHAR** ppName, __out_opt LCID* pLCID) const;
+    __declspec(nothrow noalias) size_t GetStream() const;
+    __declspec(nothrow noalias) HRESULT SetStream(__in size_t upStream);
+    __declspec(nothrow noalias) HRESULT Reload() { return E_NOTIMPL; }
 };

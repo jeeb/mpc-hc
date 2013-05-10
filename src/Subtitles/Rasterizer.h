@@ -60,7 +60,6 @@ protected:
     BYTE* mpPathTypes;
     POINT* mpPathPoints;
     int mPathPoints;
-    bool fSSE2;
 
 private:
     int mWidth, mHeight;

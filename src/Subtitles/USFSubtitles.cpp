@@ -265,9 +265,6 @@ bool CUSFSubtitles::Read(LPCTSTR fn)
             if (s->pal.alignment.IsEmpty()) {
                 s->pal.alignment = def->pal.alignment;
             }
-            if (s->pal.relativeto.IsEmpty()) {
-                s->pal.relativeto = def->pal.relativeto;
-            }
             if (s->pal.horizontal_margin.IsEmpty()) {
                 s->pal.horizontal_margin = def->pal.horizontal_margin;
             }
@@ -334,11 +331,6 @@ bool CUSFSubtitles::ConvertToSTS(CSimpleTextSubtitle& sts)
         }
 
         stss->scrAlignment = TranslateAlignment(s->pal.alignment);
-
-        if (!s->pal.relativeto.IsEmpty()) stss->relativeTo =
-                !s->pal.relativeto.CompareNoCase(L"window") ? 0 :
-                !s->pal.relativeto.CompareNoCase(L"video") ? 1 :
-                0;
 
         stss->borderStyle = 0;
         if (!s->fontstyle.outline.IsEmpty()) {
@@ -632,7 +624,6 @@ void CUSFSubtitles::ParseFontstyle(CComPtr<IXMLDOMNode> pNode, fontstyle_t& fs)
 void CUSFSubtitles::ParsePal(CComPtr<IXMLDOMNode> pNode, posattriblist_t& pal)
 {
     pal.alignment = GetAttrib(L"alignment", pNode);
-    pal.relativeto = GetAttrib(L"relative-to", pNode);
     pal.horizontal_margin = GetAttrib(L"horizontal-margin", pNode);
     pal.vertical_margin = GetAttrib(L"vertical-margin", pNode);
     pal.rotate[0] = GetAttrib(L"rotate-z", pNode);

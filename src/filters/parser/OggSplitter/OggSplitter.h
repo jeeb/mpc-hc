@@ -36,6 +36,16 @@ public:
     bool fSkip;
 };
 
+#define OggSplitterType_mask 0xF
+#define OggSplitterType_VorbisOutputPin 1
+#define OggSplitterType_FlacOutputPin 2
+#define OggSplitterType_DirectShowOutputPin 3
+#define OggSplitterType_StreamOutputPin 4
+#define OggSplitterType_VideoOutputPin 5
+#define OggSplitterType_AudioOutputPin 6
+#define OggSplitterType_TextOutputPin 7
+#define OggSplitterType_TheoraOutputPin 8
+
 class COggSplitterOutputPin : public CBaseSplitterOutputPin
 {
     class CComment
@@ -60,7 +70,7 @@ protected:
     void ResetState(DWORD seqnum = -1);
 
 public:
-    COggSplitterOutputPin(LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr);
+    COggSplitterOutputPin(LPCWSTR pName, CBaseFilter* pFilter, CCritSec* pLock, HRESULT* phr, unsigned __int8 u8BaseClass);
 
     void AddComment(BYTE* p, int len);
     CStringW GetComment(CStringW key);

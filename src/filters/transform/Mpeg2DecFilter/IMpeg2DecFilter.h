@@ -52,9 +52,6 @@ public IUnknown {
     STDMETHOD(EnableForcedSubtitles(bool fEnable)) = 0;
     STDMETHOD_(bool, IsForcedSubtitlesEnabled()) = 0;
 
-    STDMETHOD(EnablePlanarYUV(bool fEnable)) = 0;
-    STDMETHOD_(bool, IsPlanarYUVEnabled()) = 0;
-
     STDMETHOD(EnableInterlaced(bool fEnable)) = 0;
     STDMETHOD_(bool, IsInterlacedEnabled()) = 0;
 

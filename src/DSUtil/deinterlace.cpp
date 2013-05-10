@@ -242,7 +242,7 @@ static void asm_blend_row(void *dst0, const void *src0, uint32 w, ptrdiff_t srcp
 #if defined(VD_CPU_X86) || defined(VD_CPU_AMD64)
     static void asm_blend_row_SSE2(void *dst, const void *src, uint32 w, ptrdiff_t srcpitch) {
         __m128i zero = _mm_setzero_si128();
-        __m128i inv = _mm_cmpeq_epi8(zero, zero);
+        __m128i inv = _mm_cmpeq_epi32(zero, zero);
 
         w = (w + 3) >> 2;
 
@@ -307,7 +307,8 @@ static void asm_blend_row(void *dst0, const void *src0, uint32 w, ptrdiff_t srcp
 
     void nela_L8_SSE2(__m128i *dst, const __m128i *elabuf, int w16) {
         __m128i zero = _mm_setzero_si128();
-        __m128i x80b = _mm_set1_epi8((unsigned char)0x80);
+        __m128i x80b = _mm_set1_epi8(0x80);
+        __m128i inv = _mm_cmpeq_epi32(zero, zero);
 
         do {
             __m128i x0, x1, x2, y;
@@ -355,9 +356,9 @@ static void asm_blend_row(void *dst0, const void *src0, uint32 w, ptrdiff_t srcp
             __m128i cmplt_l1_r1 = _mm_cmplt_epi8(scorel1, scorer1);
 
             __m128i is_l1 = _mm_and_si128(cmplt_l1_r1, cmplt_l1_c0);
-            __m128i is_r1 = _mm_andnot_si128(cmplt_l1_r1, cmplt_r1_c0);
             __m128i is_c0_inv = _mm_or_si128(cmplt_l1_c0, cmplt_r1_c0);
-            __m128i is_c0 = _mm_andnot_si128(is_c0_inv, _mm_cmpeq_epi8(zero, zero));
+            __m128i is_r1 = _mm_andnot_si128(cmplt_l1_r1, cmplt_r1_c0);
+            __m128i is_c0 = _mm_andnot_si128(is_c0_inv, inv);
 
             __m128i is_l2 = _mm_and_si128(is_l1, _mm_cmplt_epi8(scorel2, scorel1));
             __m128i is_r2 = _mm_and_si128(is_r1, _mm_cmplt_epi8(scorer2, scorer1));
@@ -1904,8 +1905,9 @@ mainRowLoop:
             memcpy((char *)dst + dstpitch*(h - 1), (const char *)src + srcpitch*(h - 1), w*4);
 
 #ifdef _M_IX86
-        if (MMX_enabled)
-            __asm emms
+        if (MMX_enabled) {
+            _m_empty();
+        }
 #endif
     }
 
@@ -1935,34 +1937,35 @@ mainRowLoop:
         asm_blend_row_clipped((char *)dst + dstpitch, src, w, srcpitch);
 
 #ifdef _M_IX86
-        if (MMX_enabled)
-            __asm emms
+        if (MMX_enabled) {
+            _m_empty();
+        }
 #endif
     }
 }
 
-void DeinterlaceELA_X8R8G8B8(BYTE* dst, BYTE* src, DWORD w, DWORD h, DWORD dstpitch, DWORD srcpitch, bool topfield)
+void DeinterlaceELA_X8R8G8B8(void* dst, void const* src, uint32 w, uint32 h, ptrdiff_t dstpitch, ptrdiff_t srcpitch, bool topfield)
 {
     topfield = !topfield;
 
     InterpPlane_NELA_X8R8G8B8(dst, dstpitch, src, srcpitch, w, h, topfield);
 }
 
-void DeinterlaceELA(BYTE* dst, BYTE* src, DWORD w, DWORD h, DWORD dstpitch, DWORD srcpitch, bool topfield)
+void DeinterlaceELA(void* dst, void const* src, uint32 w, uint32 h, ptrdiff_t dstpitch, ptrdiff_t srcpitch, bool topfield)
 {
     topfield = !topfield;
 
     InterpPlane_NELA(dst, dstpitch, src, srcpitch, w, h, topfield);
 }
 
-void DeinterlaceBob(BYTE* dst, BYTE* src, DWORD w, DWORD h, DWORD dstpitch, DWORD srcpitch, bool topfield)
+void DeinterlaceBob(void* dst, void const* src, uint32 w, uint32 h, ptrdiff_t dstpitch, ptrdiff_t srcpitch, bool topfield)
 {
     topfield = !topfield;
 
     InterpPlane_Bob(dst, dstpitch, src, srcpitch, w, h, topfield);
 }
 
-void DeinterlaceBlend(BYTE* dst, BYTE* src, DWORD w, DWORD h, DWORD dstpitch, DWORD srcpitch)
+void DeinterlaceBlend(void* dst, void const* src, uint32 w, uint32 h, ptrdiff_t dstpitch, ptrdiff_t srcpitch)
 {
     BlendPlane(dst, dstpitch, src, srcpitch, w, h);
 }

@@ -63,7 +63,6 @@ bool CMpeg2DecSettingsWnd::OnConnect(const CInterfaceList<IUnknown, &IID_IUnknow
     m_procamp[2] = m_pM2DF->GetHue();
     m_procamp[3] = m_pM2DF->GetSaturation();
     m_forcedsubs = m_pM2DF->IsForcedSubtitlesEnabled();
-    m_planaryuv = m_pM2DF->IsPlanarYUVEnabled();
     m_interlaced = m_pM2DF->IsInterlacedEnabled();
     m_readARFromStream = m_pM2DF->IsReadARFromStreamEnabled();
 
@@ -82,10 +81,6 @@ bool CMpeg2DecSettingsWnd::OnActivate()
     const int h25 = IPP_SCALE(25);
     DWORD dwStyle = WS_VISIBLE | WS_CHILD | WS_TABSTOP;
     CPoint p(10, 10);
-
-    m_planaryuv_check.Create(ResStr(IDS_MPEG2_ENABLE_PLANAR), dwStyle | BS_AUTOCHECKBOX, CRect(p, CSize(IPP_SCALE(300), m_fontheight)), this, IDC_PP_CHECK1);
-    m_planaryuv_check.SetCheck(m_planaryuv ? BST_CHECKED : BST_UNCHECKED);
-    p.y += h20;
 
     m_interlaced_check.Create(ResStr(IDS_MPEG2_INTERLACE_FLAG), dwStyle | BS_AUTOCHECKBOX, CRect(p, CSize(IPP_SCALE(300), m_fontheight)), this, IDC_PP_CHECK2);
     m_interlaced_check.SetCheck(m_interlaced ? BST_CHECKED : BST_UNCHECKED);
@@ -163,7 +158,6 @@ void CMpeg2DecSettingsWnd::OnDeactivate()
     m_procamp[1] = (float)m_procamp_slider[1].GetPos() / 100;
     m_procamp[2] = (float)m_procamp_slider[2].GetPos() - 180;
     m_procamp[3] = (float)m_procamp_slider[3].GetPos() / 100;
-    m_planaryuv = !!IsDlgButtonChecked(m_planaryuv_check.GetDlgCtrlID());
     m_interlaced = !!IsDlgButtonChecked(m_interlaced_check.GetDlgCtrlID());
     m_forcedsubs = !!IsDlgButtonChecked(m_forcedsubs_check.GetDlgCtrlID());
     m_readARFromStream = !!IsDlgButtonChecked(m_readARFromStream_check.GetDlgCtrlID());
@@ -180,7 +174,6 @@ bool CMpeg2DecSettingsWnd::OnApply()
         m_pM2DF->SetHue(m_procamp[2]);
         m_pM2DF->SetSaturation(m_procamp[3]);
         m_pM2DF->EnableForcedSubtitles(m_forcedsubs);
-        m_pM2DF->EnablePlanarYUV(m_planaryuv);
         m_pM2DF->EnableInterlaced(m_interlaced);
         m_pM2DF->EnableReadARFromStream(m_readARFromStream);
         m_pM2DF->Apply();
@@ -213,7 +206,7 @@ END_MESSAGE_MAP()
 void CMpeg2DecSettingsWnd::OnButtonProcampPc2Tv()
 {
     m_procamp_slider[0].SetPos(128 - 16);
-    m_procamp_slider[1].SetPos(100 * 255 / (235 - 16));
+    m_procamp_slider[1].SetPos(int(100.0 * 255.0 / (235.0 - 16.0)));
 
     UpdateProcampValues();
 }

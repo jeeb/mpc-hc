@@ -33,7 +33,7 @@
 // CPPageFileInfoDetails dialog
 
 IMPLEMENT_DYNAMIC(CPPageFileInfoDetails, CPropertyPage)
-CPPageFileInfoDetails::CPPageFileInfoDetails(CString fn, IFilterGraph* pFG, ISubPicAllocatorPresenter* pCAP)
+CPPageFileInfoDetails::CPPageFileInfoDetails(CString fn, IFilterGraph* pFG, CSubPicAllocatorPresenterImpl* pCAP)
     : CPropertyPage(CPPageFileInfoDetails::IDD, CPPageFileInfoDetails::IDD)
     , m_fn(fn)
     , m_pFG(pFG)

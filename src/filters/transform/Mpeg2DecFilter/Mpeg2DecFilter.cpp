@@ -27,7 +27,6 @@
 #include "libmpeg2.h"
 #include "Mpeg2DecFilter.h"
 
-#include <xmmintrin.h>
 #include <emmintrin.h>
 
 #include "../../../DSUtil/DSUtil.h"
@@ -59,6 +58,7 @@ const AMOVIESETUP_MEDIATYPE sudPinTypesIn[] = {
 
 const AMOVIESETUP_MEDIATYPE sudPinTypesOut[] = {
     {&MEDIATYPE_Video, &MEDIASUBTYPE_IYUV},
+    {&MEDIATYPE_Video, &MEDIASUBTYPE_NV12},
 };
 
 const AMOVIESETUP_PIN sudpPins[] = {
@@ -226,8 +226,7 @@ CMpeg2DecFilter::CMpeg2DecFilter(LPUNKNOWN lpunk, HRESULT* phr)
     SetHue(0.0f);
     SetSaturation(1.0f);
     EnableForcedSubtitles(true);
-    EnablePlanarYUV(true);
-    EnableInterlaced(false);
+    EnableInterlaced(true);
     EnableReadARFromStream(true);
 
 #ifdef STANDALONE_FILTER
@@ -252,9 +251,6 @@ CMpeg2DecFilter::CMpeg2DecFilter(LPUNKNOWN lpunk, HRESULT* phr)
         if (ERROR_SUCCESS == key.QueryDWORDValue(_T("ForcedSubtitles"), dw)) {
             EnableForcedSubtitles(!!dw);
         }
-        if (ERROR_SUCCESS == key.QueryDWORDValue(_T("PlanarYUV"), dw)) {
-            EnablePlanarYUV(!!dw);
-        }
         if (ERROR_SUCCESS == key.QueryDWORDValue(_T("Interlaced"), dw)) {
             EnableInterlaced(!!dw);
         }
@@ -276,8 +272,6 @@ CMpeg2DecFilter::CMpeg2DecFilter(LPUNKNOWN lpunk, HRESULT* phr)
     SetSaturation(*(float*)&dw);
     dw = AfxGetApp()->GetProfileInt(_T("Filters\\MPEG Video Decoder"), _T("ForcedSubtitles"), m_fForcedSubs);
     EnableForcedSubtitles(!!dw);
-    dw = AfxGetApp()->GetProfileInt(_T("Filters\\MPEG Video Decoder"), _T("PlanarYUV"), m_fPlanarYUV);
-    EnablePlanarYUV(!!dw);
     dw = AfxGetApp()->GetProfileInt(_T("Filters\\MPEG Video Decoder"), _T("Interlaced"), m_fInterlaced);
     EnableInterlaced(!!dw);
     dw = AfxGetApp()->GetProfileInt(_T("Filters\\MPEG Video Decoder"), _T("ReadARFromStream"), m_bReadARFromStream);
@@ -308,7 +302,6 @@ STDMETHODIMP CMpeg2DecFilter::Apply()
         key.SetDWORDValue(_T("Hue"), *(DWORD*)&m_hue);
         key.SetDWORDValue(_T("Saturation"), *(DWORD*)&m_sat);
         key.SetDWORDValue(_T("ForcedSubtitles"), m_fForcedSubs);
-        key.SetDWORDValue(_T("PlanarYUV"), m_fPlanarYUV);
         key.SetDWORDValue(_T("Interlaced"), m_fInterlaced);
         key.SetDWORDValue(_T("ReadARFromStream"), m_bReadARFromStream);
     }
@@ -319,7 +312,6 @@ STDMETHODIMP CMpeg2DecFilter::Apply()
     AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("Hue"), *(DWORD*)&m_hue);
     AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("Saturation"), *(DWORD*)&m_sat);
     AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("ForcedSubtitles"), m_fForcedSubs);
-    AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("PlanarYUV"), m_fPlanarYUV);
     AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("Interlaced"), m_fInterlaced);
     AfxGetApp()->WriteProfileInt(_T("Filters\\MPEG Video Decoder"), _T("ReadARFromStream"), m_bReadARFromStream);
 #endif
@@ -445,33 +437,40 @@ void CMpeg2DecFilter::SetDeinterlaceMethod()
             m_fFilm = false;
         }
     }
+    m_fb.flags = newflags;
 
+    // also writes the output media compression type for future usage
     const CMediaType& mt = m_pOutput->CurrentMediaType();
-
-    if (mt.formattype == FORMAT_VideoInfo2 && (((VIDEOINFOHEADER2*)mt.pbFormat)->dwInterlaceFlags & AMINTERLACE_IsInterlaced)) {
-        m_fb.di = DIWeave;
-    } else {
-        m_fb.di = GetDeinterlaceMethod();
-
-        if (m_fb.di == DIAuto || m_fb.di != DIWeave && m_fb.di != DIBlend && m_fb.di != DIBob && m_fb.di != DIFieldShift && m_fb.di != DIELA) {
-            if (seqflags & SEQ_FLAG_PROGRESSIVE_SEQUENCE) {
-                m_fb.di = DIWeave;    // hurray!
-            } else if (m_fFilm) {
-                m_fb.di = DIWeave;    // we are lucky
-            } else if (!(m_fb.flags & PIC_FLAG_PROGRESSIVE_FRAME)) {
-                m_fb.di = DIBlend;    // ok, clear thing
-            } else
-                // big trouble here, the progressive_frame bit is not reliable :'(
-                // frames without temporal field diffs can be only detected when ntsc
-                // uses the repeat field flag (signaled with m_fFilm), if it's not set
-                // or we have pal then we might end up blending the fields unnecessarily...
-            {
-                m_fb.di = DIBlend;
-            }
+    if ((mt.formattype == FORMAT_VideoInfo) || (mt.formattype == FORMAT_MPEGVideo)) {
+        VIDEOINFOHEADER* fV = reinterpret_cast<VIDEOINFOHEADER*>(mt.pbFormat);
+        m_fb.biCompression = fV->bmiHeader.biCompression;
+    } else if ((mt.formattype == FORMAT_VideoInfo2) || (mt.formattype == FORMAT_MPEG2Video) || (mt.formattype == FORMAT_DiracVideoInfo)) {
+        VIDEOINFOHEADER2* fV = reinterpret_cast<VIDEOINFOHEADER2*>(mt.pbFormat);
+        m_fb.biCompression = fV->bmiHeader.biCompression;
+        if (fV->dwInterlaceFlags & AMINTERLACE_IsInterlaced) {
+            m_fb.di = DIWeave;
+            return;
         }
     }
 
-    m_fb.flags = newflags;
+    m_fb.di = GetDeinterlaceMethod();
+
+    if (m_fb.di == DIAuto || m_fb.di != DIWeave && m_fb.di != DIBlend && m_fb.di != DIBob && m_fb.di != DIFieldShift && m_fb.di != DIELA) {
+        if (seqflags & SEQ_FLAG_PROGRESSIVE_SEQUENCE) {
+            m_fb.di = DIWeave;    // hurray!
+        } else if (m_fFilm) {
+            m_fb.di = DIWeave;    // we are lucky
+        } else if (!(m_fb.flags & PIC_FLAG_PROGRESSIVE_FRAME)) {
+            m_fb.di = DIBlend;    // ok, clear thing
+        } else
+            // big trouble here, the progressive_frame bit is not reliable :'(
+            // frames without temporal field diffs can be only detected when ntsc
+            // uses the repeat field flag (signaled with m_fFilm), if it's not set
+            // or we have pal then we might end up blending the fields unnecessarily...
+        {
+            m_fb.di = DIBlend;
+        }
+    }
 }
 
 void CMpeg2DecFilter::SetTypeSpecificFlags(IMediaSample* pMS)
@@ -482,7 +481,7 @@ void CMpeg2DecFilter::SetTypeSpecificFlags(IMediaSample* pMS)
             props.dwTypeSpecificFlags &= ~0x7f;
 
             const CMediaType& mt = m_pOutput->CurrentMediaType();
-            if (mt.formattype == FORMAT_VideoInfo2 && (((VIDEOINFOHEADER2*)mt.pbFormat)->dwInterlaceFlags & AMINTERLACE_IsInterlaced)) {
+            if (((mt.formattype == FORMAT_VideoInfo2) || (mt.formattype == FORMAT_MPEG2Video) || (mt.formattype == FORMAT_DiracVideoInfo)) && (reinterpret_cast<VIDEOINFOHEADER2*>(mt.pbFormat)->dwInterlaceFlags & AMINTERLACE_IsInterlaced)) {
                 // props.dwTypeSpecificFlags |= AM_VIDEO_FLAG_WEAVE;
 
                 if (m_dec->m_info.m_sequence->flags & SEQ_FLAG_PROGRESSIVE_SEQUENCE) {
@@ -538,7 +537,7 @@ HRESULT CMpeg2DecFilter::Transform(IMediaSample* pIn)
     while (len >= 0) {
         mpeg2_state_t state = m_dec->mpeg2_parse();
 #ifndef _WIN64
-        __asm emms; // this one is missing somewhere in the precompiled mmx obj files
+        _m_empty();// this MMX empty status instruction is missing somewhere in the precompiled mmx obj files
 #endif
         switch (state) {
             case STATE_BUFFER:
@@ -680,7 +679,7 @@ HRESULT CMpeg2DecFilter::DeliverFast()
 
     const CMediaType& mt = m_pOutput->CurrentMediaType();
 
-    if (mt.subtype != MEDIASUBTYPE_I420 && mt.subtype != MEDIASUBTYPE_IYUV && mt.subtype != MEDIASUBTYPE_YV12) {
+    if (mt.subtype.Data1 != MEDIASUBTYPE_I420.Data1 && mt.subtype.Data1 != MEDIASUBTYPE_IYUV.Data1 && mt.subtype.Data1 != MEDIASUBTYPE_YV12.Data1 && mt.subtype.Data1 != MEDIASUBTYPE_NV12.Data1) {
         return S_FALSE;
     }
 
@@ -691,45 +690,53 @@ HRESULT CMpeg2DecFilter::DeliverFast()
         return hr;
     }
 
-    if (mt.subtype != MEDIASUBTYPE_I420 && mt.subtype != MEDIASUBTYPE_IYUV && mt.subtype != MEDIASUBTYPE_YV12) {
-        return S_FALSE;
-    }
+    BITMAPINFOHEADER* bihOut;
+    if ((mt.formattype == FORMAT_VideoInfo) || (mt.formattype == FORMAT_MPEGVideo)) {
+        VIDEOINFOHEADER* fV = reinterpret_cast<VIDEOINFOHEADER*>(mt.pbFormat);
+        bihOut = &fV->bmiHeader;
+    } else if ((mt.formattype == FORMAT_VideoInfo2) || (mt.formattype == FORMAT_MPEG2Video) || (mt.formattype == FORMAT_DiracVideoInfo)) {
+        VIDEOINFOHEADER2* fV = reinterpret_cast<VIDEOINFOHEADER2*>(mt.pbFormat);
+        bihOut = &fV->bmiHeader;
+    } else { return E_FAIL; }
 
-    BITMAPINFOHEADER bihOut;
-    ExtractBIH(&mt, &bihOut);
-
-    int w = bihOut.biWidth;
-    int h = abs(bihOut.biHeight);
-    int srcpitch = m_dec->m_info.m_sequence->width; // TODO (..+7)&~7; ?
-    int dstpitch = bihOut.biWidth;
+    size_t w = bihOut->biWidth;
+    size_t h = abs(bihOut->biHeight);
+    size_t srcpitch = m_dec->m_info.m_sequence->width; // TODO (..+7)&~7; ?-- no, source headers are absolute, pre-rounded to whatever multiple of a power of two blocks that was used in the encode, and is unsigned (always top to bottom encoded)
+    ptrdiff_t dstpitch = bihOut->biWidth;
 
     BYTE* y = pDataOut;
     BYTE* u = y + dstpitch * h;
-    BYTE* v = y + dstpitch * h * 5 / 4;
 
-    if (bihOut.biCompression == '21VY') {
-        BYTE* tmp = u;
-        u = v;
-        v = tmp;
+    if (bihOut->biCompression == MEDIASUBTYPE_NV12.Data1) { BitBltFromI420ToNV12(w, h, y, u, dstpitch, fbuf->buf[0], fbuf->buf[1], fbuf->buf[2], srcpitch); }
+    else {
+        BYTE* v = y + dstpitch * h * 5 / 4;
+
+        if (bihOut->biCompression == MEDIASUBTYPE_YV12.Data1) {
+            BYTE* tmp = u;
+            u = v;
+            v = tmp;
+        }
+
+        if (m_fb.di == DIWeave) {
+            BitBltFromI420ToI420(w, h, y, u, v, dstpitch, fbuf->buf[0], fbuf->buf[1], fbuf->buf[2], srcpitch);
+        } else if (m_fb.di == DIBlend) {
+            DeinterlaceBlend(y, fbuf->buf[0], w, h, dstpitch, srcpitch);
+            DeinterlaceBlend(u, fbuf->buf[1], w / 2, h / 2, dstpitch / 2, srcpitch / 2);
+            DeinterlaceBlend(v, fbuf->buf[2], w / 2, h / 2, dstpitch / 2, srcpitch / 2);
+        } else { // TODO
+            return S_FALSE;
+        }
     }
 
-    if (m_fb.di == DIWeave) {
-        BitBltFromI420ToI420(w, h, y, u, v, dstpitch, fbuf->buf[0], fbuf->buf[1], fbuf->buf[2], srcpitch);
-    } else if (m_fb.di == DIBlend) {
-        DeinterlaceBlend(y, fbuf->buf[0], w, h, dstpitch, srcpitch);
-        DeinterlaceBlend(u, fbuf->buf[1], w / 2, h / 2, dstpitch / 2, srcpitch / 2);
-        DeinterlaceBlend(v, fbuf->buf[2], w / 2, h / 2, dstpitch / 2, srcpitch / 2);
-    } else { // TODO
-        return S_FALSE;
-    }
+    // edit: feature removed; wrong method, this issue should be solved by setting clipping from 1088 to 1080 h (source and destination headers), not by filling it with white pixels (FF8080 is white)
+    //  if (h == 1088) {
+    //      memset(y + dstpitch*(h-8), 0xff, dstpitch*8);
+    //      memset(u + dstpitch*(h-8)/4, 0x80, dstpitch*8/4);
+    //      memset(v + dstpitch*(h-8)/4, 0x80, dstpitch*8/4);
+    //  }
 
-    if (h == 1088) {
-        memset(y + dstpitch * (h - 8), 0xff, dstpitch * 8);
-        memset(u + dstpitch * (h - 8) / 4, 0x80, dstpitch * 8 / 4);
-        memset(v + dstpitch * (h - 8) / 4, 0x80, dstpitch * 8 / 4);
-    }
-
-    if (CMpeg2DecInputPin* pPin = dynamic_cast<CMpeg2DecInputPin*>(m_pInput)) {
+    CMpeg2DecInputPin* pPin = static_cast<CMpeg2DecInputPin*>(m_pInput);
+    {
         CAutoLock cAutoLock2(&pPin->m_csRateLock);
 
         if (m_rate.Rate != pPin->m_ratechange.Rate) {
@@ -767,15 +774,22 @@ HRESULT CMpeg2DecFilter::DeliverNormal()
         return S_FALSE;
     }
 
-    int w = m_fb.w;
-    int h = m_fb.h;
-    int spitch = m_dec->m_info.m_sequence->width; // TODO (..+7)&~7; ?
-    int dpitch = m_fb.pitch;
+    size_t w = m_fb.w;
+    size_t h = m_fb.h;
+    size_t spitch = m_dec->m_info.m_sequence->width; // TODO (..+7)&~7; ?-- no, source headers are absolute, pre-rounded to whatever multiple of a power of two blocks that was used in the encode, and is unsigned (always top to bottom encoded)
+    ptrdiff_t dpitch = m_fb.pitch;
+
+    if (m_fb.biCompression == MEDIASUBTYPE_NV12.Data1) {// can't postproc, can't deinterlace
+        BitBltFromI420ToNV12(w, h, m_fb.buf[0], m_fb.buf[1], dpitch, fbuf->buf[0], fbuf->buf[1], fbuf->buf[2], spitch);
+        if (FAILED(hr = Deliver(false))) { return hr; }
+        if (!m_fInitializedBuffer) { hr = Deliver(false); }
+        return hr;
+    }
 
     REFERENCE_TIME rtStart = m_fb.rtStart;
     REFERENCE_TIME rtStop = m_fb.rtStop;
 
-    bool tff = !!(m_fb.flags & PIC_FLAG_TOP_FIELD_FIRST);
+    bool tff = static_cast<bool>(m_fb.flags & PIC_FLAG_TOP_FIELD_FIRST);
 
     // deinterlace
 
@@ -872,29 +886,37 @@ HRESULT CMpeg2DecFilter::Deliver(bool fRepeatLast)
         return hr;
     }
 
-    if (m_fb.h == 1088) {
-        memset(m_fb.buf[0] + m_fb.w * (m_fb.h - 8), 0xff, m_fb.pitch * 8);
-        memset(m_fb.buf[1] + m_fb.w * (m_fb.h - 8) / 4, 0x80, m_fb.pitch * 8 / 4);
-        memset(m_fb.buf[2] + m_fb.w * (m_fb.h - 8) / 4, 0x80, m_fb.pitch * 8 / 4);
-    }
+    // edit: feature removed; wrong method, this issue should be solved by setting clipping from 1088 to 1080 h (source and destination headers), not by filling it with white pixels (FF8080 is white)
+    //  if (m_fb.h == 1088) {
+    //      memset(m_fb.buf[0] + m_fb.w*(m_fb.h-8), 0xff, m_fb.pitch*8);
+    //      memset(m_fb.buf[1] + m_fb.w*(m_fb.h-8)/4, 0x80, m_fb.pitch*8/4);
+    //      memset(m_fb.buf[2] + m_fb.w*(m_fb.h-8)/4, 0x80, m_fb.pitch*8/4);
+    //  }
 
     BYTE** buf = &m_fb.buf[0];
 
     if (m_pSubpicInput->HasAnythingToRender(m_fb.rtStart)) {
-        BitBltFromI420ToI420(m_fb.w, m_fb.h,
-                             m_fb.buf[3], m_fb.buf[4], m_fb.buf[5], m_fb.pitch,
-                             m_fb.buf[0], m_fb.buf[1], m_fb.buf[2], m_fb.pitch);
+        if (m_fb.biCompression = MEDIASUBTYPE_NV12.Data1) {
+            BitBltFromNV12ToNV12(m_fb.w, m_fb.h,
+                                 m_fb.buf[3], m_fb.buf[4], m_fb.pitch,
+                                 m_fb.buf[0], m_fb.buf[1], m_fb.pitch);
+            m_pSubpicInput->RenderSubpics(m_fb.rtStart, &m_fb.buf[3], m_fb.pitch, m_fb.h, true);
+        } else {
+            BitBltFromI420ToI420(m_fb.w, m_fb.h,
+                                 m_fb.buf[3], m_fb.buf[4], m_fb.buf[5], m_fb.pitch,
+                                 m_fb.buf[0], m_fb.buf[1], m_fb.buf[2], m_fb.pitch);
+            m_pSubpicInput->RenderSubpics(m_fb.rtStart, &m_fb.buf[3], m_fb.pitch, m_fb.h, false);
+        }
 
         buf = &m_fb.buf[3];
-
-        m_pSubpicInput->RenderSubpics(m_fb.rtStart, buf, m_fb.pitch, m_fb.h);
     }
 
-    CopyBuffer(pDataOut, buf, (m_fb.w + 7)&~7, m_fb.h, m_fb.pitch, MEDIASUBTYPE_I420, !(m_fb.flags & PIC_FLAG_PROGRESSIVE_FRAME));
+    CopyBuffer(pDataOut, buf, (m_fb.w + 7)&~7, m_fb.h, m_fb.pitch, (m_fb.biCompression == '21VN') ? '21VN' : '024I', !(m_fb.flags & PIC_FLAG_PROGRESSIVE_FRAME));
 
     //
 
-    if (CMpeg2DecInputPin* pPin = dynamic_cast<CMpeg2DecInputPin*>(m_pInput)) {
+    CMpeg2DecInputPin* pPin = static_cast<CMpeg2DecInputPin*>(m_pInput);
+    {
         CAutoLock cAutoLock2(&pPin->m_csRateLock);
 
         if (m_rate.Rate != pPin->m_ratechange.Rate) {
@@ -1011,14 +1033,7 @@ HRESULT CMpeg2DecFilter::CheckInputType(const CMediaType* mtIn)
 
 HRESULT CMpeg2DecFilter::CheckTransform(const CMediaType* mtIn, const CMediaType* mtOut)
 {
-    bool fPlanarYUV = mtOut->subtype == MEDIASUBTYPE_YV12
-                      || mtOut->subtype == MEDIASUBTYPE_I420
-                      || mtOut->subtype == MEDIASUBTYPE_IYUV;
-
-    return SUCCEEDED(__super::CheckTransform(mtIn, mtOut))
-           && (!fPlanarYUV || IsPlanarYUVEnabled())
-           ? S_OK
-           : VFW_E_TYPE_NOT_ACCEPTED;
+    return SUCCEEDED(__super::CheckTransform(mtIn, mtOut)) ? S_OK : VFW_E_TYPE_NOT_ACCEPTED;
 }
 
 HRESULT CMpeg2DecFilter::SetMediaType(PIN_DIRECTION dir, const CMediaType* pmt)
@@ -1304,19 +1319,6 @@ STDMETHODIMP_(bool) CMpeg2DecFilter::IsForcedSubtitlesEnabled()
 {
     CAutoLock cAutoLock(&m_csProps);
     return m_fForcedSubs;
-}
-
-STDMETHODIMP CMpeg2DecFilter::EnablePlanarYUV(bool fEnable)
-{
-    CAutoLock cAutoLock(&m_csProps);
-    m_fPlanarYUV = fEnable;
-    return S_OK;
-}
-
-STDMETHODIMP_(bool) CMpeg2DecFilter::IsPlanarYUVEnabled()
-{
-    CAutoLock cAutoLock(&m_csProps);
-    return m_fPlanarYUV;
 }
 
 STDMETHODIMP CMpeg2DecFilter::EnableInterlaced(bool fEnable)
@@ -1657,7 +1659,7 @@ bool CSubpicInputPin::HasAnythingToRender(REFERENCE_TIME rt)
     return false;
 }
 
-void CSubpicInputPin::RenderSubpics(REFERENCE_TIME rt, BYTE** yuv, int w, int h)
+void CSubpicInputPin::RenderSubpics(REFERENCE_TIME rt, BYTE** yuv, int w, int h, bool bIsNV12)
 {
     CAutoLock cAutoLock(&m_csReceive);
 
@@ -1678,7 +1680,7 @@ void CSubpicInputPin::RenderSubpics(REFERENCE_TIME rt, BYTE** yuv, int w, int h)
         spu* sp = m_sps.GetNext(pos);
         if (sp->m_rtStart <= rt && rt < sp->m_rtStop
                 && (m_spon || sp->m_fForced && ((static_cast<CMpeg2DecFilter*>(m_pFilter))->IsForcedSubtitlesEnabled() || sp->m_psphli))) {
-            sp->Render(rt, yuv, w, h, m_sppal, m_fsppal);
+            sp->Render(rt, yuv, w, h, m_sppal, m_fsppal, bIsNV12);
         }
     }
 }
@@ -1903,40 +1905,45 @@ static __inline BYTE GetHalfNibble(BYTE* p, DWORD* offset, int& nField, int& n)
     return ret;
 }
 
-static __inline void DrawPixel(BYTE** yuv, CPoint pt, int pitch, AM_DVD_YUV& c)
+static __inline void DrawPixel(BYTE** yuv, POINT pt, size_t pitch, bool bIsNV12, AM_DVD_YUV& c)
 {
     if (c.Reserved == 0) {
         return;
     }
+    size_t px = pt.x, py = pt.y;
 
-    BYTE* p = &yuv[0][pt.y * pitch + pt.x];
+    BYTE* p = &yuv[0][py * pitch + px];
     //*p = (*p*(15-contrast) + sppal[color].Y*contrast)>>4;
     *p -= (*p - c.Y) * c.Reserved >> 4;
 
-    if (pt.y & 1) {
+    if (py & 1) {
         return;    // since U/V is half res there is no need to overwrite the same line again
     }
 
-    pt.x = (pt.x + 1) / 2;
-    pt.y = (pt.y /*+ 1*/) / 2; // only paint the upper field always, don't round it
-    pitch /= 2;
+    py = (py/*+1*/) >> 1; // only paint the upper field always, don't round it
+    if (!bIsNV12) {// I420/IYUV halfwidth chroma pitches, NV12 fullwidth chroma pitches
+        px = (px + 1) >> 1;
+        pitch >>= 1;
+    }
 
     // U/V is exchanged? wierd but looks true when comparing the outputted colors from other decoders
 
-    p = &yuv[1][pt.y * pitch + pt.x];
+    p = &yuv[1][py * pitch + px];
     //*p = (BYTE)(((((int)*p-0x80)*(15-contrast) + ((int)sppal[color].V-0x80)*contrast) >> 4) + 0x80);
     *p -= (*p - c.V) * c.Reserved >> 4;
 
-    p = &yuv[2][pt.y * pitch + pt.x];
+    if (bIsNV12) { ++p; }
+    else { p = &yuv[2][py * pitch + px]; }
     //*p = (BYTE)(((((int)*p-0x80)*(15-contrast) + ((int)sppal[color].U-0x80)*contrast) >> 4) + 0x80);
     *p -= (*p - c.U) * c.Reserved >> 4;
 
     // Neighter of the blending formulas are accurate (">>4" should be "/15").
     // Even though the second one is a bit worse, since we are scaling the difference only,
     // the error is still not noticable.
+    // edit: tried /15, both luma and chroma break
 }
 
-static __inline void DrawPixels(BYTE** yuv, int pitch, CPoint pt, int len, AM_DVD_YUV& c, CRect& rc)
+static __inline void DrawPixels(BYTE** yuv, int pitch, CPoint pt, int len, bool bIsNV12, AM_DVD_YUV& c, CRect& rc)
 {
     if (pt.y < rc.top || pt.y >= rc.bottom) {
         return;
@@ -1964,7 +1971,7 @@ static __inline void DrawPixels(BYTE** yuv, int pitch, CPoint pt, int len, AM_DV
     }
 
     while (len-- > 0) {
-        DrawPixel(yuv, pt, pitch, c);
+        DrawPixel(yuv, pt, pitch, bIsNV12, c);
         pt.x++;
     }
 }
@@ -2092,7 +2099,7 @@ bool CSubpicInputPin::dvdspu::Parse()
     return true;
 }
 
-void CSubpicInputPin::dvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal)
+void CSubpicInputPin::dvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12)
 {
     BYTE* p = GetData();
     DWORD offset[2] = {m_offset[0], m_offset[1]};
@@ -2140,13 +2147,13 @@ void CSubpicInputPin::dvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h
                 || (code = (code << 4) | GetNibble(p, offset, nField, fAligned)) >= 0x10
                 || (code = (code << 4) | GetNibble(p, offset, nField, fAligned)) >= 0x40
                 || (code = (code << 4) | GetNibble(p, offset, nField, fAligned)) >= 0x100) {
-            DrawPixels(yuv, w, pt, code >> 2, pal[code & 3], rcclip);
+            DrawPixels(yuv, w, pt, code >> 2, bIsNV12, pal[code & 3], rcclip);
             if ((pt.x += code >> 2) < rc.right) {
                 continue;
             }
         }
 
-        DrawPixels(yuv, w, pt, rc.right - pt.x, pal[code & 3], rcclip);
+        DrawPixels(yuv, w, pt, rc.right - pt.x, bIsNV12, pal[code & 3], rcclip);
 
         if (!fAligned) {
             GetNibble(p, offset, nField, fAligned);    // align to byte
@@ -2230,7 +2237,7 @@ bool CSubpicInputPin::cvdspu::Parse()
     return true;
 }
 
-void CSubpicInputPin::cvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal)
+void CSubpicInputPin::cvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12)
 {
     BYTE* p = GetData();
     DWORD offset[2] = {m_offset[0], m_offset[1]};
@@ -2255,13 +2262,13 @@ void CSubpicInputPin::cvdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h
         BYTE code;
 
         if ((code = GetNibble(p, offset, nField, fAligned)) >= 0x4) {
-            DrawPixels(yuv, w, pt, code >> 2, m_sppal[0][code & 3], rcclip);
+            DrawPixels(yuv, w, pt, code >> 2, bIsNV12, m_sppal[0][code & 3], rcclip);
             pt.x += code >> 2;
             continue;
         }
 
         code = GetNibble(p, offset, nField, fAligned);
-        DrawPixels(yuv, w, pt, rc.right - pt.x, m_sppal[0][code & 3], rcclip);
+        DrawPixels(yuv, w, pt, rc.right - pt.x, bIsNV12, m_sppal[0][code & 3], rcclip);
 
         if (!fAligned) {
             GetNibble(p, offset, nField, fAligned);    // align to byte
@@ -2329,7 +2336,7 @@ bool CSubpicInputPin::svcdspu::Parse()
     return true;
 }
 
-void CSubpicInputPin::svcdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal)
+void CSubpicInputPin::svcdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int h, AM_DVD_YUV* sppal, bool fsppal, bool bIsNV12)
 {
     BYTE* p = GetData();
     DWORD offset[2] = {m_offset[0], m_offset[1]};
@@ -2354,7 +2361,7 @@ void CSubpicInputPin::svcdspu::Render(REFERENCE_TIME rt, BYTE** yuv, int w, int 
         BYTE code = GetHalfNibble(p, offset, nField, n);
         BYTE repeat = 1 + (code == 0 ? GetHalfNibble(p, offset, nField, n) : 0);
 
-        DrawPixels(yuv, w, pt, repeat, m_sppal[code & 3], rcclip);
+        DrawPixels(yuv, w, pt, repeat, bIsNV12, m_sppal[code & 3], rcclip);
         if ((pt.x += repeat) < rc.right) {
             continue;
         }
@@ -2420,7 +2427,7 @@ HRESULT CClosedCaptionOutputPin::DecideBufferSize(IMemAllocator* pAllocator, ALL
            : NOERROR;
 }
 
-HRESULT CClosedCaptionOutputPin::Deliver(const void* ptr, int len)
+HRESULT CClosedCaptionOutputPin::Deliver(void const* ptr, size_t len)
 {
     HRESULT hr = S_FALSE;
 

@@ -22,8 +22,6 @@
 #pragma once
 
 #include "BaseGraph.h"
-#include "AllocatorCommon7.h"
-#include "AllocatorCommon.h"
 
 #ifndef _WIN64
 #include "qt/qt.h"
@@ -81,7 +79,7 @@ namespace DSObjects
         CPlayerWindow m_wndWindowFrame;
         CQuicktimeWindow m_wndDestFrame;
 
-        CComPtr<ISubPicAllocatorPresenter> m_pQTAP;
+        CComPtr<CSubPicAllocatorPresenterImpl> m_pQTAP;
 
     public:
         CQuicktimeGraph(HWND hParent, HRESULT& hr);

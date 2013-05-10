@@ -29,14 +29,14 @@
 #include <InitGuid.h>
 #include "moreuuids.h"
 
-extern int c2y_yb[256];
-extern int c2y_yg[256];
-extern int c2y_yr[256];
-extern void ColorConvInit();
+extern __int32 c2y_yb[256];
+extern __int32 c2y_yg[256];
+extern __int32 c2y_yr[256];
+extern void ColorConvInit(__in const bool BT709);
 
 void BltLineRGB32(DWORD* d, BYTE* sub, int w, const GUID& subtype)
 {
-    if (subtype == MEDIASUBTYPE_YV12 || subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV) {
+    if (subtype == MEDIASUBTYPE_YV12 || subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV || subtype == MEDIASUBTYPE_NV12 || subtype == MEDIASUBTYPE_NV21) {
         BYTE* db = (BYTE*)d;
         BYTE* dbtend = db + w;
 
@@ -164,7 +164,7 @@ void CDirectVobSubFilter::PrintMessages(BYTE* pOut)
         return;
     }
 
-    ColorConvInit();
+    ColorConvInit(false);
 
     const GUID& subtype = m_pOutput->CurrentMediaType().subtype;
 
@@ -186,20 +186,20 @@ void CDirectVobSubFilter::PrintMessages(BYTE* pOut)
     msg.AppendFormat(_T("real fps: %.3f, current fps: %.3f\nmedia time: %d, subtitle time: %I64d [ms]\nframe number: %d (calculated)\nrate: %.4lf\n"),
                      m_fps, m_fMediaFPSEnabled ? m_MediaFPS : fabs(m_fps),
                      m_tPrev.Millisecs(), CalcCurrentTime() / 10000,
-                     (int)(m_tPrev.m_time * m_fps / 10000000),
+                     (int)(m_tPrev.m_time * m_fps / 10000000.0 + 0.5),
                      m_pInput->CurrentRate());
 
     CAutoLock cAutoLock(&m_csQueueLock);
 
     if (m_pSubPicQueue) {
-        int nSubPics = -1;
-        REFERENCE_TIME rtNow = -1, rtStart = -1, rtStop = -1;
-        m_pSubPicQueue->GetStats(nSubPics, rtNow, rtStart, rtStop);
-        msg.AppendFormat(_T("queue stats: %I64d - %I64d [ms]\n"), rtStart / 10000, rtStop / 10000);
+        SubPicQueueStats QStats;
+        m_pSubPicQueue->GetStats(&QStats);
+        unsigned __int8 u8SubPics = QStats.u8SubPics;
+        msg.AppendFormat(L"Queue stats: Buffered %2hu, Queue start %+8.3f s, Queue end %+8.3f s\n", u8SubPics, static_cast<double>(QStats.i64Start) / 10000000.0, static_cast<double>(QStats.i64Stop) / 10000000.0);
 
-        for (int i = 0; i < nSubPics; i++) {
-            m_pSubPicQueue->GetStats(i, rtStart, rtStop);
-            msg.AppendFormat(_T("%d: %I64d - %I64d [ms]\n"), i, rtStart / 10000, rtStop / 10000);
+        for (unsigned __int8 i = 0; i < u8SubPics; i++) {
+            m_pSubPicQueue->GetStats(i, &QStats.i64Start);
+            msg.AppendFormat(L"Subtitle %2hu: [%I64d, %I64d) ms\n", i, QStats.i64Start / 10000, QStats.i64Stop / 10000);
         }
     }
 
@@ -225,7 +225,7 @@ void CDirectVobSubFilter::PrintMessages(BYTE* pOut)
     int pitchIn = bm.bmWidthBytes;
     int pitchOut = bihOut.biWidth * bihOut.biBitCount >> 3;
 
-    if (subtype == MEDIASUBTYPE_YV12 || subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV) {
+    if (subtype == MEDIASUBTYPE_YV12 || subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV || subtype == MEDIASUBTYPE_NV12 || subtype == MEDIASUBTYPE_NV21) {
         pitchOut = bihOut.biWidth;
     }
 

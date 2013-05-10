@@ -41,7 +41,6 @@ CPPageSubStyle::CPPageSubStyle()
     , m_screenalignment(0)
     , m_margin(0, 0, 0, 0)
     , m_linkalphasliders(FALSE)
-    , m_relativeTo(FALSE)
     , m_fUseDefaultStyle(true)
     , m_stss(AfxGetAppSettings().subdefstyle)
 {
@@ -111,9 +110,10 @@ void CPPageSubStyle::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_SLIDER3, m_alphasliders[2]);
     DDX_Control(pDX, IDC_SLIDER4, m_alphasliders[3]);
     DDX_Check(pDX, IDC_CHECK1, m_linkalphasliders);
-    DDX_Check(pDX, IDC_CHECK_RELATIVETO, m_relativeTo);
 }
 
+
+// CPPageSubStyle message handlers
 
 BEGIN_MESSAGE_MAP(CPPageSubStyle, CPPageBase)
     ON_BN_CLICKED(IDC_BUTTON1, OnBnClickedButton1)
@@ -125,8 +125,51 @@ BEGIN_MESSAGE_MAP(CPPageSubStyle, CPPageBase)
     ON_WM_HSCROLL()
 END_MESSAGE_MAP()
 
+static TCHAR const* const CharSetNames[] = {
+    _T("BALTIC (186)"),
+    _T("MAC (77)"),
+    _T("RUSSIAN (204)"),
+    _T("EASTEUROPE (238)"),
+    _T("THAI (222)"),
+    _T("VIETNAMESE (163)"),
+    _T("TURKISH (162)"),
+    _T("GREEK (161)"),
+    _T("ARABIC (178)"),
+    _T("HEBREW (177)"),
+    _T("JOHAB (130)"),
+    _T("OEM (255)"),
+    _T("CHINESEBIG5 (136)"),
+    _T("GB2312 (134)"),
+    _T("HANGUL (129)"),
+    _T("HANGEUL (129)"),
+    _T("SHIFTJIS (128)"),
+    _T("SYMBOL (2)"),
+    _T("DEFAULT (1)"),
+    _T("ANSI (0)")
+};// strings are loaded by a decrementing loop
 
-// CPPageSubStyle message handlers
+static unsigned __int8 const CharSetList[] = {
+    ANSI_CHARSET,
+    DEFAULT_CHARSET,
+    SYMBOL_CHARSET,
+    SHIFTJIS_CHARSET,
+    HANGEUL_CHARSET,
+    HANGUL_CHARSET,
+    GB2312_CHARSET,
+    CHINESEBIG5_CHARSET,
+    OEM_CHARSET,
+    JOHAB_CHARSET,
+    HEBREW_CHARSET,
+    ARABIC_CHARSET,
+    GREEK_CHARSET,
+    TURKISH_CHARSET,
+    VIETNAMESE_CHARSET,
+    THAI_CHARSET,
+    EASTEUROPE_CHARSET,
+    RUSSIAN_CHARSET,
+    MAC_CHARSET,
+    BALTIC_CHARSET
+};
 
 BOOL CPPageSubStyle::OnInitDialog()
 {
@@ -136,15 +179,12 @@ BOOL CPPageSubStyle::OnInitDialog()
 
     m_font.SetWindowText(m_stss.fontName);
     m_iCharset = -1;
-    for (int i = 0; i < CharSetLen; i++) {
-        CString str;
-        str.Format(_T("%s (%d)"), CharSetNames[i], CharSetList[i]);
-        m_charset.AddString(str);
-        m_charset.SetItemData(i, CharSetList[i]);
-        if (m_stss.charSet == CharSetList[i]) {
-            m_iCharset = i;
-        }
-    }
+    ptrdiff_t i = _countof(CharSetList) - 1;
+    do {
+        m_charset.AddString(CharSetNames[i]);
+        if (m_stss.charSet == CharSetList[i]) { m_iCharset = i; }
+        --i;
+    } while (i >= 0);
 
     // TODO: allow floats in these edit boxes
     m_spacing = (int)m_stss.fontSpacing;
@@ -171,7 +211,6 @@ BOOL CPPageSubStyle::OnInitDialog()
     m_marginrightspin.SetRange32(-10000, 10000);
     m_margintopspin.SetRange32(-10000, 10000);
     m_marginbottomspin.SetRange32(-10000, 10000);
-    m_relativeTo = m_stss.relativeTo;
 
     for (int i = 0; i < 4; i++) {
         m_color[i].SetColorPtr(&m_stss.colors[i]);
@@ -194,7 +233,7 @@ BOOL CPPageSubStyle::OnApply()
     UpdateData();
 
     if (m_iCharset >= 0) {
-        m_stss.charSet = (int)m_charset.GetItemData(m_iCharset);
+        m_stss.charSet = CharSetList[static_cast<size_t>(m_iCharset)];
     }
     m_stss.fontSpacing = m_spacing;
     m_stss.fontAngleZ = m_angle;
@@ -207,7 +246,6 @@ BOOL CPPageSubStyle::OnApply()
 
     m_stss.scrAlignment = m_screenalignment + 1;
     m_stss.marginRect = m_margin;
-    m_stss.relativeTo = m_relativeTo;
 
     for (int i = 0; i < 4; i++) {
         m_stss.alpha[i] = 255 - m_alpha[i];
@@ -217,9 +255,9 @@ BOOL CPPageSubStyle::OnApply()
         STSStyle& stss = AfxGetAppSettings().subdefstyle;
         if (!(stss == m_stss)) {
             stss = m_stss;
-            if (CMainFrame* pFrame = dynamic_cast<CMainFrame*>(AfxGetMainWnd())) {
-                pFrame->SetSubtitle(0, true, false, true);
-            }
+#ifndef STANDALONE_FILTER
+            static_cast<CMainFrame*>(AfxGetMainWnd())->SetSubtitle(0, true, false, true);
+#endif
         }
     }
 

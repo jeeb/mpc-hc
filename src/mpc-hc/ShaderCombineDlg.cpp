@@ -76,10 +76,11 @@ BOOL CShaderCombineDlg::OnInitDialog()
     //AddAnchor(IDCANCEL, TOP_RIGHT);
 
     const CAppSettings& s = AfxGetAppSettings();
+    CMainFrame* pApp = (CMainFrame*)AfxGetMainWnd();
 
     // remember the initial state
-    m_fcheck1 = m_oldcheck1 = ((CMainFrame*)AfxGetMainWnd())->m_bToggleShader;
-    m_fcheck2 = m_oldcheck2 = ((CMainFrame*)AfxGetMainWnd())->m_bToggleShaderScreenSpace;
+    m_fcheck1 = m_oldcheck1 = pApp->m_bToggleShader[0];
+    m_fcheck2 = m_oldcheck2 = pApp->m_bToggleShader[1];
     m_oldlabels1.AddTailList(&m_labels1);
     m_oldlabels2.AddTailList(&m_labels2);
 

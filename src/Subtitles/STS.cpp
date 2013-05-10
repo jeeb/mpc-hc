@@ -191,63 +191,6 @@ CHtmlColorMap g_colors;
 
 //
 
-BYTE CharSetList[] = {
-    ANSI_CHARSET,
-    DEFAULT_CHARSET,
-    SYMBOL_CHARSET,
-    SHIFTJIS_CHARSET,
-    HANGEUL_CHARSET,
-    HANGUL_CHARSET,
-    GB2312_CHARSET,
-    CHINESEBIG5_CHARSET,
-    OEM_CHARSET,
-    JOHAB_CHARSET,
-    HEBREW_CHARSET,
-    ARABIC_CHARSET,
-    GREEK_CHARSET,
-    TURKISH_CHARSET,
-    VIETNAMESE_CHARSET,
-    THAI_CHARSET,
-    EASTEUROPE_CHARSET,
-    RUSSIAN_CHARSET,
-    MAC_CHARSET,
-    BALTIC_CHARSET
-};
-
-TCHAR* CharSetNames[] = {
-    _T("ANSI"),
-    _T("DEFAULT"),
-    _T("SYMBOL"),
-    _T("SHIFTJIS"),
-    _T("HANGEUL"),
-    _T("HANGUL"),
-    _T("GB2312"),
-    _T("CHINESEBIG5"),
-    _T("OEM"),
-    _T("JOHAB"),
-    _T("HEBREW"),
-    _T("ARABIC"),
-    _T("GREEK"),
-    _T("TURKISH"),
-    _T("VIETNAMESE"),
-    _T("THAI"),
-    _T("EASTEUROPE"),
-    _T("RUSSIAN"),
-    _T("MAC"),
-    _T("BALTIC"),
-};
-
-int CharSetLen = _countof(CharSetList);
-
-//
-
-static DWORD CharSetToCodePage(DWORD dwCharSet)
-{
-    CHARSETINFO cs = {0};
-    ::TranslateCharsetInfo((DWORD*)dwCharSet, &cs, TCI_SRCCHARSET);
-    return cs.ciACP;
-}
-
 int FindChar(CStringW str, WCHAR c, int pos, bool fUnicode, int CharSet)
 {
     if (fUnicode) {
@@ -256,7 +199,9 @@ int FindChar(CStringW str, WCHAR c, int pos, bool fUnicode, int CharSet)
 
     int fStyleMod = 0;
 
-    DWORD cp = CharSetToCodePage(CharSet);
+    UINT cp = 0;
+    CHARSETINFO cs;
+    if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(CharSet)), &cs, TCI_SRCCHARSET)) { cp = cs.ciACP; }
     int OrgCharSet = CharSet;
 
     for (int i = 0, j = str.GetLength(), k; i < j; i++) {
@@ -284,7 +229,7 @@ int FindChar(CStringW str, WCHAR c, int pos, bool fUnicode, int CharSet)
                     CharSet = OrgCharSet;
                 }
 
-                cp = CharSetToCodePage(CharSet);
+                if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(CharSet)), &cs, TCI_SRCCHARSET)) { cp = cs.ciACP; }
             }
         }
     }
@@ -296,7 +241,9 @@ static CStringW ToMBCS(CStringW str, DWORD CharSet)
 {
     CStringW ret;
 
-    DWORD cp = CharSetToCodePage(CharSet);
+    UINT cp = 0;
+    CHARSETINFO cs;
+    if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(CharSet)), &cs, TCI_SRCCHARSET)) { cp = cs.ciACP; }
 
     for (int i = 0, j = str.GetLength(); i < j; i++) {
         WCHAR wc = str.GetAt(i);
@@ -360,9 +307,11 @@ static CStringW UnicodeSSAToMBCS(CStringW str, DWORD CharSet)
 
 static CStringW ToUnicode(CStringW str, DWORD CharSet)
 {
-    CStringW ret;
-    DWORD cp = CharSetToCodePage(CharSet);
+    UINT cp = 0;
+    CHARSETINFO cs;
+    if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(CharSet)), &cs, TCI_SRCCHARSET)) { cp = cs.ciACP; }
 
+    CStringW ret;
     for (int i = 0, j = str.GetLength(); i < j; i++) {
         WCHAR wc = str.GetAt(i);
         char c = wc & 0xff;
@@ -1474,10 +1423,6 @@ static bool OpenSubStationAlpha(CTextFile* file, CSimpleTextSubtitle& ret, int C
                     alpha = GetInt(buff);
                 }
                 style->charSet = GetInt(buff);
-                if (sver >= 6)  {
-                    style->relativeTo = GetInt(buff);
-                }
-
                 if (sver <= 4)  {
                     style->colors[2] = style->colors[3];    // style->colors[2] is used for drawing the outline
                 }
@@ -1810,7 +1755,8 @@ static int nOpenFuncts = _countof(OpenFuncts);
 
 //
 
-CSimpleTextSubtitle::CSimpleTextSubtitle()
+CSimpleTextSubtitle::CSimpleTextSubtitle(bool bRenderedTextType)
+    : mk_bRenderedTextType(bRenderedTextType)
 {
     m_mode = TIME;
     m_dstScreenSize = CSize(0, 0);
@@ -2185,36 +2131,35 @@ void CSimpleTextSubtitle::ConvertToFrameBased(double fps)
     CreateSegments();
 }
 
-int CSimpleTextSubtitle::SearchSub(int t, double fps)
+size_t CSimpleTextSubtitle::SearchSub(__int64 t, double fps)
 {
-    int i = 0, j = (int)GetCount() - 1, ret = -1;
+    size_t uSegCount = m_segments.GetCount();
+    if (!uSegCount) { return MAXSIZE_T; }
+    size_t j = uSegCount - 1;
 
-    if (j >= 0 && t >= TranslateStart(j, fps)) {
+    if (t >= TranslateStart(j, fps)) {
         return j;
     }
 
+    size_t i = 0, ret = MAXSIZE_T;
     while (i < j) {
-        int mid = (i + j) >> 1;
-
-        int midt = TranslateStart(mid, fps);
+        size_t mid = (i + j) >> 1;
+        __int64 midt = TranslateStart(mid, fps);
 
         if (t == midt) {
-            while (mid > 0 && t == TranslateStart(mid - 1, fps)) {
-                --mid;
-            }
+            while ((mid > 0) && (t == TranslateStart(mid - 1, fps))) { --mid; }
             ret = mid;
             break;
         } else if (t < midt) {
-            ret = -1;
+            ret = MAXSIZE_T;
             if (j == mid) {
-                mid--;
+                ASSERT(mid);// it should never decrement 0
+                --mid;
             }
             j = mid;
-        } else if (t > midt) {
+        } else { // t > midt
             ret = mid;
-            if (i == mid) {
-                ++mid;
-            }
+            if (i == mid) { ++mid; }
             i = mid;
         }
     }
@@ -2222,109 +2167,94 @@ int CSimpleTextSubtitle::SearchSub(int t, double fps)
     return ret;
 }
 
-const STSSegment* CSimpleTextSubtitle::SearchSubs(int t, double fps, /*[out]*/ int* iSegment, int* nSegments)
+const STSSegment* CSimpleTextSubtitle::SearchSubs(LONGLONG t, double fps, size_t* iSegment, size_t* nSegments) const
 {
-    int i = 0, j = (int)m_segments.GetCount() - 1, ret = -1;
-
-    if (nSegments) {
-        *nSegments = j + 1;
-    }
+    size_t uSegCount = m_segments.GetCount();
+    if (nSegments) { *nSegments = uSegCount; }
+    if (!uSegCount) { return NULL; }
+    size_t j = uSegCount - 1;
 
     // last segment
-    if (j >= 0 && t >= TranslateSegmentStart(j, fps) && t < TranslateSegmentEnd(j, fps)) {
-        if (iSegment) {
-            *iSegment = j;
+    if (t >= TranslateSegmentStart(j, fps)) {
+        if (t < TranslateSegmentEnd(j, fps)) {
+            // last segment
+            if (iSegment) { *iSegment = j; }
+            return &m_segments[j];
         }
-        return &m_segments[j];
-    }
 
-    // after last segment
-    if (j >= 0 && t >= TranslateSegmentEnd(j, fps)) {
-        if (iSegment) {
-            *iSegment = j + 1;
-        }
+        // after last segment
+        if (iSegment) { *iSegment = uSegCount; }
         return nullptr;
     }
 
     // before first segment
-    if (j > 0 && t < TranslateSegmentStart(i, fps)) {
-        if (iSegment) {
-            *iSegment = -1;
-        }
+    if (j > 0 && t < TranslateSegmentStart(0, fps)) {
+        if (iSegment) { *iSegment = MAXSIZE_T; }
         return nullptr;
     }
 
+    size_t i = 0, ret = MAXSIZE_T;
     while (i < j) {
-        int mid = (i + j) >> 1;
-
-        int midt = TranslateSegmentStart(mid, fps);
+        size_t mid = (i + j) >> 1;
+        __int64 midt = TranslateSegmentStart(mid, fps);
 
         if (t == midt) {
             ret = mid;
             break;
         } else if (t < midt) {
-            ret = -1;
+            ret = MAXSIZE_T;
             if (j == mid) {
-                mid--;
+                ASSERT(mid);// it should never decrement 0
+                --mid;
             }
             j = mid;
-        } else if (t > midt) {
+        } else { // t > midt
             ret = mid;
-            if (i == mid) {
-                mid++;
-            }
+            if (i == mid) { ++mid; }
             i = mid;
         }
     }
 
-    if (0 <= ret && (size_t)ret < m_segments.GetCount()) {
-        if (iSegment) {
-            *iSegment = ret;
-        }
-    }
+    if (ret < uSegCount) {
+        if (iSegment) { *iSegment = ret; }
 
-    if (0 <= ret && (size_t)ret < m_segments.GetCount()
-            && m_segments[ret].subs.GetCount() > 0
-            && TranslateSegmentStart(ret, fps) <= t && t < TranslateSegmentEnd(ret, fps)) {
-        return &m_segments[ret];
+        if (m_segments[ret].subs.GetCount() > 0
+                && TranslateSegmentStart(ret, fps) <= t
+                && t < TranslateSegmentEnd(ret, fps)) { return (&m_segments[ret]); }
     }
 
     return nullptr;
 }
 
-int CSimpleTextSubtitle::TranslateStart(int i, double fps)
+LONGLONG CSimpleTextSubtitle::TranslateStart(__in const size_t i, __in const double fps) const
 {
-    return (i < 0 || GetCount() <= (size_t)i ? -1 :
-            m_mode == TIME ? GetAt(i).start :
-            m_mode == FRAME ? (int)(GetAt(i).start * 1000 / fps) :
-            0);
+    return (GetCount() <= i) ? -1 :
+           (m_mode == TIME) ? GetAt(i).start :
+           (m_mode == FRAME) ? static_cast<LONGLONG>(GetAt(i).start * 1000.0 / fps + 0.5) : 0;
 }
 
-int CSimpleTextSubtitle::TranslateEnd(int i, double fps)
+LONGLONG CSimpleTextSubtitle::TranslateEnd(__in const size_t i, __in const double fps) const
 {
-    return (i < 0 || GetCount() <= (size_t)i ? -1 :
-            m_mode == TIME ? GetAt(i).end :
-            m_mode == FRAME ? (int)(GetAt(i).end * 1000 / fps) :
-            0);
+    return (GetCount() <= i) ? -1 :
+           (m_mode == TIME) ? GetAt(i).end :
+           (m_mode == FRAME) ? static_cast<LONGLONG>(GetAt(i).end * 1000.0 / fps + 0.5) : 0;
 }
 
-int CSimpleTextSubtitle::TranslateSegmentStart(int i, double fps)
+LONGLONG CSimpleTextSubtitle::TranslateSegmentStart(__in const size_t i, __in const double fps) const
 {
-    return (i < 0 || m_segments.GetCount() <= (size_t)i ? -1 :
-            m_mode == TIME ? m_segments[i].start :
-            m_mode == FRAME ? (int)(m_segments[i].start * 1000 / fps) :
-            0);
+    return (m_segments.GetCount() <= i) ? -1 :
+           (m_mode == TIME) ? m_segments[i].start :
+           (m_mode == FRAME) ? static_cast<LONGLONG>(m_segments[i].start * 1000.0 / fps + 0.5) : 0;
 }
 
-int CSimpleTextSubtitle::TranslateSegmentEnd(int i, double fps)
+LONGLONG CSimpleTextSubtitle::TranslateSegmentEnd(__in const size_t i, __in const double fps) const
 {
-    return (i < 0 || m_segments.GetCount() <= (size_t)i ? -1 :
-            m_mode == TIME ? m_segments[i].end :
-            m_mode == FRAME ? (int)(m_segments[i].end * 1000 / fps) :
-            0);
+    return (m_segments.GetCount() <= i) ? -1 :
+           (m_mode == TIME) ? m_segments[i].end :
+           (m_mode == FRAME) ? static_cast<LONGLONG>(m_segments[i].end * 1000.0 / fps + 0.5) : 0;
 }
 
-STSStyle* CSimpleTextSubtitle::GetStyle(int i)
+STSStyle* CSimpleTextSubtitle::GetStyle(size_t i)
 {
     CString def = _T("Default");
 
@@ -2343,7 +2273,7 @@ STSStyle* CSimpleTextSubtitle::GetStyle(int i)
     return style;
 }
 
-bool CSimpleTextSubtitle::GetStyle(int i, STSStyle& stss)
+bool CSimpleTextSubtitle::GetStyle(size_t i, STSStyle& stss)
 {
     CString def = _T("Default");
 
@@ -2367,9 +2297,6 @@ bool CSimpleTextSubtitle::GetStyle(int i, STSStyle& stss)
     }
 
     stss = *style;
-    if (stss.relativeTo == 2 && defstyle) {
-        stss.relativeTo = defstyle->relativeTo;
-    }
 
     return true;
 }
@@ -2928,7 +2855,6 @@ void STSStyle::SetDefault()
     fBlur = 0;
     fGaussianBlur = 0;
     fontShiftX = fontShiftY = fontAngleZ = fontAngleX = fontAngleY = 0;
-    relativeTo = 2;
 }
 
 bool STSStyle::operator == (STSStyle& s)
@@ -2950,7 +2876,6 @@ bool STSStyle::operator == (STSStyle& s)
             && alpha[3] == s.alpha[3]
             && fBlur == s.fBlur
             && fGaussianBlur == s.fGaussianBlur
-            && relativeTo == s.relativeTo
             && IsFontStyleEqual(s));
 }
 
@@ -2980,7 +2905,7 @@ STSStyle& STSStyle::operator = (LOGFONT& lf)
     charSet = lf.lfCharSet;
     fontName = lf.lfFaceName;
     HDC hDC = GetDC(0);
-    fontSize = -MulDiv(lf.lfHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY));
+    fontSize = -72.0 * static_cast<double>(lf.lfHeight) / static_cast<double>(GetDeviceCaps(hDC, LOGPIXELSY));
     ReleaseDC(0, hDC);
     //  fontAngleZ = lf.lfEscapement/10.0;
     fontWeight = lf.lfWeight;
@@ -2995,7 +2920,7 @@ LOGFONTA& operator <<= (LOGFONTA& lfa, STSStyle& s)
     lfa.lfCharSet = s.charSet;
     strncpy_s(lfa.lfFaceName, LF_FACESIZE, CStringA(s.fontName), _TRUNCATE);
     HDC hDC = GetDC(0);
-    lfa.lfHeight = -MulDiv((int)(s.fontSize + 0.5), GetDeviceCaps(hDC, LOGPIXELSY), 72);
+    lfa.lfHeight = static_cast<LONG>(s.fontSize * static_cast<double>(GetDeviceCaps(hDC, LOGPIXELSY)) / -72.0 - 0.5); // rounding using -0.5, because of truncation rules below 0.0
     ReleaseDC(0, hDC);
     lfa.lfWeight = s.fontWeight;
     lfa.lfItalic = s.fItalic ? -1 : 0;
@@ -3009,7 +2934,7 @@ LOGFONTW& operator <<= (LOGFONTW& lfw, STSStyle& s)
     lfw.lfCharSet = s.charSet;
     wcsncpy_s(lfw.lfFaceName, LF_FACESIZE, CStringW(s.fontName), _TRUNCATE);
     HDC hDC = GetDC(0);
-    lfw.lfHeight = -MulDiv((int)(s.fontSize + 0.5), GetDeviceCaps(hDC, LOGPIXELSY), 72);
+    lfw.lfHeight = static_cast<LONG>(s.fontSize * static_cast<double>(GetDeviceCaps(hDC, LOGPIXELSY)) / -72.0 - 0.5); // rounding using -0.5, because of truncation rules below 0.0
     ReleaseDC(0, hDC);
     lfw.lfWeight = s.fontWeight;
     lfw.lfItalic = s.fItalic ? -1 : 0;
@@ -3020,7 +2945,7 @@ LOGFONTW& operator <<= (LOGFONTW& lfw, STSStyle& s)
 
 CString& operator <<= (CString& style, STSStyle& s)
 {
-    style.Format(_T("%d;%d;%d;%d;%d;%d;%f;%f;%f;%f;0x%06x;0x%06x;0x%06x;0x%06x;0x%02x;0x%02x;0x%02x;0x%02x;%d;%s;%f;%f;%f;%f;%d;%d;%d;%d;%d;%f;%f;%f;%f;%d"),
+    style.Format(_T("%d;%d;%d;%d;%d;%d;%f;%f;%f;%f;0x%06x;0x%06x;0x%06x;0x%06x;0x%02x;0x%02x;0x%02x;0x%02x;%d;%s;%f;%f;%f;%f;%d;%d;%d;%d;%d;%f;%f;%f;%f"),
                  s.marginRect.left, s.marginRect.right, s.marginRect.top, s.marginRect.bottom,
                  s.scrAlignment, s.borderStyle,
                  s.outlineWidthX, s.outlineWidthY, s.shadowDepthX, s.shadowDepthY,
@@ -3031,8 +2956,7 @@ CString& operator <<= (CString& style, STSStyle& s)
                  s.fontScaleX, s.fontScaleY,
                  s.fontSpacing, s.fontWeight,
                  s.fItalic, s.fUnderline, s.fStrikeOut, s.fBlur, s.fGaussianBlur,
-                 s.fontAngleZ, s.fontAngleX, s.fontAngleY,
-                 s.relativeTo);
+                 s.fontAngleZ, s.fontAngleX, s.fontAngleY);
 
     return style;
 }
@@ -3075,7 +2999,6 @@ STSStyle& operator <<= (STSStyle& s, CString& style)
             s.fontAngleZ = GetFloat(str, ';');
             s.fontAngleX = GetFloat(str, ';');
             s.fontAngleY = GetFloat(str, ';');
-            s.relativeTo = GetInt(str, ';');
         }
     } catch (...) {
         s.SetDefault();

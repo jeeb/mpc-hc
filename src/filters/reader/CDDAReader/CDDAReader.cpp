@@ -272,29 +272,32 @@ CCDDAStream::~CCDDAStream()
 
 bool CCDDAStream::Load(const WCHAR* fnw)
 {
-    CString path(fnw);
+    int iTrackIndex;
+    {
+        CString drive(fnw);
+        iTrackIndex = drive.MakeLower().Find(_T(".cda")) - 1;
+        if (iTrackIndex <= 0) {
+            return false;
+        }
 
-    int iDriveLetter = path.Find(_T(":\\")) - 1;
-    int iTrackIndex = CString(path).MakeLower().Find(_T(".cda")) - 1;
-    if (iDriveLetter < 0 || iTrackIndex <= iDriveLetter) {
-        return false;
-    }
+        do {
+            wchar_t c = drive[iTrackIndex - 1];
+            if (c >= L'0' && c <= L'9') {
+                break;
+            }
+        } while (--iTrackIndex);
+        if (1 != _stscanf_s(drive.Mid(iTrackIndex), _T("%u"), &iTrackIndex)) {
+            return false;
+        }
+        drive.Truncate(drive.ReverseFind(_T('\\')));// search for the last _T('\\'), then truncate right before that character
 
-    CString drive = CString(_T("\\\\.\\")) + path[iDriveLetter] + _T(":");
-    while (iTrackIndex > 0 && _istdigit(path[iTrackIndex - 1])) {
-        iTrackIndex--;
-    }
-    if (1 != _stscanf_s(path.Mid(iTrackIndex), _T("%d"), &iTrackIndex)) {
-        return false;
-    }
+        if (m_hDrive != INVALID_HANDLE_VALUE) {
+            CloseHandle(m_hDrive);
+            m_hDrive = INVALID_HANDLE_VALUE;
+        }
 
-    if (m_hDrive != INVALID_HANDLE_VALUE) {
-        CloseHandle(m_hDrive);
-        m_hDrive = INVALID_HANDLE_VALUE;
+        m_hDrive = CreateFile(drive, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
     }
-
-    m_hDrive = CreateFile(drive, GENERIC_READ, FILE_SHARE_READ, nullptr,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_READONLY | FILE_FLAG_SEQUENTIAL_SCAN, (HANDLE)nullptr);
     if (m_hDrive == INVALID_HANDLE_VALUE) {
         return false;
     }

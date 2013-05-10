@@ -20,249 +20,176 @@
  */
 
 #include "stdafx.h"
-#include "SubPicImpl.h"
+#include "ISubPic.h"
 #include "../DSUtil/DSUtil.h"
 
 //
-// CSubPicImpl
+// CBSubPic
 //
+// IUnknown
 
-CSubPicImpl::CSubPicImpl()
-    : CUnknown(NAME("CSubPicImpl"), nullptr)
-    , m_rtStart(0)
-    , m_rtStop(0)
-    , m_rtSegmentStart(0)
-    , m_rtSegmentStop(0)
-    , m_rcDirty(0, 0, 0, 0)
-    , m_maxsize(0, 0)
-    , m_size(0, 0)
-    , m_vidrect(0, 0, 0, 0)
-    , m_VirtualTextureSize(0, 0)
-    , m_VirtualTextureTopLeft(0, 0)
+__declspec(nothrow noalias) STDMETHODIMP CBSubPic::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-}
+    ASSERT(ppv);
+    __assume(this);// fix assembly: the compiler generated tests for null pointer input on static_cast<T>(this)
 
-STDMETHODIMP CSubPicImpl::NonDelegatingQueryInterface(REFIID riid, void** ppv)
-{
-    return
-        QI(ISubPic)
-        __super::NonDelegatingQueryInterface(riid, ppv);
-}
-
-// ISubPic
-
-STDMETHODIMP_(REFERENCE_TIME) CSubPicImpl::GetStart()
-{
-    return m_rtStart;
-}
-
-STDMETHODIMP_(REFERENCE_TIME) CSubPicImpl::GetStop()
-{
-    return m_rtStop;
-}
-
-STDMETHODIMP_(REFERENCE_TIME) CSubPicImpl::GetSegmentStart()
-{
-    return m_rtSegmentStart ? m_rtSegmentStart : m_rtStart;
-}
-
-STDMETHODIMP_(REFERENCE_TIME) CSubPicImpl::GetSegmentStop()
-{
-    return m_rtSegmentStop ? m_rtSegmentStop : m_rtStop;
-}
-
-STDMETHODIMP_(void) CSubPicImpl::SetSegmentStart(REFERENCE_TIME rtStart)
-{
-    m_rtSegmentStart = rtStart;
-}
-
-STDMETHODIMP_(void) CSubPicImpl::SetSegmentStop(REFERENCE_TIME rtStop)
-{
-    m_rtSegmentStop = rtStop;
-}
-
-STDMETHODIMP_(void) CSubPicImpl::SetStart(REFERENCE_TIME rtStart)
-{
-    m_rtStart = rtStart;
-}
-
-STDMETHODIMP_(void) CSubPicImpl::SetStop(REFERENCE_TIME rtStop)
-{
-    m_rtStop = rtStop;
-}
-
-STDMETHODIMP CSubPicImpl::CopyTo(ISubPic* pSubPic)
-{
-    if (!pSubPic) {
-        return E_POINTER;
+    __int64 lo = reinterpret_cast<__int64 const*>(&riid)[0], hi = reinterpret_cast<__int64 const*>(&riid)[1];
+    void* pv = static_cast<IUnknown*>(this);
+    if (lo == reinterpret_cast<__int64 const*>(&IID_IUnknown)[0] && hi == reinterpret_cast<__int64 const*>(&IID_IUnknown)[1]) {
+        goto exit;
     }
-
-    pSubPic->SetStart(m_rtStart);
-    pSubPic->SetStop(m_rtStop);
-    pSubPic->SetSegmentStart(m_rtSegmentStart);
-    pSubPic->SetSegmentStop(m_rtSegmentStop);
-    pSubPic->SetDirtyRect(m_rcDirty);
-    pSubPic->SetSize(m_size, m_vidrect);
-    pSubPic->SetVirtualTextureSize(m_VirtualTextureSize, m_VirtualTextureTopLeft);
-
-    return S_OK;
+    pv = this;
+    if (lo == reinterpret_cast<__int64 const*>(&__uuidof(CBSubPic))[0] && hi == reinterpret_cast<__int64 const*>(&__uuidof(CBSubPic))[1]) {
+        goto exit;
+    }
+    *ppv = nullptr;
+    return E_NOINTERFACE;
+exit:
+    *ppv = pv;
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
-STDMETHODIMP CSubPicImpl::GetDirtyRect(RECT* pDirtyRect)
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CBSubPic::AddRef()
 {
-    return pDirtyRect ? *pDirtyRect = m_rcDirty, S_OK : E_POINTER;
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
 }
 
-STDMETHODIMP CSubPicImpl::GetSourceAndDest(SIZE* pSize, RECT* pRcSource, RECT* pRcDest)
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CBSubPic::Release()
 {
-    CheckPointer(pRcSource, E_POINTER);
-    CheckPointer(pRcDest,   E_POINTER);
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
 
-    if (m_size.cx > 0 && m_size.cy > 0) {
-        CRect rcTemp = m_rcDirty;
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
 
-        // FIXME
-        rcTemp.DeflateRect(1, 1);
-
-        *pRcSource = rcTemp;
-
-        rcTemp.OffsetRect(m_VirtualTextureTopLeft);
-        *pRcDest = CRect(rcTemp.left   * pSize->cx / m_VirtualTextureSize.cx,
-                         rcTemp.top    * pSize->cy / m_VirtualTextureSize.cy,
-                         rcTemp.right  * pSize->cx / m_VirtualTextureSize.cx,
-                         rcTemp.bottom * pSize->cy / m_VirtualTextureSize.cy);
-
-        return S_OK;
+        // class created with placement new
+        this->~CBSubPic();
+        free(this);
+        return 0;
     } else {
-        return E_INVALIDARG;
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
     }
 }
 
-STDMETHODIMP CSubPicImpl::SetDirtyRect(RECT* pDirtyRect)
-{
-    return pDirtyRect ? m_rcDirty = *pDirtyRect, S_OK : E_POINTER;
-}
+// CBSubPic
 
-STDMETHODIMP CSubPicImpl::GetMaxSize(SIZE* pMaxSize)
+__declspec(nothrow noalias) bool CBSubPic::GetSourceAndDest(__out_ecount_opt(2) RECT arcSourceDest[2]) const
 {
-    return pMaxSize ? *pMaxSize = m_maxsize, S_OK : E_POINTER;
-}
+    ASSERT(arcSourceDest);
 
-STDMETHODIMP CSubPicImpl::SetSize(SIZE size, RECT vidrect)
-{
-    m_size = size;
-    m_vidrect = vidrect;
-
-    if (m_size.cx > m_maxsize.cx) {
-        m_size.cy = MulDiv(m_size.cy, m_maxsize.cx, m_size.cx);
-        m_size.cx = m_maxsize.cx;
+    if (!(m_rcDirty.right - m_rcDirty.left) || !(m_rcDirty.bottom - m_rcDirty.top)) {
+        return false;
     }
+    *arcSourceDest = m_rcDirty;
 
-    if (m_size.cy > m_maxsize.cy) {
-        m_size.cx = MulDiv(m_size.cx, m_maxsize.cy, m_size.cy);
-        m_size.cy = m_maxsize.cy;
+    LONG left = m_rcDirty.left;
+    LONG right = m_rcDirty.right;
+    LONG w = m_vidrect.right - m_vidrect.left;
+    if (m_maxsize.cx != w) {
+        left = left * w / m_maxsize.cx;
+        right = right * w / m_maxsize.cx;
     }
+    arcSourceDest[1].left = left;
+    arcSourceDest[1].right = right;
 
-    if (m_size.cx != size.cx || m_size.cy != size.cy) {
-        m_vidrect.top    = MulDiv(m_vidrect.top,    m_size.cx, size.cx);
-        m_vidrect.bottom = MulDiv(m_vidrect.bottom, m_size.cx, size.cx);
-        m_vidrect.left   = MulDiv(m_vidrect.left,   m_size.cy, size.cy);
-        m_vidrect.right  = MulDiv(m_vidrect.right,  m_size.cy, size.cy);
+    LONG top = m_rcDirty.top;
+    LONG bottom = m_rcDirty.bottom;
+    LONG h = m_vidrect.bottom - m_vidrect.top;
+    if (m_maxsize.cy != h) {
+        top = top * h / m_maxsize.cy;
+        bottom = bottom * h / m_maxsize.cy;
     }
-    m_VirtualTextureSize = m_size;
-
-    return S_OK;
-}
-
-STDMETHODIMP CSubPicImpl::SetVirtualTextureSize(const SIZE pSize, const POINT pTopLeft)
-{
-    m_VirtualTextureSize.SetSize(pSize.cx, pSize.cy);
-    m_VirtualTextureTopLeft.SetPoint(pTopLeft.x, pTopLeft.y);
-
-    return S_OK;
+    arcSourceDest[1].top = top;
+    arcSourceDest[1].bottom = bottom;
+    return true;
 }
 
 //
-// ISubPicAllocatorImpl
+// CSubPicAllocatorImpl
 //
+// IUnknown
 
-CSubPicAllocatorImpl::CSubPicAllocatorImpl(SIZE cursize, bool fDynamicWriteOnly, bool fPow2Textures)
-    : CUnknown(NAME("ISubPicAllocatorImpl"), nullptr)
-    , m_cursize(cursize)
-    , m_fDynamicWriteOnly(fDynamicWriteOnly)
-    , m_fPow2Textures(fPow2Textures)
+__declspec(nothrow noalias) STDMETHODIMP CSubPicAllocatorImpl::QueryInterface(REFIID riid, __deref_out void** ppv)
 {
-    m_curvidrect = CRect(CPoint(0, 0), m_cursize);
-}
+    ASSERT(ppv);
+    __assume(this);// fix assembly: the compiler generated tests for null pointer input on static_cast<T>(this)
 
-STDMETHODIMP CSubPicAllocatorImpl::NonDelegatingQueryInterface(REFIID riid, void** ppv)
-{
-    return
-        QI(ISubPicAllocator)
-        __super::NonDelegatingQueryInterface(riid, ppv);
-}
-
-// ISubPicAllocator
-
-STDMETHODIMP CSubPicAllocatorImpl::SetCurSize(SIZE cursize)
-{
-    m_cursize = cursize;
-    return S_OK;
-}
-
-STDMETHODIMP CSubPicAllocatorImpl::SetCurVidRect(RECT curvidrect)
-{
-    m_curvidrect = curvidrect;
-    return S_OK;
-}
-
-STDMETHODIMP CSubPicAllocatorImpl::GetStatic(ISubPic** ppSubPic)
-{
-    if (!ppSubPic) {
-        return E_POINTER;
+    __int64 lo = reinterpret_cast<__int64 const*>(&riid)[0], hi = reinterpret_cast<__int64 const*>(&riid)[1];
+    void* pv = static_cast<IUnknown*>(this);
+    if (lo == reinterpret_cast<__int64 const*>(&IID_IUnknown)[0] && hi == reinterpret_cast<__int64 const*>(&IID_IUnknown)[1]) {
+        goto exit;
     }
-
-    SIZE maxSize;
-    if (m_pStatic && (FAILED(m_pStatic->GetMaxSize(&maxSize)) || maxSize.cx < m_cursize.cx || maxSize.cy < m_cursize.cy)) {
-        m_pStatic.Release();
-        m_pStatic = nullptr;
+    pv = this;
+    if (lo == reinterpret_cast<__int64 const*>(&__uuidof(CSubPicAllocatorImpl))[0] && hi == reinterpret_cast<__int64 const*>(&__uuidof(CSubPicAllocatorImpl))[1]) {
+        goto exit;
     }
-
-    if (!m_pStatic) {
-        if (!Alloc(true, &m_pStatic) || !m_pStatic) {
-            return E_OUTOFMEMORY;
-        }
-    }
-
-    m_pStatic->SetSize(m_cursize, m_curvidrect);
-
-    (*ppSubPic = m_pStatic)->AddRef();
-
-    return S_OK;
+    *ppv = nullptr;
+    return E_NOINTERFACE;
+exit:
+    *ppv = pv;
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    UNREFERENCED_PARAMETER(ulRef);
+    return NOERROR;
 }
 
-STDMETHODIMP CSubPicAllocatorImpl::AllocDynamic(ISubPic** ppSubPic)
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CSubPicAllocatorImpl::AddRef()
 {
-    if (!ppSubPic) {
-        return E_POINTER;
-    }
-
-    if (!Alloc(false, ppSubPic) || !*ppSubPic) {
-        return E_OUTOFMEMORY;
-    }
-
-    (*ppSubPic)->SetSize(m_cursize, m_curvidrect);
-
-    return S_OK;
+    // based on CUnknown::NonDelegatingAddRef()
+    // the original CUnknown::NonDelegatingAddRef() has a version that keeps compatibility for Windows 95, Windows NT 3.51 and earlier, this one doesn't
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
+    return ulRef;
 }
 
-STDMETHODIMP_(bool) CSubPicAllocatorImpl::IsDynamicWriteOnly()
+__declspec(nothrow noalias) STDMETHODIMP_(ULONG) CSubPicAllocatorImpl::Release()
 {
-    return m_fDynamicWriteOnly;
-}
+    // based on CUnknown::NonDelegatingRelease()
+    // If the reference count drops to zero delete ourselves
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
 
-STDMETHODIMP CSubPicAllocatorImpl::ChangeDevice(IUnknown* pDev)
-{
-    m_pStatic = nullptr;
-    return S_OK;
+    if (!ulRef) {
+        // COM rules say we must protect against re-entrancy.
+        // If we are an aggregator and we hold our own interfaces
+        // on the aggregatee, the QI for these interfaces will
+        // addref ourselves. So after doing the QI we must release
+        // a ref count on ourselves. Then, before releasing the
+        // private interface, we must addref ourselves. When we do
+        // this from the destructor here it will result in the ref
+        // count going to 1 and then back to 0 causing us to
+        // re-enter the destructor. Hence we add an extra refcount here
+        // once we know we will delete the object.
+        // for an example aggregator see filgraph\distrib.cpp.
+        ++mv_ulReferenceCount;
+
+        // class created with placement new
+        this->~CSubPicAllocatorImpl();
+        free(this);
+        return 0;
+    } else {
+        // Don't touch the counter again even in this leg as the object
+        // may have just been released on another thread too
+        return ulRef;
+    }
 }

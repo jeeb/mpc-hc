@@ -31,8 +31,8 @@
 #include "realmedia/rmavsurf.h"
 #include "realmedia/rmaevent.h"
 #include "realmedia/rmaprefs.h"
-#include "DSUtil.h"
 #include "AuthDlg.h"
+#include "../filters/renderer/VideoRenderers/RM9AllocatorPresenter.h"
 
 using namespace DSObjects;
 
@@ -568,21 +568,20 @@ void CRealMediaPlayerWindowed::DestroySite(IRMASite* pSite)
 CRealMediaPlayerWindowless::CRealMediaPlayerWindowless(HWND hWndParent, CRealMediaGraph* pRMG)
     : CRealMediaPlayer(hWndParent, pRMG)
 {
-    const CAppSettings& s = AfxGetAppSettings();
-
-    bool bFullscreen = (AfxGetApp()->m_pMainWnd != nullptr) && (((CMainFrame*)AfxGetApp()->m_pMainWnd)->IsD3DFullScreenMode());
-    switch (s.iRMVideoRendererType) {
-        default:
-        case VIDRNDT_RM_DX7:
-            if (FAILED(CreateAP7(CLSID_RM7AllocatorPresenter, hWndParent, &m_pRMAP))) {
-                return;
+    if (AfxGetAppSettings().iRMVideoRendererType == VIDRNDT_RM_DX9) {
+        void* pRawMem = _aligned_malloc(sizeof(CRM9AllocatorPresenter), 16);
+        if (!pRawMem) {
+            MessageBoxW(hWndParent, L"Out of memory for creating DirectX 9 RealMedia presenter", NULL, MB_OK | MB_ICONERROR);
+        } else {
+            CStringW strError;
+            CRM9AllocatorPresenter* pRM9r = new(pRawMem) CRM9AllocatorPresenter(hWndParent, &strError);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(hWndParent, strError, L"Error creating DirectX 9 RealMedia presenter", MB_OK | MB_ICONERROR);
+                pRM9r->Release();
+            } else {
+                m_pRMAP.Attach(pRM9r);// inherits the reference
             }
-            break;
-        case VIDRNDT_RM_DX9:
-            if (FAILED(CreateAP9(CLSID_RM9AllocatorPresenter, hWndParent, bFullscreen, &m_pRMAP))) {
-                return;
-            }
-            break;
+        }
     }
 }
 
@@ -595,7 +594,7 @@ STDMETHODIMP CRealMediaPlayerWindowless::NonDelegatingQueryInterface(REFIID riid
     CheckPointer(ppv, E_POINTER);
 
     return
-        (m_pRMAP && (riid == __uuidof(ISubPicAllocatorPresenter) || riid == IID_IRMAVideoSurface)) ? m_pRMAP->QueryInterface(riid, ppv) :
+        (m_pRMAP && (riid == __uuidof(CSubPicAllocatorPresenterImpl) || riid == IID_IRMAVideoSurface)) ? m_pRMAP->QueryInterface(riid, ppv) :
         __super::NonDelegatingQueryInterface(riid, ppv);
 }
 
@@ -678,7 +677,7 @@ STDMETHODIMP CRealMediaGraph::NonDelegatingQueryInterface(REFIID riid, void** pp
     CheckPointer(ppv, E_POINTER);
 
     return
-        (m_pRMP && (riid == __uuidof(ISubPicAllocatorPresenter) || riid == __uuidof(ISubPicAllocatorPresenter))) ? m_pRMP->QueryInterface(riid, ppv) :
+        (m_pRMP && (riid == __uuidof(CSubPicAllocatorPresenterImpl))) ? m_pRMP->QueryInterface(riid, ppv) :
         __super::NonDelegatingQueryInterface(riid, ppv);
 }
 
@@ -775,8 +774,9 @@ STDMETHODIMP CRealMediaGraph::GetVideoSize(long* pWidth, long* pHeight)
     if (!pWidth || !pHeight) {
         return E_POINTER;
     }
-    *pWidth = m_pRMP->GetVideoSize().cx;
-    *pHeight = m_pRMP->GetVideoSize().cy;
+    SIZE szVideoSize = m_pRMP->GetVideoSize(true);
+    *pWidth = szVideoSize.cx;
+    *pHeight = szVideoSize.cy;
     return S_OK;
 }
 

@@ -508,21 +508,6 @@ const AMOVIESETUP_MEDIATYPE CMPCVideoDecFilter::sudPinTypesOut[] = {
 };
 const int CMPCVideoDecFilter::sudPinTypesOutCount = _countof(CMPCVideoDecFilter::sudPinTypesOut);
 
-BOOL CALLBACK EnumFindProcessWnd(HWND hwnd, LPARAM lParam)
-{
-    DWORD procid = 0;
-    TCHAR WindowClass [40];
-    GetWindowThreadProcessId(hwnd, &procid);
-    GetClassName(hwnd, WindowClass, _countof(WindowClass));
-
-    if (procid == GetCurrentProcessId() && _tcscmp(WindowClass, _T("MediaPlayerClassicW")) == 0) {
-        HWND* pWnd = (HWND*)lParam;
-        *pWnd = hwnd;
-        return FALSE;
-    }
-    return TRUE;
-}
-
 CMPCVideoDecFilter::CMPCVideoDecFilter(LPUNKNOWN lpunk, HRESULT* phr)
     : CBaseVideoFilter(MPCVideoDecName, lpunk, phr, __uuidof(this))
 {
@@ -661,8 +646,172 @@ CMPCVideoDecFilter::CMPCVideoDecFilter(LPUNKNOWN lpunk, HRESULT* phr)
     avcodec_register_all();
     av_log_set_callback(LogLibavcodec);
 
-    EnumWindows(EnumFindProcessWnd, (LPARAM)&hWnd);
-    DetectVideoCard(hWnd);
+    // detect the display adapter
+    // note: this function doesn't guarantee that the correct adapter is returned, the video renderer has to be queried for that
+    // SetEVRForDXVA2() queries EVR-based video renderers for that, but it's in an intermediate pass
+    m_nPCIVendor = 0;
+    m_nPCIDevice = 0;
+    m_VideoDriverVersion.QuadPart = 0;
+
+    // main window's nearest monitor to device name
+    HMONITOR hMonitor = MonitorFromWindow(*AfxGetMainWnd(), MONITOR_DEFAULTTONEAREST);
+    MONITORINFOEXW mi;
+    mi.cbSize = sizeof(MONITORINFOEX);
+    if (GetMonitorInfoW(hMonitor, &mi)) {
+        DISPLAY_DEVICEW DisplayDevice;
+        DisplayDevice.cb = sizeof(DISPLAY_DEVICEW);
+
+        HKEY hKey;
+        wchar_t fileName[MAX_DDDEVICEID_STRING];
+        DWORD dwStrSize;
+
+        DWORD dwDevNum = 0;
+        for (;;) {
+            if (!EnumDisplayDevicesW(NULL, dwDevNum, &DisplayDevice, 0)) {
+                ASSERT(0);// device not found
+                break;
+            }
+
+            if ((!_wcsicmp(DisplayDevice.DeviceName, mi.szDevice))// for if we have another device like hardware mpeg decoder or video card or another type of driver
+                    || ((DisplayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) && (!_wcsicmp(mi.szDevice, L"DISPLAY")))) {// check if its the primary driver we just found
+                // copy device characteristics
+                if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, DisplayDevice.DeviceKey + 18, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS) {
+                    dwStrSize = MAX_DDDEVICEID_STRING;
+                    if (RegQueryValueExW(hKey, L"InstalledDisplayDrivers", 0, NULL, reinterpret_cast<LPBYTE>(fileName), &dwStrSize) == ERROR_SUCCESS) {
+                        ASSERT((MAX_DDDEVICEID_STRING >= dwStrSize) && dwStrSize);
+                        DWORD i = dwStrSize - 1;// the loop is constructed to break if even single-letter file names are not possible anymore
+                        wchar_t* pRName = fileName;
+NextRNameIteration:
+                        DWORD size = GetFileVersionInfoSizeW(pRName, NULL);
+                        if (size) {
+                            BYTE* versionInfo = new(std::nothrow) BYTE[size];
+                            if (versionInfo) {
+                                if (GetFileVersionInfoW(pRName, 0, size, versionInfo)) {
+                                    UINT len = 0;
+                                    VS_FIXEDFILEINFO* vsfi;
+                                    if (VerQueryValueW(versionInfo, L"\\", reinterpret_cast<void**>(&vsfi), &len)) {
+                                        // store the driver version
+                                        // endianess problem here: dwFileVersionMS (high) is first in the struct, dwFileVersionMS (low) is next, so it can't be copied as 64 bits at once
+                                        m_VideoDriverVersion.HighPart = vsfi->dwProductVersionMS;
+                                        m_VideoDriverVersion.LowPart = vsfi->dwProductVersionLS;
+                                    } else {
+                                        ASSERT(0);
+                                    }
+                                } else {
+                                    ASSERT(0);
+                                }
+                                delete[] versionInfo;
+                            } else {
+                                ASSERT(0);
+                            }
+                            goto SkipRNameIteration;
+                        }
+
+                        ++pRName;
+                        do {
+                            wchar_t c = *pRName++;// point to the next over the NULL character
+                            if (!c) {
+                                goto NextRNameIteration;
+                            }
+                        } while (--i);
+
+                        ASSERT(0);
+                    } else {
+                        ASSERT(0);
+                    }
+SkipRNameIteration:
+                    RegCloseKey(hKey);
+                } else {
+                    ASSERT(0);
+                }
+
+                // get vendor ID
+                unsigned __int8* pIDn = reinterpret_cast<unsigned __int8*>(DisplayDevice.DeviceID); // reading the upper bytes would be pointless, those are all 0
+                unsigned __int8 u8Nibble = pIDn[8 << 1];// 4 characters, starting at character 8
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10; // 'a' 0x61
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10; // 'A' 0x41
+                } else {
+                    u8Nibble -= '0';      // '0' 0x30
+                }
+                m_nPCIVendor = u8Nibble << 12;// each hexadecimal char stores 4 bits
+                u8Nibble = pIDn[9 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIVendor |= u8Nibble << 8;
+                u8Nibble = pIDn[10 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIVendor |= u8Nibble << 4;
+                u8Nibble = pIDn[11 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIVendor |= u8Nibble;
+
+                // get device ID
+                u8Nibble = pIDn[17 << 1];// 4 characters, starting at character 17
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIDevice = u8Nibble << 12;
+                u8Nibble = pIDn[18 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIDevice |= u8Nibble << 8;
+                u8Nibble = pIDn[19 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIDevice |= u8Nibble << 4;
+                u8Nibble = pIDn[20 << 1];
+                if (u8Nibble >= 'a') {
+                    u8Nibble -= 'a' - 10;
+                } else if (u8Nibble >= 'A') {
+                    u8Nibble -= 'A' - 10;
+                } else {
+                    u8Nibble -= '0';
+                }
+                m_nPCIDevice |= u8Nibble;
+
+                // get device name
+                m_strDeviceDescription = DisplayDevice.DeviceString;
+                m_strDeviceDescription.AppendFormat(_T(" (%04hX:%04hX)"), m_nPCIVendor, m_nPCIDevice);
+                break;
+            }
+            ++dwDevNum;
+        }
+    } else {
+        ASSERT(0); // monitor info inaccessible
+    }
 
 #ifdef _DEBUG
     // Check codec definition table
@@ -673,28 +822,6 @@ CMPCVideoDecFilter::CMPCVideoDecFilter(LPUNKNOWN lpunk, HRESULT* phr)
         ASSERT(ffCodecs[i].clsMinorType == sudPinTypesIn[i].clsMinorType);
     }
 #endif
-}
-
-void CMPCVideoDecFilter::DetectVideoCard(HWND hWnd)
-{
-    IDirect3D9* pD3D9;
-    m_nPCIVendor = 0;
-    m_nPCIDevice = 0;
-    m_VideoDriverVersion.HighPart = 0;
-    m_VideoDriverVersion.LowPart = 0;
-
-    pD3D9 = Direct3DCreate9(D3D_SDK_VERSION);
-    if (pD3D9) {
-        D3DADAPTER_IDENTIFIER9 adapterIdentifier;
-        if (pD3D9->GetAdapterIdentifier(GetAdapter(pD3D9, hWnd), 0, &adapterIdentifier) == S_OK) {
-            m_nPCIVendor = adapterIdentifier.VendorId;
-            m_nPCIDevice = adapterIdentifier.DeviceId;
-            m_VideoDriverVersion = adapterIdentifier.DriverVersion;
-            m_strDeviceDescription = adapterIdentifier.Description;
-            m_strDeviceDescription.AppendFormat(_T(" (%04X:%04X)"), m_nPCIVendor, m_nPCIDevice);
-        }
-        pD3D9->Release();
-    }
 }
 
 CMPCVideoDecFilter::~CMPCVideoDecFilter()
@@ -757,14 +884,14 @@ int CMPCVideoDecFilter::PictHeight()
 
 int CMPCVideoDecFilter::PictWidthRounded()
 {
-    // Picture height should be rounded to 16 for DXVA
-    return ((m_nWidth + 15) / 16) * 16;
+    // Picture width should be rounded up to multiples of 16 for DXVA
+    return (m_nWidth + 15) & ~15;
 }
 
 int CMPCVideoDecFilter::PictHeightRounded()
 {
-    // Picture height should be rounded to 16 for DXVA
-    return ((m_nHeight + 15) / 16) * 16;
+    // Picture height should be rounded up to multiples of 16 for DXVA
+    return (m_nHeight + 15) & ~15;
 }
 
 int CMPCVideoDecFilter::FindCodec(const CMediaType* mtIn)
@@ -1202,7 +1329,7 @@ HRESULT CMPCVideoDecFilter::SetMediaType(PIN_DIRECTION direction, const CMediaTy
                         if (m_nDXVA_SD && PictWidthRounded() < 1280) { // check "Disable DXVA for SD" option
                             break;
                         }
-                        int nCompat = FFH264CheckCompatibility(PictWidthRounded(), PictHeightRounded(), m_pAVCtx, (BYTE*)m_pAVCtx->extradata, m_pAVCtx->extradata_size, m_nPCIVendor, m_nPCIDevice, m_VideoDriverVersion);
+                        int nCompat = FFH264CheckCompatibility(PictWidthRounded(), PictHeightRounded(), m_pAVCtx, m_pAVCtx->extradata, m_pAVCtx->extradata_size, m_nPCIVendor, m_nPCIDevice, m_VideoDriverVersion);
                         if (nCompat) {
                             if (nCompat == DXVA_HIGH_BIT       ||
                                     m_nDXVACheckCompatibility == 0 || // full check
@@ -1259,21 +1386,37 @@ HRESULT CMPCVideoDecFilter::SetMediaType(PIN_DIRECTION direction, const CMediaTy
     return hr;
 }
 
-VIDEO_OUTPUT_FORMATS DXVAFormats[] = { // DXVA2
+VIDEO_OUTPUT_FORMATS const DXVAFormats[] = { // DXVA2
     {&MEDIASUBTYPE_NV12, 1, 12, 'avxd'},
     {&MEDIASUBTYPE_NV12, 1, 12, 'AVXD'},
     {&MEDIASUBTYPE_NV12, 1, 12, 'AVxD'},
     {&MEDIASUBTYPE_NV12, 1, 12, 'AvXD'}
 };
 
-VIDEO_OUTPUT_FORMATS SoftwareFormats1[] = { // Software
+VIDEO_OUTPUT_FORMATS const SoftwareFormats1[] = { // Software
+
     {&MEDIASUBTYPE_NV12, 2, 12, '21VN'},
+    {&MEDIASUBTYPE_NV21, 2, 12, '12VN'},
     {&MEDIASUBTYPE_YV12, 3, 12, '21VY'},
+    {&MEDIASUBTYPE_I420, 3, 12, '024I'},
+    {&MEDIASUBTYPE_IYUV, 3, 12, 'VUYI'},
     {&MEDIASUBTYPE_YUY2, 1, 16, '2YUY'},
+    {&MEDIASUBTYPE_UYVY, 1, 16, 'YVYU'},
+    {&MEDIASUBTYPE_YVYU, 1, 16, 'UYVY'},
+    {&MEDIASUBTYPE_VYUY, 1, 16, 'YUYV'},
 };
 
-VIDEO_OUTPUT_FORMATS SoftwareFormats2[] = { // Software
+VIDEO_OUTPUT_FORMATS const SoftwareFormats2[] = { // Software
+    {&MEDIASUBTYPE_ARGB32, 1, 32, BI_RGB},
     {&MEDIASUBTYPE_RGB32, 1, 32, BI_RGB},
+    {&MEDIASUBTYPE_RGB24, 1, 24, BI_RGB},
+    {&MEDIASUBTYPE_RGB565, 1, 16, BI_RGB},
+    {&MEDIASUBTYPE_RGB555, 1, 16, BI_RGB},
+    {&MEDIASUBTYPE_ARGB32, 1, 32, BI_BITFIELDS},
+    {&MEDIASUBTYPE_RGB32, 1, 32, BI_BITFIELDS},
+    {&MEDIASUBTYPE_RGB24, 1, 24, BI_BITFIELDS},
+    {&MEDIASUBTYPE_RGB565, 1, 16, BI_BITFIELDS},
+    {&MEDIASUBTYPE_RGB555, 1, 16, BI_BITFIELDS}
 };
 
 bool CMPCVideoDecFilter::IsDXVASupported()
@@ -1299,7 +1442,7 @@ void CMPCVideoDecFilter::BuildDXVAOutputFormat()
 
     m_nVideoOutputCount = IsDXVASupported() ? ffCodecs[m_nCodecNb].DXVAModeCount() + _countof(DXVAFormats) : 0;
     if (m_bUseFFmpeg) {
-        if (!(m_pAVCtx->width & 1 || m_pAVCtx->height & 1)) { // Do not use NV12, YV12 and YUY2 if width or height is not even
+        if (!(m_pAVCtx->width & 1) && !(m_pAVCtx->height & 1)) { // Do not use NV12, YV12 and YUY2 if width or height is not even
             m_nVideoOutputCount += _countof(SoftwareFormats1);
         }
         m_nVideoOutputCount += _countof(SoftwareFormats2);
@@ -1322,7 +1465,7 @@ void CMPCVideoDecFilter::BuildDXVAOutputFormat()
     }
     // Software rendering
     if (m_bUseFFmpeg) {
-        if (!(m_pAVCtx->width & 1 || m_pAVCtx->height & 1)) { // Do not use NV12, YV12 and YUY2 if width or height is not even
+        if (!(m_pAVCtx->width & 1) && !(m_pAVCtx->height & 1)) { // Do not use NV12, YV12 and YUY2 if width or height is not even
             memcpy(&m_pVideoOutputFormat[nPos], SoftwareFormats1, sizeof(SoftwareFormats1));
             nPos += _countof(SoftwareFormats1);
         }
@@ -1339,10 +1482,10 @@ int CMPCVideoDecFilter::GetPicEntryNumber()
     }
 }
 
-void CMPCVideoDecFilter::GetOutputFormats(int& nNumber, VIDEO_OUTPUT_FORMATS** ppFormats)
+int CMPCVideoDecFilter::GetOutputFormats(VIDEO_OUTPUT_FORMATS const** ppFormats)
 {
-    nNumber = m_nVideoOutputCount;
     *ppFormats = m_pVideoOutputFormat;
+    return m_nVideoOutputCount;
 }
 
 void CMPCVideoDecFilter::AllocExtradata(AVCodecContext* pAVCtx, const CMediaType* pmt)
@@ -1576,17 +1719,42 @@ void CMPCVideoDecFilter::SetTypeSpecificFlags(IMediaSample* pMS)
 #if HAS_FFMPEG_VIDEO_DECODERS
 unsigned __int64 CMPCVideoDecFilter::GetCspFromMediaType(GUID& subtype)
 {
-    if (subtype == MEDIASUBTYPE_I420 || subtype == MEDIASUBTYPE_IYUV || subtype == MEDIASUBTYPE_YV12) {
-        return (FF_CSP_420P | FF_CSP_FLAGS_YUV_ADJ);
-    } else if (subtype == MEDIASUBTYPE_NV12) {
+    // use the same flags as indicated in ffImgfmt.cpp
+    DWORD dwTag = subtype.Data1;
+    if (dwTag == '21VN') {
         return FF_CSP_NV12;
-    } else if (subtype == MEDIASUBTYPE_RGB32) {
-        return FF_CSP_RGB32;
-    } else if (subtype == MEDIASUBTYPE_YUY2) {
+    } else if (dwTag == '12VN') {
+        return FF_CSP_NV12;// don't add FF_CSP_FLAGS_YUV_ORDER, NV21 has packed chroma in one plane
+    } else if (dwTag == MEDIASUBTYPE_YV12.Data1) {
+        return FF_CSP_420P | FF_CSP_FLAGS_YUV_ADJ | FF_CSP_FLAGS_YUV_ORDER;
+    } else if ((dwTag == MEDIASUBTYPE_I420.Data1) || (dwTag == MEDIASUBTYPE_IYUV.Data1)) {
+        return FF_CSP_420P | FF_CSP_FLAGS_YUV_ADJ;
+    } else if (dwTag == MEDIASUBTYPE_YUY2.Data1) {
         return FF_CSP_YUY2;
+    } else if (dwTag == MEDIASUBTYPE_UYVY.Data1) {
+        return FF_CSP_UYVY;
+    } else if (dwTag == MEDIASUBTYPE_YVYU.Data1) {
+        return FF_CSP_YVYU;
+    } else if (dwTag == MEDIASUBTYPE_VYUY.Data1) {
+        return FF_CSP_VYUY;
+    } else if (dwTag == MEDIASUBTYPE_ARGB32.Data1) {
+        return FF_CSP_RGBA;
+    } else if (dwTag == MEDIASUBTYPE_RGB32.Data1) {
+        return FF_CSP_RGB32;
+    } else if (dwTag == MEDIASUBTYPE_RGB24.Data1) {
+        return FF_CSP_RGB24;
+    } else if (dwTag == MEDIASUBTYPE_RGB565.Data1) {
+        return FF_CSP_RGB16;
+    } else if (dwTag == MEDIASUBTYPE_RGB555.Data1) {
+        return FF_CSP_RGB15;
     }
 
+#ifdef _DEBUG// the Data1 member can usually be read like a set of characters, except with the RGB types (which are still all unique among the video media types)
+    __declspec(align(4)) char szName[5];
+    szName[4] = 0;
+    *reinterpret_cast<DWORD*>(szName) = dwTag;
     ASSERT(FALSE);
+#endif
     return FF_CSP_NULL;
 }
 
@@ -1829,7 +1997,7 @@ HRESULT CMPCVideoDecFilter::SoftwareDecode(IMediaSample* pIn, BYTE* pDataIn, int
 
             // From LAVVideo ...
             // Check if we have proper pixel alignment and the dst memory is actually aligned
-            if (FFALIGN(outStride, 16) != outStride || ((uintptr_t)pDataOut % 16u)) {
+            if (outStride & 15 || reinterpret_cast<uintptr_t>(pDataOut) & 15) {
                 outStride = FFALIGN(outStride, 16);
                 int requiredSize = (outStride * m_pAVCtx->height * m_nSwOutBpp) << 3;
                 if (requiredSize > m_nAlignedFFBufferSize) {
@@ -1840,21 +2008,28 @@ HRESULT CMPCVideoDecFilter::SoftwareDecode(IMediaSample* pIn, BYTE* pDataIn, int
                 outData = m_pAlignedFFBuffer;
             }
 
-            uint8_t* dst[4] = {nullptr, nullptr, nullptr, nullptr};
-            stride_t dstStride[4] = {0, 0, 0, 0};
+            uint8_t* dst[4];
+            stride_t dstStride[4];
             const TcspInfo* outcspInfo = csp_getInfo(m_nOutCsp);
 
-            if (m_nOutCsp == FF_CSP_YUY2 || m_nOutCsp == FF_CSP_RGB32) {
-                dst[0] = outData;
-                dstStride[0] = (m_nSwOutBpp >> 3) * (outStride);
-            } else {
-                for (unsigned int i = 0; i < outcspInfo->numPlanes; i++) {
-                    dstStride[i] = outStride >> outcspInfo->shiftX[i];
-                    dst[i] = !i ? outData : dst[i - 1] + dstStride[i - 1] * (m_pOutSize.cy >> outcspInfo->shiftY[i - 1]);
-                }
+            dst[0] = outData;
+            if (m_nOutCsp & (FF_CSPS_MASK_YUV_PACKED | FF_CSPS_MASK_RGB | FF_CSPS_MASK_BGR)) { // packed formats
+                dstStride[0] = outStride * (m_nSwOutBpp >> 3);
+                dstStride[1] = dstStride[2] = dstStride[3] = 0;
+                dst[1] = dst[2] = dst[3] = nullptr;
+            } else {// planar formats
+                dstStride[0] = outStride >> outcspInfo->shiftX[0];
+                dstStride[1] = outStride >> outcspInfo->shiftX[1];
+                dstStride[2] = outStride >> outcspInfo->shiftX[2];
+                dstStride[3] = outStride >> outcspInfo->shiftX[3];
+                dst[1] = dst[0] + dstStride[0] * (m_pOutSize.cy >> outcspInfo->shiftY[0]);
+                dst[2] = dst[1] + dstStride[1] * (m_pOutSize.cy >> outcspInfo->shiftY[1]);
+                dst[3] = dst[2] + dstStride[2] * (m_pOutSize.cy >> outcspInfo->shiftY[2]);
 
-                if (m_nOutCsp & FF_CSP_420P) {
-                    std::swap(dst[1], dst[2]);
+                if (m_nOutCsp & FF_CSP_FLAGS_YUV_ORDER) { // for example, YV12 has swapped chroma planes, note: don't use this for semi-planar types, such as NV21
+                    uint8_t* pTmp = dst[1];
+                    dst[1] = dst[2];
+                    dst[2] = pTmp;
                 }
             }
 
@@ -2303,48 +2478,79 @@ HRESULT CMPCVideoDecFilter::ConfigureDXVA2(IPin* pPin)
 
 HRESULT CMPCVideoDecFilter::SetEVRForDXVA2(IPin* pPin)
 {
-    HRESULT hr = S_OK;
-
-    CComPtr<IMFGetService> pGetService;
-    CComPtr<IDirectXVideoMemoryConfiguration> pVideoConfig;
-    CComPtr<IMFVideoDisplayControl> pVdc;
-
     // Query the pin for IMFGetService.
-    hr = pPin->QueryInterface(__uuidof(IMFGetService), (void**)&pGetService);
-
-    // Get the IDirectXVideoMemoryConfiguration interface.
+    IMFGetService* pGetService;
+    HRESULT hr = pPin->QueryInterface(__uuidof(IMFGetService), reinterpret_cast<void**>(&pGetService));
     if (SUCCEEDED(hr)) {
-        hr = pGetService->GetService(
-                 MR_VIDEO_ACCELERATION_SERVICE,
-                 __uuidof(IDirectXVideoMemoryConfiguration),
-                 (void**)&pVideoConfig);
-
-        if (SUCCEEDED(pGetService->GetService(MR_VIDEO_RENDER_SERVICE, __uuidof(IMFVideoDisplayControl), (void**)&pVdc))) {
-            HWND    hWnd;
-            if (SUCCEEDED(pVdc->GetVideoWindow(&hWnd))) {
-                DetectVideoCard(hWnd);
+        // Try to get the adapter description of the active DirectX 9 device.
+        IDirect3DDeviceManager9* pDevMan9;
+        hr = pGetService->GetService(MR_VIDEO_ACCELERATION_SERVICE, IID_IDirect3DDeviceManager9, reinterpret_cast<void**>(&pDevMan9));
+        if (SUCCEEDED(hr)) {
+            HANDLE hDevice;
+            hr = pDevMan9->OpenDeviceHandle(&hDevice);
+            if (SUCCEEDED(hr)) {
+                IDirect3DDevice9* pD3DDev9;
+                hr = pDevMan9->LockDevice(hDevice, &pD3DDev9, TRUE);
+                if (hr == DXVA2_E_NEW_VIDEO_DEVICE) {
+                    // Invalid device handle. Try to open a new device handle.
+                    hr = pDevMan9->CloseDeviceHandle(hDevice);
+                    if (SUCCEEDED(hr)) {
+                        hr = pDevMan9->OpenDeviceHandle(&hDevice);
+                        // Try to lock the device again.
+                        if (SUCCEEDED(hr)) {
+                            hr = pDevMan9->LockDevice(hDevice, &pD3DDev9, TRUE);
+                        }
+                    }
+                }
+                if (SUCCEEDED(hr)) {
+                    D3DDEVICE_CREATION_PARAMETERS DevPar9;
+                    hr = pD3DDev9->GetCreationParameters(&DevPar9);
+                    if (SUCCEEDED(hr)) {
+                        IDirect3D9* pD3D9;
+                        hr = pD3DDev9->GetDirect3D(&pD3D9);
+                        if (SUCCEEDED(hr)) {
+                            D3DADAPTER_IDENTIFIER9 AdapID9;
+                            hr = pD3D9->GetAdapterIdentifier(DevPar9.AdapterOrdinal, 0, &AdapID9);
+                            if (SUCCEEDED(hr)) {
+                                // copy adapter description
+                                m_nPCIVendor = AdapID9.VendorId;
+                                m_nPCIDevice = AdapID9.DeviceId;
+                                m_VideoDriverVersion.QuadPart = AdapID9.DriverVersion.QuadPart;
+                                m_strDeviceDescription = AdapID9.Description;
+                                m_strDeviceDescription.AppendFormat(_T(" (%04hX:%04hX)"), m_nPCIVendor, m_nPCIDevice);
+                            }
+                        }
+                        pD3D9->Release();
+                    }
+                    pD3DDev9->Release();
+                    pDevMan9->UnlockDevice(hDevice, FALSE);
+                }
+                pDevMan9->CloseDeviceHandle(hDevice);
             }
+            pDevMan9->Release();
         }
-    }
 
-    // Notify the EVR.
-    if (SUCCEEDED(hr)) {
-        DXVA2_SurfaceType surfaceType;
-
-        for (DWORD iTypeIndex = 0; ; iTypeIndex++) {
-            hr = pVideoConfig->GetAvailableSurfaceTypeByIndex(iTypeIndex, &surfaceType);
-
-            if (FAILED(hr)) {
-                break;
+        IDirectXVideoMemoryConfiguration* pVideoConfig;
+        hr = pGetService->GetService(MR_VIDEO_ACCELERATION_SERVICE, IID_IDirectXVideoMemoryConfiguration, reinterpret_cast<void**>(&pVideoConfig));
+        if (SUCCEEDED(hr)) {
+            // Notify the EVR.
+            DXVA2_SurfaceType surfaceType;
+            DWORD dwTypeIndex = 0;
+            for (;;) {
+                hr = pVideoConfig->GetAvailableSurfaceTypeByIndex(dwTypeIndex, &surfaceType);
+                if (FAILED(hr)) {
+                    break;
+                }
+                if (surfaceType == DXVA2_SurfaceType_DecoderRenderTarget) {
+                    hr = pVideoConfig->SetSurfaceType(DXVA2_SurfaceType_DecoderRenderTarget);
+                    break;
+                }
+                ++dwTypeIndex;
             }
-
-            if (surfaceType == DXVA2_SurfaceType_DecoderRenderTarget) {
-                hr = pVideoConfig->SetSurfaceType(DXVA2_SurfaceType_DecoderRenderTarget);
-                break;
-            }
+            pVideoConfig->Release();
         }
+        pGetService->Release();
     }
-
     return hr;
 }
 

@@ -20,7 +20,6 @@
  */
 
 #include "stdafx.h"
-#include <afxdlgs.h>
 #include <atlpath.h>
 #include "resource.h"
 #include "../../../Subtitles/VobSubFile.h"
@@ -119,6 +118,8 @@ CSRIAPI int csri_request_fmt(csri_inst* inst, const struct csri_fmt* fmt)
         case CSRI_F_BGR:
         case CSRI_F_YUY2:
         case CSRI_F_YV12:
+        case CSRI_F_NV12:
+        case CSRI_F_NV21:
             inst->pixfmt = fmt->pixfmt;
             break;
 
@@ -160,10 +161,24 @@ CSRIAPI void csri_render(csri_inst* inst, struct csri_frame* frame, double time)
 
         case CSRI_F_YV12:
             spd.type = MSP_YV12;
-            spd.bpp = 12;
+            spd.bpp = 8;
+            spd.bits = frame->planes[0];
+            spd.bitsU = frame->planes[2];
+            spd.bitsV = frame->planes[1];
+            spd.pitch = frame->strides[0];
+            spd.pitchUV = frame->strides[1];
+            break;
+
+        case CSRI_F_NV12:
+            spd.type = MSP_NV12;
+            goto SKIP_NV21;
+        case CSRI_F_NV21:
+            spd.type = MSP_NV21;
+SKIP_NV21:
+            spd.bpp = 8;
             spd.bits = frame->planes[0];
             spd.bitsU = frame->planes[1];
-            spd.bitsV = frame->planes[2];
+            spd.bitsV = frame->planes[1];
             spd.pitch = frame->strides[0];
             spd.pitchUV = frame->strides[1];
             break;

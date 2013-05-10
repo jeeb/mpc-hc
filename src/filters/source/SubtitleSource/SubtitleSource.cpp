@@ -365,17 +365,17 @@ HRESULT CSubtitleStream::OnThreadCreate()
     CAutoLock cAutoLockShared(&m_cSharedState);
 
     if (m_mt.majortype == MEDIATYPE_Video && m_mt.subtype == MEDIASUBTYPE_ARGB32) {
-        m_nPosition = (int)(m_rtStart / _ATPF);
+        m_nPosition = m_rtStart / _ATPF;
     } else if (m_mt.majortype == MEDIATYPE_Video && m_mt.subtype == MEDIASUBTYPE_RGB32) {
-        int m_nSegments = 0;
-        if (!m_rts.SearchSubs((int)(m_rtStart / 10000), 10000000.0 / _ATPF, &m_nPosition, &m_nSegments)) {
-            m_nPosition = m_nSegments;
+        size_t nSegments = 0;
+        if (!m_rts.SearchSubs(m_rtStart / 10000, 10000000 / _ATPF, &m_nPosition, &nSegments)) {
+            m_nPosition = nSegments;
         }
     } else {
-        m_nPosition = m_rts.SearchSub((int)(m_rtStart / 10000), 25);
+        m_nPosition = m_rts.SearchSub(m_rtStart / 10000, 25.0);
         if (m_nPosition < 0) {
             m_nPosition = 0;
-        } else if (m_rts[m_nPosition].end <= (int)(m_rtStart / 10000)) {
+        } else if (m_rts[m_nPosition].end <= m_rtStart / 10000) {
             m_nPosition++;
         }
     }
@@ -430,7 +430,7 @@ HRESULT CSubtitleStream::FillBuffer(IMediaSample* pSample)
             DeleteMediaType(pmt);
         }
 
-        int len = 0;
+        size_t len = 0;
         REFERENCE_TIME rtStart, rtStop;
 
         if (m_mt.majortype == MEDIATYPE_Video && m_mt.subtype == MEDIASUBTYPE_ARGB32) {
@@ -443,11 +443,19 @@ HRESULT CSubtitleStream::FillBuffer(IMediaSample* pSample)
             BITMAPINFOHEADER& bmi = ((VIDEOINFOHEADER*)m_mt.pbFormat)->bmiHeader;
 
             SubPicDesc spd;
+            spd.type = 0;
             spd.w = _WIDTH;
             spd.h = _HEIGHT;
             spd.bpp = 32;
-            spd.pitch = bmi.biWidth * 4;
+            spd.pitch = bmi.biWidth << 2;
+            spd.pitchUV = 0;
             spd.bits = pData;
+            spd.bitsU = NULL;
+            spd.bitsV = NULL;
+            spd.vidrect.left = 0;
+            spd.vidrect.top = 0;
+            spd.vidrect.right = 0;
+            spd.vidrect.bottom = 0;
 
             len = spd.h * spd.pitch;
 
@@ -473,11 +481,19 @@ HRESULT CSubtitleStream::FillBuffer(IMediaSample* pSample)
             BITMAPINFOHEADER& bmi = ((VIDEOINFOHEADER*)m_mt.pbFormat)->bmiHeader;
 
             SubPicDesc spd;
+            spd.type = 0;
             spd.w = _WIDTH;
             spd.h = _HEIGHT;
             spd.bpp = 32;
-            spd.pitch = bmi.biWidth * 4;
+            spd.pitch = bmi.biWidth << 2;
+            spd.pitchUV = 0;
             spd.bits = pData;
+            spd.bitsU = NULL;
+            spd.bitsV = NULL;
+            spd.vidrect.left = 0;
+            spd.vidrect.top = 0;
+            spd.vidrect.right = 0;
+            spd.vidrect.bottom = 0;
 
             len = spd.h * spd.pitch;
 
@@ -653,7 +669,7 @@ HRESULT CSubtitleSourceSSA::GetMediaType(CMediaType* pmt)
         return E_FAIL;
     }
 
-    int len = (int)f.GetLength() - 3;
+    size_t len = f.GetLength() - 3;
     f.Seek(3, CFile::begin);
 
     SUBTITLEINFO* psi = (SUBTITLEINFO*)pmt->AllocFormatBuffer(sizeof(SUBTITLEINFO) + len);
@@ -704,7 +720,7 @@ HRESULT CSubtitleSourceASS::GetMediaType(CMediaType* pmt)
         return E_FAIL;
     }
 
-    int len = (int)f.GetLength();
+    size_t len = f.GetLength();
 
     SUBTITLEINFO* psi = (SUBTITLEINFO*)pmt->AllocFormatBuffer(sizeof(SUBTITLEINFO) + len);
     memset(psi, 0, pmt->FormatLength());

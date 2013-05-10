@@ -23,6 +23,8 @@
 #include "DirectVobSub.h"
 #include "VSFilter.h"
 
+#define ResStr(id) CString(MAKEINTRESOURCE(id))// TODO; replace this by the usual LoadString() to constant resource
+
 CDirectVobSub::CDirectVobSub()
 {
     AFX_MANAGE_STATE(AfxGetStaticModuleState());

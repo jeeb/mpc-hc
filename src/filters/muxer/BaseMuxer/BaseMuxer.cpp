@@ -89,8 +89,8 @@ void CBaseMuxerFilter::AddInput()
     }
     CAutoPtr<CBaseMuxerRawOutputPin> pAutoPtrRawOutputPin(pRawOutputPin);
 
-    pInputPin->SetRelatedPin(pRawOutputPin);
-    pRawOutputPin->SetRelatedPin(pInputPin);
+    pInputPin->SetRelatedPin(pRawOutputPin, true);
+    pRawOutputPin->SetRelatedPin(pInputPin, false);
 
     m_pInputs.AddTail(pAutoPtrInputPin);
     m_pRawOutputs.AddTail(pAutoPtrRawOutputPin);
@@ -214,10 +214,13 @@ void CBaseMuxerFilter::MuxHeaderInternal()
 
     POSITION pos = m_pPins.GetHeadPosition();
     while (pos) {
-        if (CBaseMuxerInputPin* pInput = m_pPins.GetNext(pos))
-            if (CBaseMuxerRawOutputPin* pOutput = dynamic_cast<CBaseMuxerRawOutputPin*>(pInput->GetRelatedPin())) {
-                pOutput->MuxHeader(pInput->CurrentMediaType());
+        if (CBaseMuxerInputPin* pInput = m_pPins.GetNext(pos)) {
+            if (pInput->m_bRawOutputPin) {
+                if (CBasePin* pBPin = pInput->GetRelatedPin()) {
+                    static_cast<CBaseMuxerRawOutputPin*>(pBPin)->MuxHeader(pInput->CurrentMediaType());
+                }
             }
+        }
     }
 }
 
@@ -238,8 +241,10 @@ void CBaseMuxerFilter::MuxPacketInternal(const MuxerPacket* pPacket)
     MuxPacket(pPacket);
 
     if (CBaseMuxerInputPin* pInput = pPacket->pPin)
-        if (CBaseMuxerRawOutputPin* pOutput = dynamic_cast<CBaseMuxerRawOutputPin*>(pInput->GetRelatedPin())) {
-            pOutput->MuxPacket(pInput->CurrentMediaType(), pPacket);
+        if (pInput->m_bRawOutputPin) {
+            if (CBasePin* pBPin = pInput->GetRelatedPin()) {
+                static_cast<CBaseMuxerRawOutputPin*>(pBPin)->MuxPacket(pInput->CurrentMediaType(), pPacket);
+            }
         }
 }
 
@@ -258,8 +263,10 @@ void CBaseMuxerFilter::MuxFooterInternal()
     POSITION pos = m_pPins.GetHeadPosition();
     while (pos) {
         if (CBaseMuxerInputPin* pInput = m_pPins.GetNext(pos))
-            if (CBaseMuxerRawOutputPin* pOutput = dynamic_cast<CBaseMuxerRawOutputPin*>(pInput->GetRelatedPin())) {
-                pOutput->MuxFooter(pInput->CurrentMediaType());
+            if (pInput->m_bRawOutputPin) {
+                if (CBasePin* pBPin = pInput->GetRelatedPin()) {
+                    static_cast<CBaseMuxerRawOutputPin*>(pBPin)->MuxFooter(pInput->CurrentMediaType());
+                }
             }
     }
 }

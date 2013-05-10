@@ -22,451 +22,192 @@
 #include "stdafx.h"
 #include "DX9SubPic.h"
 #include <vmr9.h>
+#include <intrin.h>
 
 //
 // CDX9SubPic
 //
+// CBSubPic
 
-CDX9SubPic::CDX9SubPic(IDirect3DSurface9* pSurface, CDX9SubPicAllocator* pAllocator, bool bExternalRenderer)
-    : m_pSurface(pSurface)
-    , m_pAllocator(pAllocator)
-    , m_bExternalRenderer(bExternalRenderer)
+__declspec(nothrow noalias) void CDX9SubPic::GetDesc(__out SubPicDesc* pTarget) const
 {
-    D3DSURFACE_DESC d3dsd;
-    ZeroMemory(&d3dsd, sizeof(d3dsd));
-    if (SUCCEEDED(m_pSurface->GetDesc(&d3dsd))) {
-        m_maxsize.SetSize(d3dsd.Width, d3dsd.Height);
-        m_rcDirty.SetRect(0, 0, d3dsd.Width, d3dsd.Height);
-    }
+    ASSERT(pTarget);
+
+    pTarget->type = 0;
+    pTarget->w = m_maxsize.cx;
+    pTarget->h = m_maxsize.cy;
+    pTarget->bpp = 32;
+    pTarget->pitch = 0;
+    pTarget->bits = nullptr;
+    pTarget->vidrect = m_vidrect;
 }
 
-CDX9SubPic::~CDX9SubPic()
+__declspec(nothrow noalias) HRESULT CDX9SubPic::CopyTo(__out_opt CBSubPic* pSubPic) const
 {
-    {
-        CAutoLock Lock(&CDX9SubPicAllocator::ms_SurfaceQueueLock);
-        // Add surface to cache
-        if (m_pAllocator) {
-            for (POSITION pos = m_pAllocator->m_AllocatedSurfaces.GetHeadPosition(); pos;) {
-                POSITION ThisPos = pos;
-                CDX9SubPic* pSubPic = m_pAllocator->m_AllocatedSurfaces.GetNext(pos);
-                if (pSubPic == this) {
-                    m_pAllocator->m_AllocatedSurfaces.RemoveAt(ThisPos);
-                    break;
-                }
-            }
-            m_pAllocator->m_FreeSurfaces.AddTail(m_pSurface);
-        }
-    }
-}
+    ASSERT(pSubPic);
 
-
-// ISubPic
-
-STDMETHODIMP_(void*) CDX9SubPic::GetObject()
-{
-    CComPtr<IDirect3DTexture9> pTexture;
-    if (SUCCEEDED(m_pSurface->GetContainer(IID_IDirect3DTexture9, (void**)&pTexture))) {
-        return (void*)(IDirect3DTexture9*)pTexture;
+    if (!(m_rcDirty.right - m_rcDirty.left) || !(m_rcDirty.bottom - m_rcDirty.top)) {
+        ASSERT(0);
+        return E_ABORT;
     }
 
-    return nullptr;
-}
-
-STDMETHODIMP CDX9SubPic::GetDesc(SubPicDesc& spd)
-{
-    D3DSURFACE_DESC d3dsd;
-    ZeroMemory(&d3dsd, sizeof(d3dsd));
-    if (FAILED(m_pSurface->GetDesc(&d3dsd))) {
-        return E_FAIL;
-    }
-
-    spd.type = 0;
-    spd.w = m_size.cx;
-    spd.h = m_size.cy;
-    spd.bpp =
-        d3dsd.Format == D3DFMT_A8R8G8B8 ? 32 :
-        d3dsd.Format == D3DFMT_A4R4G4B4 ? 16 : 0;
-    spd.pitch = 0;
-    spd.bits = nullptr;
-    spd.vidrect = m_vidrect;
-
-    return S_OK;
-}
-
-STDMETHODIMP CDX9SubPic::CopyTo(ISubPic* pSubPic)
-{
     HRESULT hr;
-    if (FAILED(hr = __super::CopyTo(pSubPic))) {
+    CDX9SubPic* pDstSP = static_cast<CDX9SubPic*>(pSubPic);
+    pDstSP->m_rtStart = m_rtStart;
+    pDstSP->m_rtStop = m_rtStop;
+    pDstSP->m_rtSegmentStart = m_rtSegmentStart;
+    pDstSP->m_rtSegmentStop = m_rtSegmentStop;
+    pDstSP->m_rcDirty = m_rcDirty;
+    pDstSP->m_vidrect = m_vidrect;
+    pDstSP->m_maxsize = m_maxsize;
+
+    if (FAILED(hr = pDstSP->m_pD3DDev->CreateTexture(m_rcDirty.right - m_rcDirty.left, m_rcDirty.bottom - m_rcDirty.top, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pDstSP->m_pTexture, nullptr))) {
+        ASSERT(0);
+        return hr;
+    }
+    if (FAILED(hr = pDstSP->m_pTexture->GetSurfaceLevel(0, &pDstSP->m_pSurface))) {
+        ASSERT(0);
         return hr;
     }
 
-    if (m_rcDirty.IsRectEmpty()) {
-        return S_FALSE;
-    }
-
-    CComPtr<IDirect3DDevice9> pD3DDev;
-    if (!m_pSurface || FAILED(m_pSurface->GetDevice(&pD3DDev)) || !pD3DDev) {
-        return E_FAIL;
-    }
-
-    IDirect3DTexture9* pSrcTex = (IDirect3DTexture9*)GetObject();
-    CComPtr<IDirect3DSurface9> pSrcSurf;
-    pSrcTex->GetSurfaceLevel(0, &pSrcSurf);
-    D3DSURFACE_DESC srcDesc;
-    pSrcSurf->GetDesc(&srcDesc);
-
-    IDirect3DTexture9* pDstTex = (IDirect3DTexture9*)pSubPic->GetObject();
-    CComPtr<IDirect3DSurface9> pDstSurf;
-    pDstTex->GetSurfaceLevel(0, &pDstSurf);
-    D3DSURFACE_DESC dstDesc;
-    pDstSurf->GetDesc(&dstDesc);
-
-    RECT r;
-    SetRect(&r, 0, 0, min(srcDesc.Width, dstDesc.Width), min(srcDesc.Height, dstDesc.Height));
-    POINT p = { 0, 0 };
-    hr = pD3DDev->UpdateSurface(pSrcSurf, &r, pDstSurf, &p);
-    //  ASSERT (SUCCEEDED (hr));
-
-    return SUCCEEDED(hr) ? S_OK : E_FAIL;
+    static POINT const zp = {0, 0};// obligated when using partial updates
+    hr = pDstSP->m_pD3DDev->UpdateSurface(m_pSurface, &m_rcDirty, pDstSP->m_pSurface, &zp);
+    ASSERT(hr == S_OK);
+    return hr;
 }
 
-STDMETHODIMP CDX9SubPic::ClearDirtyRect(DWORD color)
+__declspec(nothrow noalias) HRESULT CDX9SubPic::LockAndClearDirtyRect(__out_opt SubPicDesc* pTarget)
 {
-    if (m_rcDirty.IsRectEmpty()) {
-        return S_FALSE;
-    }
-
-    CComPtr<IDirect3DDevice9> pD3DDev;
-    if (!m_pSurface || FAILED(m_pSurface->GetDevice(&pD3DDev)) || !pD3DDev) {
-        return E_FAIL;
-    }
-
-    SubPicDesc spd;
-    if (SUCCEEDED(Lock(spd))) {
-        int h = m_rcDirty.Height();
-
-        BYTE* ptr = spd.bits + spd.pitch * m_rcDirty.top + (m_rcDirty.left * spd.bpp >> 3);
-
-        if (spd.bpp == 16) {
-            while (h-- > 0) {
-                memsetw(ptr, (unsigned short)color, 2 * m_rcDirty.Width());
-                ptr += spd.pitch;
-            }
-        } else if (spd.bpp == 32) {
-            while (h-- > 0) {
-                memsetd(ptr, color, 4 * m_rcDirty.Width());
-                ptr += spd.pitch;
-            }
-        }
-        /*
-                DWORD* ptr = (DWORD*)bm.bits;
-                DWORD* end = ptr + bm.h*bm.wBytes/4;
-                while (ptr < end) *ptr++ = color;
-        */
-        Unlock(nullptr);
-    }
-
-    //      HRESULT hr = pD3DDev->ColorFill(m_pSurface, m_rcDirty, color);
-
-    m_rcDirty.SetRectEmpty();
-
-    return S_OK;
-}
-
-STDMETHODIMP CDX9SubPic::Lock(SubPicDesc& spd)
-{
-    D3DSURFACE_DESC d3dsd;
-    ZeroMemory(&d3dsd, sizeof(d3dsd));
-    if (FAILED(m_pSurface->GetDesc(&d3dsd))) {
-        return E_FAIL;
-    }
-
-    D3DLOCKED_RECT LockedRect;
-    ZeroMemory(&LockedRect, sizeof(LockedRect));
-    if (FAILED(m_pSurface->LockRect(&LockedRect, nullptr, D3DLOCK_NO_DIRTY_UPDATE | D3DLOCK_NOSYSLOCK))) {
-        return E_FAIL;
-    }
-
-    spd.type = 0;
-    spd.w = m_size.cx;
-    spd.h = m_size.cy;
-    spd.bpp =
-        d3dsd.Format == D3DFMT_A8R8G8B8 ? 32 :
-        d3dsd.Format == D3DFMT_A4R4G4B4 ? 16 : 0;
-    spd.pitch = LockedRect.Pitch;
-    spd.bits = (BYTE*)LockedRect.pBits;
-    spd.vidrect = m_vidrect;
-
-    return S_OK;
-}
-
-STDMETHODIMP CDX9SubPic::Unlock(RECT* pDirtyRect)
-{
-    HRESULT hr = m_pSurface->UnlockRect();
-
-    if (pDirtyRect) {
-        m_rcDirty = *pDirtyRect;
-        if (!((CRect*)pDirtyRect)->IsRectEmpty()) {
-            m_rcDirty.InflateRect(1, 1);
-            m_rcDirty.left &= ~127;
-            m_rcDirty.top &= ~63;
-            m_rcDirty.right = (m_rcDirty.right + 127) & ~127;
-            m_rcDirty.bottom = (m_rcDirty.bottom + 63) & ~63;
-            m_rcDirty &= CRect(CPoint(0, 0), m_size);
-        }
-    } else {
-        m_rcDirty = CRect(CPoint(0, 0), m_size);
-    }
-
-    CComPtr<IDirect3DTexture9> pTexture = (IDirect3DTexture9*)GetObject();
-    if (pTexture && !((CRect*)pDirtyRect)->IsRectEmpty()) {
-        hr = pTexture->AddDirtyRect(&m_rcDirty);
-    }
-
-    return S_OK;
-}
-
-STDMETHODIMP CDX9SubPic::AlphaBlt(RECT* pSrc, RECT* pDst, SubPicDesc* pTarget)
-{
-    ASSERT(pTarget == nullptr);
-
-    if (!pSrc || !pDst) {
-        return E_POINTER;
-    }
-
-    CRect src(*pSrc), dst(*pDst);
-
-    CComPtr<IDirect3DDevice9> pD3DDev;
-    CComPtr<IDirect3DTexture9> pTexture = (IDirect3DTexture9*)GetObject();
-    if (!pTexture || FAILED(pTexture->GetDevice(&pD3DDev)) || !pD3DDev) {
-        return E_NOINTERFACE;
-    }
+    ASSERT(pTarget);
 
     HRESULT hr;
-
-    D3DSURFACE_DESC d3dsd;
-    ZeroMemory(&d3dsd, sizeof(d3dsd));
-    if (FAILED(pTexture->GetLevelDesc(0, &d3dsd)) /*|| d3dsd.Type != D3DRTYPE_TEXTURE*/) {
-        return E_FAIL;
+    D3DLOCKED_RECT LockedRect;
+    if (FAILED(hr = m_pTexture->LockRect(0, &LockedRect, nullptr, 0))) {
+        ASSERT(0);
+        return hr;
     }
 
-    float w = (float)d3dsd.Width;
-    float h = (float)d3dsd.Height;
+    pTarget->type = 0;
+    pTarget->w = m_maxsize.cx;
+    pTarget->h = m_maxsize.cy;
+    pTarget->bpp = 32;
+    pTarget->pitch = LockedRect.Pitch;
+    pTarget->pitchUV = 0;
+    pTarget->bits = LockedRect.pBits;
+    pTarget->bitsU = nullptr;
+    pTarget->bitsV = nullptr;
+    pTarget->vidrect = m_vidrect;
 
-    // Be careful with the code that follows. Some compilers (e.g. Visual Studio 2012) used to miscompile
-    // it in some cases (namely x64 with optimizations /O2 /Ot). This bug led pVertices not to be correctly
-    // initialized and thus the subtitles weren't shown.
-    struct {
-        float x, y, z, rhw;
-        float tu, tv;
+    if ((m_rcDirty.right - m_rcDirty.left) && (m_rcDirty.bottom - m_rcDirty.top)) {// an empty status can happen when all subtitle elements move out of view, it's not an error
+        // the method here is wrong: the do while loop is very unwelcome as alignment is important, and on top of that, this operation should be done on a custom-sized texture made to fit the contents of the subtitle without padding, so only a linear fill is required
+        __declspec(align(16)) static __int32 const iFillVal[4] = {0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000};
+        __m128 xFillVal = _mm_load_ps(reinterpret_cast<const float*>(iFillVal));
+#ifdef _M_X64// also pre-load the smaller fill values in gpr registers
+        __int64 iFillValPad = 0xFF000000FF000000;
+#elif _M_IX86_FP != 1// SSE2 code, don't use on SSE builds
+        __int32 iFillValPad = 0xFF000000;
+#endif
+        size_t upWidth = m_rcDirty.right - m_rcDirty.left, upHeight = m_rcDirty.bottom - m_rcDirty.top, upPitch = m_maxsize.cx << 2;
+        uintptr_t pRow = reinterpret_cast<uintptr_t>(LockedRect.pBits) + upPitch * m_rcDirty.top;
+        if (m_maxsize.cx - upWidth <= 16) { // linear fill
+            upWidth = upHeight * (upPitch >> 2);
+            upHeight = 1;
+        } else {// fill per row
+            pRow += m_rcDirty.left << 2;
+        }
+
+        do {
+            uintptr_t pDst = pRow;
+            size_t upCount = upWidth;
+            // fill the output to meet 16-byte alignment, sorted for aligned access
+            // note: when clearing entire textures, the initial realignment fill parts are also useless, the driver always allocates textures at 16-byte boundaries
+            if (pDst & 4 && upCount) { // 4-to-8-byte alignment
+#if _M_IX86_FP != 1// SSE2 code, don't use on SSE builds, works correctly for x64
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst), iFillValPad); // x64: copies lower bytes in the register
+#else
+                _mm_store_ss(reinterpret_cast<float*>(pDst), xFillVal);
+#endif
+                pDst += 4;
+                --upCount;
+            }
+            if (pDst & 8 && (upCount >= 2)) { // 8-to-16-byte alignment
+#ifdef _M_X64
+                _mm_stream_si64x(reinterpret_cast<__int64*>(pDst), iFillValPad);
+#elif _M_IX86_FP != 1// SSE2 code, don't use on SSE builds
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst), iFillValPad);
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst + 4), iFillValPad);
+#else
+                _mm_storel_pi(reinterpret_cast<__m64*>(pDst), xFillVal); // not related to MMX
+#endif
+                pDst += 8;
+                upCount -= 2;
+            }
+            ASSERT(!(pDst & 15) || (upCount < 4)); // if not 16-byte aligned, _mm_stream_ps will fail
+
+            // excludes the last the last 3 optional values (in the bit shift), as the next function only targets 128-bit fills
+            if (size_t i = upCount >> 2) do {
+                    _mm_stream_ps(reinterpret_cast<float*>(pDst), xFillVal);
+                    pDst += 16;
+                } while (--i);
+
+            if (upCount & 2) { // finalize the last 3 optional values, sorted for aligned access
+#ifdef _M_X64
+                _mm_stream_si64x(reinterpret_cast<__int64*>(pDst), iFillValPad);
+#elif _M_IX86_FP != 1// SSE2 code, don't use on SSE builds
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst), iFillValPad);
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst + 4), iFillValPad);
+#else
+                _mm_storel_pi(reinterpret_cast<__m64*>(pDst), xFillVal); // not related to MMX
+#endif
+                pDst += 8;
+            }
+            if (upCount & 1) { // no address increment for the last possible value
+#if _M_IX86_FP != 1// SSE2 code, don't use on SSE builds, works correctly for x64
+                _mm_stream_si32(reinterpret_cast<__int32*>(pDst), iFillValPad);// x64: copies lower bytes in the register
+#else
+                _mm_store_ss(reinterpret_cast<float*>(pDst), xFillVal);
+#endif
+            }
+            pRow += upPitch;
+        } while (--upHeight); // advance pointer to the next row in the texture
+
+        ZeroMemory(&m_rcDirty, sizeof(RECT));
     }
-    pVertices[] = {
-        {float(dst.left),  float(dst.top),    0.5f, 2.0f, float(src.left)  / w, float(src.top) / h},
-        {float(dst.right), float(dst.top),    0.5f, 2.0f, float(src.right) / w, float(src.top) / h},
-        {float(dst.left),  float(dst.bottom), 0.5f, 2.0f, float(src.left)  / w, float(src.bottom) / h},
-        {float(dst.right), float(dst.bottom), 0.5f, 2.0f, float(src.right) / w, float(src.bottom) / h},
-    };
-
-    for (size_t i = 0; i < _countof(pVertices); i++) {
-        pVertices[i].x -= 0.5f;
-        pVertices[i].y -= 0.5f;
-    }
-
-    hr = pD3DDev->SetTexture(0, pTexture);
-
-    // GetRenderState fails for devices created with D3DCREATE_PUREDEVICE
-    // so we need to provide default values in case GetRenderState fails
-    DWORD abe, sb, db;
-    if (FAILED(pD3DDev->GetRenderState(D3DRS_ALPHABLENDENABLE, &abe))) {
-        abe = FALSE;
-    }
-    if (FAILED(pD3DDev->GetRenderState(D3DRS_SRCBLEND, &sb))) {
-        sb = D3DBLEND_ONE;
-    }
-    if (FAILED(pD3DDev->GetRenderState(D3DRS_DESTBLEND, &db))) {
-        db = D3DBLEND_ZERO;
-    }
-
-    hr = pD3DDev->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-    hr = pD3DDev->SetRenderState(D3DRS_LIGHTING, FALSE);
-    hr = pD3DDev->SetRenderState(D3DRS_ZENABLE, FALSE);
-    hr = pD3DDev->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-    hr = pD3DDev->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);         // pre-multiplied src and ...
-    hr = pD3DDev->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCALPHA);   // ... inverse alpha channel for dst
-
-    hr = pD3DDev->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-    hr = pD3DDev->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    hr = pD3DDev->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-
-    if (pSrc == pDst) {
-        hr = pD3DDev->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
-        hr = pD3DDev->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
-    } else {
-        hr = pD3DDev->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
-        hr = pD3DDev->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-    }
-    hr = pD3DDev->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
-
-    hr = pD3DDev->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
-    hr = pD3DDev->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
-    hr = pD3DDev->SetSamplerState(0, D3DSAMP_BORDERCOLOR, 0xFF000000);
-
-    /*//
-
-    D3DCAPS9 d3dcaps9;
-    hr = pD3DDev->GetDeviceCaps(&d3dcaps9);
-    if (d3dcaps9.AlphaCmpCaps & D3DPCMPCAPS_LESS)
-    {
-        hr = pD3DDev->SetRenderState(D3DRS_ALPHAREF, (DWORD)0x000000FE);
-        hr = pD3DDev->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-        hr = pD3DDev->SetRenderState(D3DRS_ALPHAFUNC, D3DPCMPCAPS_LESS);
-    }
-
-    *///
-
-    hr = pD3DDev->SetPixelShader(nullptr);
-
-    if (m_bExternalRenderer && FAILED(hr = pD3DDev->BeginScene())) {
-        return E_FAIL;
-    }
-
-    hr = pD3DDev->SetFVF(D3DFVF_XYZRHW | D3DFVF_TEX1);
-    hr = pD3DDev->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, pVertices, sizeof(pVertices[0]));
-
-    if (m_bExternalRenderer) {
-        hr = pD3DDev->EndScene();
-    }
-
-    pD3DDev->SetTexture(0, nullptr);
-
-    pD3DDev->SetRenderState(D3DRS_ALPHABLENDENABLE, abe);
-    pD3DDev->SetRenderState(D3DRS_SRCBLEND, sb);
-    pD3DDev->SetRenderState(D3DRS_DESTBLEND, db);
-
     return S_OK;
+}
+
+__declspec(nothrow noalias) void CDX9SubPic::Unlock(__in RECT const rDirtyRect)
+{
+    m_rcDirty = rDirtyRect;
+    EXECUTE_ASSERT(S_OK == m_pTexture->UnlockRect(0));// should only fail if m_pTexture wasn't locked in the first place
 }
 
 //
 // CDX9SubPicAllocator
 //
 
-CDX9SubPicAllocator::CDX9SubPicAllocator(IDirect3DDevice9* pD3DDev, SIZE maxsize, bool fPow2Textures, bool bExternalRenderer)
-    : CSubPicAllocatorImpl(maxsize, true, fPow2Textures)
-    , m_pD3DDev(pD3DDev)
-    , m_maxsize(maxsize)
-    , m_bExternalRenderer(bExternalRenderer)
+__declspec(nothrow noalias restrict) CBSubPic* CDX9SubPicAllocator::Alloc(__in bool fStatic) const
 {
-}
-
-CCritSec CDX9SubPicAllocator::ms_SurfaceQueueLock;
-
-CDX9SubPicAllocator::~CDX9SubPicAllocator()
-{
-    ClearCache();
-}
-
-void CDX9SubPicAllocator::GetStats(int& _nFree, int& _nAlloc)
-{
-    CAutoLock Lock(&ms_SurfaceQueueLock);
-    _nFree = (int)m_FreeSurfaces.GetCount();
-    _nAlloc = (int)m_AllocatedSurfaces.GetCount();
-}
-
-void CDX9SubPicAllocator::ClearCache()
-{
-    {
-        // Clear the allocator of any remaining subpics
-        CAutoLock Lock(&ms_SurfaceQueueLock);
-        for (POSITION pos = m_AllocatedSurfaces.GetHeadPosition(); pos;) {
-            CDX9SubPic* pSubPic = m_AllocatedSurfaces.GetNext(pos);
-            pSubPic->m_pAllocator = nullptr;
-        }
-        m_AllocatedSurfaces.RemoveAll();
-        m_FreeSurfaces.RemoveAll();
-    }
-}
-
-// ISubPicAllocator
-
-STDMETHODIMP CDX9SubPicAllocator::ChangeDevice(IUnknown* pDev)
-{
-    ClearCache();
-    CComQIPtr<IDirect3DDevice9> pD3DDev = pDev;
-    if (!pD3DDev) {
-        return E_NOINTERFACE;
+    void* pRawMem = malloc(sizeof(CDX9SubPic));
+    if (!pRawMem) {
+        ASSERT(0);
+        return nullptr;
     }
 
-    CAutoLock cAutoLock(this);
-    m_pD3DDev = pD3DDev;
-
-    return __super::ChangeDevice(pDev);
-}
-
-STDMETHODIMP CDX9SubPicAllocator::SetMaxTextureSize(SIZE MaxTextureSize)
-{
-    ClearCache();
-    m_maxsize = MaxTextureSize;
-    SetCurSize(MaxTextureSize);
-    return S_OK;
-}
-
-// ISubPicAllocatorImpl
-
-bool CDX9SubPicAllocator::Alloc(bool fStatic, ISubPic** ppSubPic)
-{
-    if (!ppSubPic) {
-        return false;
-    }
-
-    CAutoLock cAutoLock(this);
-
-    *ppSubPic = nullptr;
-
-    CComPtr<IDirect3DSurface9> pSurface;
-
-    int Width = m_maxsize.cx;
-    int Height = m_maxsize.cy;
-
-    if (m_fPow2Textures && Width < 1024 && Height < 1024) {
-        Width = Height = 1;
-        while (Width < m_maxsize.cx) {
-            Width <<= 1;
-        }
-        while (Height < m_maxsize.cy) {
-            Height <<= 1;
-        }
-    }
-    if (!fStatic) {
-        CAutoLock cAutoLock2(&ms_SurfaceQueueLock);
-        POSITION FreeSurf = m_FreeSurfaces.GetHeadPosition();
-        if (FreeSurf) {
-            pSurface = m_FreeSurfaces.GetHead();
-            m_FreeSurfaces.RemoveHead();
-        }
-    }
-
-    if (!pSurface) {
-        CComPtr<IDirect3DTexture9> pTexture;
-        if (FAILED(m_pD3DDev->CreateTexture(Width, Height, 1, 0, D3DFMT_A8R8G8B8, fStatic ? D3DPOOL_SYSTEMMEM : D3DPOOL_DEFAULT, &pTexture, nullptr))) {
-            return false;
+    CDX9SubPic* pSubPic;
+    if (fStatic) {
+        IDirect3DTexture9* pTexture;
+        if (FAILED(m_pD3DDev->CreateTexture(m_u32Width, m_u32Height, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_SYSTEMMEM, &pTexture, nullptr))) {
+            ASSERT(0);
+            free(pRawMem);
+            return nullptr;
         }
 
-        if (FAILED(pTexture->GetSurfaceLevel(0, &pSurface))) {
-            return false;
-        }
+        // note: this constructor is modified to inherit the reference of pTexture
+        pSubPic = new(pRawMem) CDX9SubPic(m_u32Width, m_u32Height, pTexture);
+    } else {
+        pSubPic = new(pRawMem) CDX9SubPic(m_u32Width, m_u32Height, m_pD3DDev);
     }
 
-    *ppSubPic = DEBUG_NEW CDX9SubPic(pSurface, fStatic ? 0 : this, m_bExternalRenderer);
-    if (!(*ppSubPic)) {
-        return false;
-    }
-
-    (*ppSubPic)->AddRef();
-
-    if (!fStatic) {
-        CAutoLock cAutoLock3(&ms_SurfaceQueueLock);
-        m_AllocatedSurfaces.AddHead((CDX9SubPic*)*ppSubPic);
-    }
-
-    return true;
+    return pSubPic;
 }

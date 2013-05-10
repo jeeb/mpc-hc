@@ -23,10 +23,6 @@
 #include <mpconfig.h>
 #include "FGFilter.h"
 #include "MainFrm.h"
-#include "DSUtil.h"
-#include "AllocatorCommon7.h"
-#include "AllocatorCommon.h"
-#include "SyncAllocatorPresenter.h"
 #include "moreuuids.h"
 
 
@@ -34,9 +30,10 @@
 // CFGFilter
 //
 
-CFGFilter::CFGFilter(const CLSID& clsid, CStringW name, UINT64 merit)
+CFGFilter::CFGFilter(const CLSID& clsid, CStringW name, UINT64 merit, unsigned __int8 u8ClassType)
     : m_clsid(clsid)
     , m_name(name)
+    , mk_u8ClassType(u8ClassType)
 {
     m_merit.val = merit;
 }
@@ -96,7 +93,7 @@ bool CFGFilter::CheckTypes(const CAtlArray<GUID>& types, bool fExactMatch)
 //
 
 CFGFilterRegistry::CFGFilterRegistry(IMoniker* pMoniker, UINT64 merit)
-    : CFGFilter(GUID_NULL, L"", merit)
+    : CFGFilter(GUID_NULL, CStringW(), merit, FGFType_Registry)
     , m_pMoniker(pMoniker)
 {
     if (!m_pMoniker) {
@@ -118,7 +115,7 @@ CFGFilterRegistry::CFGFilterRegistry(IMoniker* pMoniker, UINT64 merit)
 }
 
 CFGFilterRegistry::CFGFilterRegistry(CStringW DisplayName, UINT64 merit)
-    : CFGFilter(GUID_NULL, L"", merit)
+    : CFGFilter(GUID_NULL, CStringW(), merit, FGFType_Registry)
     , m_DisplayName(DisplayName)
 {
     if (m_DisplayName.IsEmpty()) {
@@ -169,7 +166,7 @@ void CFGFilterRegistry::QueryProperties()
 }
 
 CFGFilterRegistry::CFGFilterRegistry(const CLSID& clsid, UINT64 merit)
-    : CFGFilter(clsid, L"", merit)
+    : CFGFilter(clsid, CStringW(), merit, FGFType_Registry)
 {
     if (m_clsid == GUID_NULL) {
         return;
@@ -406,7 +403,7 @@ void CFGFilterRegistry::ExtractFilterData(BYTE* p, UINT len)
 //
 
 CFGFilterFile::CFGFilterFile(const CLSID& clsid, CString path, CStringW name, UINT64 merit)
-    : CFGFilter(clsid, name, merit)
+    : CFGFilter(clsid, name, merit, FGFType_File)
     , m_path(path)
     , m_hInst(nullptr)
 {
@@ -424,7 +421,7 @@ HRESULT CFGFilterFile::Create(IBaseFilter** ppBF, CInterfaceList<IUnknown, &IID_
 //
 
 CFGFilterVideoRenderer::CFGFilterVideoRenderer(HWND hWnd, const CLSID& clsid, CStringW name, UINT64 merit)
-    : CFGFilter(clsid, name, merit)
+    : CFGFilter(clsid, name, merit, FGFType_VideoRenderer)
     , m_hWnd(hWnd)
 {
     AddType(MEDIATYPE_Video, MEDIASUBTYPE_NULL);
@@ -432,61 +429,115 @@ CFGFilterVideoRenderer::CFGFilterVideoRenderer(HWND hWnd, const CLSID& clsid, CS
 
 HRESULT CFGFilterVideoRenderer::Create(IBaseFilter** ppBF, CInterfaceList<IUnknown, &IID_IUnknown>& pUnks)
 {
+    ASSERT(ppBF);
     TRACE(_T("--> CFGFilterVideoRenderer::Create on thread: %d\n"), GetCurrentThreadId());
-    CheckPointer(ppBF, E_POINTER);
 
-    HRESULT hr = S_OK;
-
-    CComPtr<ISubPicAllocatorPresenter> pCAP;
-
-    if (m_clsid == CLSID_VMR7AllocatorPresenter
-            || m_clsid == CLSID_VMR9AllocatorPresenter
-            || m_clsid == CLSID_DXRAllocatorPresenter
-            || m_clsid == CLSID_madVRAllocatorPresenter
-            || m_clsid == CLSID_EVRAllocatorPresenter
-            || m_clsid == CLSID_SyncAllocatorPresenter) {
-        bool bFullscreen = (AfxGetApp()->m_pMainWnd != nullptr) && (((CMainFrame*)AfxGetApp()->m_pMainWnd)->IsD3DFullScreenMode());
-        if (SUCCEEDED(CreateAP7(m_clsid, m_hWnd, &pCAP))
-                || SUCCEEDED(CreateAP9(m_clsid, m_hWnd, bFullscreen, &pCAP))
-                || SUCCEEDED(CreateEVR(m_clsid, m_hWnd, bFullscreen, &pCAP))
-                || SUCCEEDED(CreateSyncRenderer(m_clsid, m_hWnd, bFullscreen, &pCAP))) {
-            CComPtr<IUnknown> pRenderer;
-            if (SUCCEEDED(hr = pCAP->CreateRenderer(&pRenderer))) {
-                *ppBF = CComQIPtr<IBaseFilter>(pRenderer).Detach();
-                pUnks.AddTail(pCAP);
-                if (CComQIPtr<ISubPicAllocatorPresenter2> pCAP2 = pCAP) {
-                    pUnks.AddTail(pCAP2);
-                }
-                // madVR supports calling IVideoWindow::put_Owner before the pins are connected
-                if (m_clsid == CLSID_madVRAllocatorPresenter) {
-                    if (CComQIPtr<IVideoWindow> pVW = pCAP) {
-                        pVW->put_Owner((OAHWND)m_hWnd);
-                    }
-                }
+    HRESULT hr = E_OUTOFMEMORY;
+    if (m_clsid == CLSID_EVRAllocatorPresenter) {
+#ifdef _WIN64
+        void* pRawMem = malloc(sizeof(DSObjects::CEVRAllocatorPresenter));
+#else
+        void* pRawMem = _aligned_malloc(sizeof(DSObjects::CEVRAllocatorPresenter), 16);
+#endif
+        if (!pRawMem) {
+            MessageBoxW(m_hWnd, L"Out of memory for creating EVR Custom Presenter", nullptr, MB_OK | MB_ICONERROR);
+        } else {
+            CString strError;
+            DSObjects::CEVRAllocatorPresenter* pEVRCP = new(pRawMem) DSObjects::CEVRAllocatorPresenter(m_hWnd, &strError);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(m_hWnd, strError, L"Error creating EVR Custom Presenter", MB_OK | MB_ICONERROR);
+                ULONG u = pEVRCP->Release();
+                ASSERT(!u);
+                UNREFERENCED_PARAMETER(u);
+            } else {
+                *ppBF = static_cast<IBaseFilter*>(&pEVRCP->m_OuterEVR);// inherits the reference
+                pUnks.AddTail(static_cast<IUnknown*>(static_cast<CSubPicAllocatorPresenterImpl*>(pEVRCP)));// CSubPicAllocatorPresenterImpl is at Vtable location 0
+                hr = S_OK;
+            }
+        }
+    } else if (m_clsid == CLSID_VMR9AllocatorPresenter) {
+#ifdef _WIN64
+        void* pRawMem = malloc(sizeof(DSObjects::CVMR9AllocatorPresenter));
+#else
+        void* pRawMem = _aligned_malloc(sizeof(DSObjects::CVMR9AllocatorPresenter), 16);
+#endif
+        if (!pRawMem) {
+            MessageBoxW(m_hWnd, L"Out of memory for creating VMR-9 (renderless)", nullptr, MB_OK | MB_ICONERROR);
+        } else {
+            CStringW strError;
+            DSObjects::CVMR9AllocatorPresenter* pVMR9r = new(pRawMem) DSObjects::CVMR9AllocatorPresenter(m_hWnd, &strError);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(m_hWnd, strError, L"Error creating VMR-9 (renderless)", MB_OK | MB_ICONERROR);
+                ULONG u = pVMR9r->Release();
+                ASSERT(!u);
+                UNREFERENCED_PARAMETER(u);
+            } else {
+                *ppBF = static_cast<IBaseFilter*>(&pVMR9r->m_OuterVMR);// inherits the reference
+                pUnks.AddTail(static_cast<IUnknown*>(static_cast<CSubPicAllocatorPresenterImpl*>(pVMR9r)));// CSubPicAllocatorPresenterImpl is at Vtable location 0
+                hr = S_OK;
+            }
+        }
+    } else if (m_clsid == CLSID_SyncAllocatorPresenter) {
+        GothSync::CSyncAP* pCAP;
+        if (SUCCEEDED(CreateEVRS(m_hWnd, &pCAP))) {
+            if (SUCCEEDED(hr = pCAP->CreateRenderer(ppBF))) {
+                pUnks.AddTail(static_cast<IUnknown*>(static_cast<CSubPicAllocatorPresenterImpl*>(pCAP)));// CSubPicAllocatorPresenterImpl is at Vtable location 0
+            }
+            pCAP->Release();
+        }
+    } else if (m_clsid == CLSID_DXRAllocatorPresenter) {
+        void* pRawMem = malloc(sizeof(DSObjects::CDXRAllocatorPresenter));
+        if (!pRawMem) {
+            MessageBoxW(m_hWnd, L"Out of memory for creating Haali Renderer", nullptr, MB_OK | MB_ICONERROR);
+        } else {
+            CStringW strError;
+            DSObjects::CDXRAllocatorPresenter* pDXR = new(pRawMem) DSObjects::CDXRAllocatorPresenter(m_hWnd, &strError, ppBF);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(m_hWnd, strError, L"Error creating Haali Renderer", MB_OK | MB_ICONERROR);
+                ULONG u = pDXR->Release();
+                ASSERT(!u);
+                UNREFERENCED_PARAMETER(u);
+            } else {
+                pUnks.AddTail(static_cast<IUnknown*>(pDXR));
+                pDXR->Release();
+                hr = S_OK;
+            }
+        }
+    } else if (m_clsid == CLSID_madVRAllocatorPresenter) {
+        void* pRawMem = malloc(sizeof(DSObjects::CmadVRAllocatorPresenter));
+        if (!pRawMem) {
+            MessageBoxW(m_hWnd, L"Out of memory for creating madVR", nullptr, MB_OK | MB_ICONERROR);
+        } else {
+            CStringW strError;
+            DSObjects::CmadVRAllocatorPresenter* pmadVR = new(pRawMem) DSObjects::CmadVRAllocatorPresenter(m_hWnd, &strError, ppBF);
+            if (!strError.IsEmpty()) {
+                MessageBoxW(m_hWnd, strError, L"Error creating madVR", MB_OK | MB_ICONERROR);
+                ULONG u = pmadVR->Release();
+                ASSERT(!u);
+                UNREFERENCED_PARAMETER(u);
+            } else {
+                pUnks.AddTail(static_cast<IUnknown*>(pmadVR));
+                pmadVR->Release();
+                hr = S_OK;
             }
         }
     } else {
-        CComPtr<IBaseFilter> pBF;
-        if (SUCCEEDED(pBF.CoCreateInstance(m_clsid))) {
-            if (m_clsid == CLSID_EnhancedVideoRenderer) {
-                CComQIPtr<IEVRFilterConfig> pConfig = pBF;
-                pConfig->SetNumberOfStreams(3);
-            }
-
-            BeginEnumPins(pBF, pEP, pPin) {
-                if (CComQIPtr<IMixerPinConfig, &IID_IMixerPinConfig> pMPC = pPin) {
-                    pUnks.AddTail(pMPC);
-                    break;
+        IUnknown* pUnk;
+        if (SUCCEEDED(hr = CoCreateInstance(m_clsid, nullptr, CLSCTX_ALL, IID_IUnknown, reinterpret_cast<void**>(&pUnk)))) {
+            if (SUCCEEDED(hr = pUnk->QueryInterface(IID_IBaseFilter, reinterpret_cast<void**>(ppBF)))) {
+                IBaseFilter* pBF = *ppBF;// temporary
+                IMixerPinConfig* pMPC;
+                BeginEnumPins(pBF, pEP, pPin) {
+                    if (SUCCEEDED(pPin->QueryInterface(IID_IMixerPinConfig, reinterpret_cast<void**>(&pMPC)))) {
+                        pUnks.AddTail(static_cast<IUnknown*>(pMPC));
+                        break;
+                    }
                 }
+                EndEnumPins
+                // no Release() on temporary pBF, the refrence is kept by ppBF
             }
-            EndEnumPins;
-
-            *ppBF = pBF.Detach();
+            pUnk->Release();
         }
-    }
-
-    if (!*ppBF) {
-        hr = E_FAIL;
     }
 
     return hr;
@@ -524,8 +575,6 @@ void CFGFilterList::Insert(CFGFilter* pFGF, int group, bool exactmatch, bool aut
     TRACE(_T("FGM: Inserting %d %d %016I64x '%s' --> "), group, exactmatch, pFGF->GetMerit(),
           pFGF->GetName().IsEmpty() ? CStringFromGUID(pFGF->GetCLSID()) : CString(pFGF->GetName()));
 
-    CFGFilterRegistry* pFGFR = dynamic_cast<CFGFilterRegistry*>(pFGF);
-
     POSITION pos = m_filters.GetHeadPosition();
     while (pos) {
         filter_t& f = m_filters.GetNext(pos);
@@ -547,11 +596,15 @@ void CFGFilterList::Insert(CFGFilter* pFGF, int group, bool exactmatch, bool aut
             break;
         }
 
-        if (CFGFilterRegistry* pFGFR2 = dynamic_cast<CFGFilterRegistry*>(f.pFGF)) {
-            if (pFGFR && pFGFR->GetMoniker() && pFGFR2->GetMoniker() && S_OK == pFGFR->GetMoniker()->IsEqual(pFGFR2->GetMoniker())) {
-                TRACE(_T("Rejected (duplicated moniker)\n"));
-                bInsert = false;
-                break;
+        if ((pFGF->mk_u8ClassType == FGFType_Registry) && (f.pFGF->mk_u8ClassType == FGFType_Registry)) {
+            if (IMoniker* pM1 = static_cast<CFGFilterRegistry*>(pFGF)->GetMoniker()) {
+                if (IMoniker* pM2 = static_cast<CFGFilterRegistry*>(f.pFGF)->GetMoniker()) {
+                    if (S_OK == pM1->IsEqual(pM2)) {
+                        TRACE(_T("Rejected (duplicated moniker)\n"));
+                        bInsert = false;
+                        break;
+                    }
+                }
             }
         }
     }
@@ -616,14 +669,15 @@ int CFGFilterList::filter_cmp(const void* a, const void* b)
     }
 
     if (fa->pFGF->GetCLSID() == fb->pFGF->GetCLSID()) {
-        CFGFilterFile* fgfa = dynamic_cast<CFGFilterFile*>(fa->pFGF);
-        CFGFilterFile* fgfb = dynamic_cast<CFGFilterFile*>(fb->pFGF);
-
-        if (fgfa && !fgfb) {
-            return -1;
-        }
-        if (!fgfa && fgfb) {
-            return +1;
+        unsigned __int8 u8bClassType = fb->pFGF->mk_u8ClassType == FGFType_File;
+        if (fa->pFGF->mk_u8ClassType == FGFType_File) {
+            if (u8bClassType != FGFType_File) {
+                return -1;
+            }
+        } else {
+            if (u8bClassType == FGFType_File) {
+                return +1;
+            }
         }
     }
 

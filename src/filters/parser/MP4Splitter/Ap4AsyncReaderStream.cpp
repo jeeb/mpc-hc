@@ -23,7 +23,7 @@
 #include "Ap4AsyncReaderStream.h"
 
 AP4_AsyncReaderStream::AP4_AsyncReaderStream(CBaseSplitterFile* pFile)
-    : m_refs(1)
+    : mv_ulReferenceCount(1)// not a COM class, may construct with reference count set
     , m_pFile(pFile)
 {
     ASSERT(pFile);
@@ -31,19 +31,20 @@ AP4_AsyncReaderStream::AP4_AsyncReaderStream(CBaseSplitterFile* pFile)
 
 AP4_AsyncReaderStream::~AP4_AsyncReaderStream()
 {
-    ASSERT(m_refs == 0);
+    ASSERT(mv_ulReferenceCount == 1);
 }
 
 void AP4_AsyncReaderStream::AddReference()
 {
-    ASSERT(m_refs > 0);
-    ++m_refs;
+    ULONG ulRef = _InterlockedIncrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    ASSERT(ulRef);
 }
 
 void AP4_AsyncReaderStream::Release()
 {
-    ASSERT(m_refs > 0);
-    if (--m_refs == 0) {
+    ULONG ulRef = _InterlockedDecrement(reinterpret_cast<LONG volatile*>(&mv_ulReferenceCount));
+    if (!ulRef) {
+        ++mv_ulReferenceCount;// simple re-entrancy protection, it's only for the current thread that enters the destructor, so no lock required
         delete this;
     }
 }

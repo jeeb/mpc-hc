@@ -176,8 +176,8 @@ public:
     CVobSubFileRipper();
     virtual ~CVobSubFileRipper();
 
-    DECLARE_IUNKNOWN
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+    // IUnknown
+    __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
 
     // IVSFRipper
     STDMETHODIMP SetCallBack(IVSFRipperCallback* pCallback);

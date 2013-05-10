@@ -93,7 +93,6 @@ public:
     int m_alpha[4];
     CSliderCtrl m_alphasliders[4];
     BOOL m_linkalphasliders;
-    BOOL m_relativeTo;
 
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support

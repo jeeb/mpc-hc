@@ -22,50 +22,39 @@
 #include "stdafx.h"
 #include "text.h"
 
-DWORD CharSetToCodePage(DWORD dwCharSet)
-{
-    if (dwCharSet == CP_UTF8) {
-        return CP_UTF8;
-    }
-    if (dwCharSet == CP_UTF7) {
-        return CP_UTF7;
-    }
-    CHARSETINFO cs = {0};
-    ::TranslateCharsetInfo((DWORD*)dwCharSet, &cs, TCI_SRCCHARSET);
-    return cs.ciACP;
-}
-
 CStringA ConvertMBCS(CStringA str, DWORD SrcCharSet, DWORD DstCharSet)
 {
-    WCHAR* utf16 = DEBUG_NEW WCHAR[str.GetLength() + 1];
-    memset(utf16, 0, (str.GetLength() + 1)*sizeof(WCHAR));
+    unsigned int uiStrLength = str.GetLength();
+    wchar_t* utf16 = new(std::nothrow) wchar_t[uiStrLength];
+    if (!utf16) {
+        ASSERT(0);
+        return CStringA();
+    }
 
-    CHAR* mbcs = DEBUG_NEW CHAR[str.GetLength() * 6 + 1];
-    memset(mbcs, 0, str.GetLength() * 6 + 1);
+    // relate the input and output code page trough UTF-16
+    UINT SrcCodeP = 0, DstCodeP = 0;
+    CHARSETINFO cs;
+    // zero-extend the incoming charset values if required, these calls do not actually use them as a pointer
+    if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(SrcCharSet)), &cs, TCI_SRCCHARSET)) {
+        SrcCodeP = cs.ciACP;
+    }
+    if (::TranslateCharsetInfo(reinterpret_cast<DWORD*>(static_cast<uintptr_t>(DstCharSet)), &cs, TCI_SRCCHARSET)) {
+        DstCodeP = cs.ciACP;
+    }
 
-    int len = MultiByteToWideChar(
-                  CharSetToCodePage(SrcCharSet),
-                  0,
-                  str,
-                  -1, // null terminated string
-                  utf16,
-                  str.GetLength() + 1);
+    int len = MultiByteToWideChar(SrcCodeP, 0, str, uiStrLength, utf16, uiStrLength * 2);
+    if (!len) {
+        ASSERT(0);
+        delete [] utf16;
+        return "";
+    }
 
-    len = WideCharToMultiByte(
-              CharSetToCodePage(DstCharSet),
-              0,
-              utf16,
-              len,
-              mbcs,
-              str.GetLength() * 6,
-              nullptr,
-              nullptr);
-
-    str = mbcs;
+    char* pRawStr = str.GetBuffer(uiStrLength * 6); // allow 5 times the string length as extra headroom
+    len = WideCharToMultiByte(DstCodeP, 0, utf16, len, pRawStr, uiStrLength * 6, nullptr, nullptr);
+    ASSERT(len);
+    str.ReleaseBuffer(len); // also works nicely when len equals 0
 
     delete [] utf16;
-    delete [] mbcs;
-
     return str;
 }
 
@@ -73,7 +62,8 @@ CStringA UrlEncode(CStringA str_in, bool fArg)
 {
     CStringA str_out;
 
-    for (int i = 0; i < str_in.GetLength(); i++) {
+    int len = str_in.GetLength();
+    for (int i = 0; i < len; ++i) {
         char c = str_in[i];
         if (fArg && (c == '#' || c == '?' || c == '%' || c == '&' || c == '=')) {
             str_out.AppendFormat("%%%02x", (BYTE)c);

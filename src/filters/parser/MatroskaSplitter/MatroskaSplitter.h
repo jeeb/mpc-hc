@@ -43,6 +43,7 @@ protected:
     }
 public:
     CAutoPtr<MatroskaReader::BlockGroup> bg;
+    MatroskaPacket() : Packet(true) {}
 };
 
 class CMatroskaSplitterOutputPin : public CBaseSplitterOutputPin

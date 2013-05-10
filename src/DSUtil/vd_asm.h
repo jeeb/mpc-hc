@@ -23,12 +23,12 @@
 #pragma once
 
 #ifndef _WIN64
-void yuvtoyuy2row_MMX(BYTE* dst, BYTE* srcy, BYTE* srcu, BYTE* srcv, DWORD width);
-void yuvtoyuy2row_avg_MMX(BYTE* dst, BYTE* srcy, BYTE* srcu, BYTE* srcv, DWORD width, DWORD pitchuv);
+void yuvtoyuy2row_MMX(BYTE *dst, BYTE const *srcy, BYTE const *srcu, BYTE const *srcv, size_t width);
+void yuvtoyuy2row_avg_MMX(BYTE *dst, BYTE const *srcy, BYTE const *srcu, BYTE const *srcv, size_t width, ptrdiff_t pitchuv);
 
 void yv12_yuy2_row_sse2();
 void yv12_yuy2_row_sse2_linear();
 void yv12_yuy2_row_sse2_linear_interlaced();
-void yv12_yuy2_sse2(const BYTE *Y, const BYTE *U, const BYTE *V, int halfstride, unsigned halfwidth, unsigned height, BYTE *YUY2, int d_stride);
-void yv12_yuy2_sse2_interlaced(const BYTE *Y, const BYTE *U, const BYTE *V, int halfstride, unsigned halfwidth, unsigned height, BYTE *YUY2, int d_stride);
+void yv12_yuy2_sse2(BYTE const *Y, BYTE const *U, BYTE const *V, ptrdiff_t halfstride, int halfwidth, int height, BYTE *YUY2, ptrdiff_t d_stride);
+void yv12_yuy2_sse2_interlaced(BYTE const *Y, BYTE const *U, BYTE const *V, ptrdiff_t halfstride, int halfwidth, int height, BYTE *YUY2, ptrdiff_t d_stride);
 #endif

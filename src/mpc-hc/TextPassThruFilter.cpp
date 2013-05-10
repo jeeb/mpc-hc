@@ -53,7 +53,7 @@ protected:
     }
 
     void InvalidateSubtitle(REFERENCE_TIME rtStart, ISubStream* pSubStream) {
-        m_pTPTFilter->m_pMainFrame->InvalidateSubtitle((DWORD_PTR)pSubStream, rtStart);
+        m_pTPTFilter->m_pMainFrame->InvalidateSubtitlePic(reinterpret_cast<uintptr_t>(pSubStream), rtStart);
     }
 
 public:

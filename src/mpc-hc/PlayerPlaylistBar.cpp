@@ -179,10 +179,6 @@ void CPlayerPlaylistBar::AddItem(CAtlList<CString>& fns, CAtlList<CString>* subs
 
 static bool SearchFiles(CString mask, CAtlList<CString>& sl)
 {
-    if (mask.Find(_T("://")) >= 0) {
-        return false;
-    }
-
     mask.Trim();
     sl.RemoveAll();
 
@@ -226,9 +222,15 @@ static bool SearchFiles(CString mask, CAtlList<CString>& sl)
 
             FindClose(h);
 
-            if (sl.GetCount() == 0 && mask.Find(_T(":\\")) == 1) {
-                if (CDROM_VideoCD == GetCDROMType(mask[0], sl)) {
-                    sl.RemoveAll(); // need to open VideoCD as disk
+            if (sl.GetCount() == 0) {
+                unsigned int len = mask.GetLength();
+                if (len) {
+                    if (mask[len - 1] != _T('\\')) {
+                        mask += _T('\\');
+                    }
+                    if (CDROM_VideoCD == GetCDROMType(mask, sl)) {
+                        sl.RemoveAll(); // need to open VideoCD as disk
+                    }
                 }
             }
         }

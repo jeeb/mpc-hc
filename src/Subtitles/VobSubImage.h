@@ -59,7 +59,8 @@ private:
     void TrimSubImage();
 
 public:
-    int iLang, iIdx;
+    uintptr_t iIdx;
+    int iLang;
     bool fForced;
     __int64 start, delay;
     CRect rect;
@@ -72,7 +73,10 @@ public:
     CVobSubImage();
     virtual ~CVobSubImage();
 
-    void Invalidate() { iLang = iIdx = -1; }
+    void Invalidate() {
+        iIdx = MAXSIZE_T;
+        iLang = -1;
+    }
 
     void GetPacketInfo(BYTE* lpData, int packetsize, int datasize);
     bool Decode(BYTE* lpData, int packetsize, int datasize,
@@ -85,7 +89,7 @@ public:
 
 private:
     CAutoPtrList<COutline>* GetOutlineList(CPoint& topleft);
-    int  GrabSegment(int start, COutline& o, COutline& ret);
+    int GrabSegment(int start, COutline& o, COutline& ret);
     void SplitOutline(COutline& o, COutline& o1, COutline& o2);
     void AddSegment(COutline& o, CAtlArray<BYTE>& pathTypes, CAtlArray<CPoint>& pathPoints);
 

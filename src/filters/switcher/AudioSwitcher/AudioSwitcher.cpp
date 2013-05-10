@@ -136,87 +136,146 @@ HRESULT CAudioSwitcherFilter::CheckMediaType(const CMediaType* pmt)
            : VFW_E_TYPE_NOT_ACCEPTED;
 }
 
-template<class T, class U, int Umin, int Umax>
-__forceinline void mix(DWORD mask, int ch, int bps, BYTE* src, BYTE* dst)
+__forceinline void mixU8(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
 {
-    U sum = 0;
+    __int32 sum = 0;// x86-ism; 16-bit register usage requires an expensive prefix, 32-bit register usage doesn't
 
-    for (int i = 0, j = ch; i < j; i++) {
+    ptrdiff_t i = ch - 1;
+    do {
         if (mask & (1 << i)) {
-            sum += *(T*)&src[bps * i];
+            sum += reinterpret_cast<__int8*>(src)[i] - 128;// offset to signed, this helps when clipping
         }
+        --i;
+    } while (i >= 0);
+
+    if (sum < MININT8) {
+        sum = MININT8;
+    } else if (sum > MAXINT8) {
+        sum = MAXINT8;
     }
 
-    if (sum < Umin) {
-        sum = Umin;
-    } else if (sum > Umax) {
-        sum = Umax;
-    }
-
-    *(T*)dst = (T)sum;
+    *dst = static_cast<__int8>(sum) + 128;// revert offset
 }
 
-template<>
-__forceinline void mix<int, INT64, INT24_MIN, INT24_MAX>(DWORD mask, int ch, int bps, BYTE* src, BYTE* dst)
+__forceinline void mixS16(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
 {
-    INT64 sum = 0;
+    __int32 sum = 0;
 
-    for (int i = 0, j = ch; i < j; i++) {
+    ptrdiff_t i = ch - 1;
+    do {
         if (mask & (1 << i)) {
-            int tmp;
-            memcpy((BYTE*)&tmp + 1, &src[bps * i], 3);
-            sum += tmp >> 8;
+            sum += reinterpret_cast<__int16*>(src)[i];
         }
+        --i;
+    } while (i >= 0);
+
+    if (sum < MININT16) {
+        sum = MININT16;
+    } else if (sum > MAXINT16) {
+        sum = MAXINT16;
     }
 
-    sum = min(max(sum, INT24_MIN), INT24_MAX);
-
-    memcpy(dst, (BYTE*)&sum, 3);
+    *reinterpret_cast<__int16*>(dst) = static_cast<__int16>(sum);
 }
 
-template<class T, class U, int Umin, int Umax>
-__forceinline void mix4(DWORD mask, BYTE* src, BYTE* dst)
+__forceinline void mixS24(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
 {
-    U sum = 0;
-    int bps = sizeof T;
+    __int32 sum = 0;// 32 bits is enough to hold the sum of 256 maximum range samples
+    ptrdiff_t i = ch - 1;
 
-    if (mask & (1 << 0)) {
-        sum += *(T*)&src[bps * 0];
-    }
-    if (mask & (1 << 1)) {
-        sum += *(T*)&src[bps * 1];
-    }
-    if (mask & (1 << 2)) {
-        sum += *(T*)&src[bps * 2];
-    }
-    if (mask & (1 << 3)) {
-        sum += *(T*)&src[bps * 3];
+    // note: due to allocation rules we are not allowed to sample the byte below the initial memory mapping address, nor the byte above the final one
+    // generate aligned reads
+    if (reinterpret_cast<uintptr_t>(src) & 1) {// pointer to odd
+        do {
+            if (mask & (1 << i)) {
+                unsigned __int8 tmp8 = src[3 * i];// low
+                unsigned __int16 tmp16 = *reinterpret_cast<unsigned __int16*>(src + 3 * i + 1);// high
+                __int32 tmp32 = (tmp16 << 16) | (tmp8 << 8);
+                sum += tmp32 >> 8;
+            }
+            --i;
+        } while (i >= 0);
+    } else {// pointer to even
+        do {
+            if (mask & (1 << i)) {
+                unsigned __int16 tmp16 = *reinterpret_cast<unsigned __int16*>(src + 3 * i);// low
+                unsigned __int8 tmp8 = src[3 * i + 2];// high
+                __int32 tmp32 = (tmp16 << 8) | (tmp8 << 24);
+                sum += tmp32 >> 8;
+            }
+            --i;
+        } while (i >= 0);
     }
 
-    if (sum < Umin) {
-        sum = Umin;
-    } else if (sum > Umax) {
-        sum = Umax;
+    if (sum < INT24_MIN) {
+        sum = INT24_MIN;
+    } else if (sum > INT24_MAX) {
+        sum = INT24_MAX;
     }
 
-    *(T*)dst = (T)sum;
+    // generate aligned writes
+    if (reinterpret_cast<uintptr_t>(dst) & 1) {// pointer to odd
+        *dst = static_cast<__int8>(sum);
+        sum = static_cast<unsigned __int32>(sum) >> 8;// use a logical shift
+        *reinterpret_cast<__int16*>(dst + 1) = static_cast<__int16>(sum);
+    } else {
+        *reinterpret_cast<__int16*>(dst) = static_cast<__int16>(sum);
+        sum = static_cast<unsigned __int32>(sum) >> 16;// use a logical shift
+        dst[2] = static_cast<__int8>(sum);
+    }
 }
 
-template<class T>
-T clamp(double s, T smin, T smax)
+__forceinline void mixS32(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
 {
-    if (s < -1.0) {
-        s = -1.0;
-    } else if (s > 1.0) {
-        s = 1.0;
+    __int64 sum = 0;
+
+    ptrdiff_t i = ch - 1;
+    do {
+        if (mask & (1 << i)) {
+            sum += reinterpret_cast<__int32*>(src)[i];
+        }
+        --i;
+    } while (i >= 0);
+
+    if (sum < MININT32) {
+        sum = MININT32;
+    } else if (sum > MAXINT32) {
+        sum = MAXINT32;
     }
-    T t = (T)(s * smax);
-    if (t < smin) {
-        t = smin;
-    } else if (t > smax) {
-        t = smax;
-    }
-    return t;
+
+    *reinterpret_cast<__int32*>(dst) = static_cast<__int32>(sum);
+}
+
+__forceinline void mixF(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
+{
+    float sum = 0.0f;
+
+    ptrdiff_t i = ch - 1;
+    do {
+        if (mask & (1 << i)) {
+            sum += reinterpret_cast<float*>(src)[i];
+        }
+        --i;
+    } while (i >= 0);
+
+    // floating-point never requires clamping on output
+    *reinterpret_cast<float*>(dst) = sum;
+}
+
+__forceinline void mixD(DWORD mask, size_t ch, BYTE* src, BYTE* dst)
+{
+    double sum = 0.0;
+
+    ptrdiff_t i = ch - 1;
+    do {
+        if (mask & (1 << i)) {
+            sum += reinterpret_cast<double*>(src)[i];
+        }
+        --i;
+    } while (i >= 0);
+
+    // floating-point never requires clamping on output
+    *reinterpret_cast<double*>(dst) = sum;
 }
 
 HRESULT CAudioSwitcherFilter::Transform(IMediaSample* pIn, IMediaSample* pOut)
@@ -297,35 +356,33 @@ HRESULT CAudioSwitcherFilter::Transform(IMediaSample* pIn, IMediaSample* pOut)
                 int srcstep = bps * wfe->nChannels;
                 int dststep = bps * wfeout->nChannels;
                 int channels = wfe->nChannels;
-                if (fPCM && wfe->wBitsPerSample == 8) {
-                    for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix<unsigned char, INT64, 0, UCHAR_MAX>(mask, channels, bps, src, dst);
-                    }
-                } else if (fPCM && wfe->wBitsPerSample == 16) {
-                    if (wfe->nChannels != 4 || wfeout->nChannels != 4) {
+                if (fPCM) {
+                    if (wfe->wBitsPerSample == 8) {
                         for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                            mix<short, INT64, SHRT_MIN, SHRT_MAX>(mask, channels, bps, src, dst);
+                            mixU8(mask, channels, src, dst);
                         }
-                    } else { // most popular channels count
+                    } else if (wfe->wBitsPerSample == 16) {
                         for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                            mix4<short, INT64, SHRT_MIN, SHRT_MAX>(mask, src, dst);
+                            mixS16(mask, channels, src, dst);
+                        }
+                    } else if (wfe->wBitsPerSample == 24) {
+                        for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
+                            mixS24(mask, channels, src, dst);
+                        }
+                    } else if (wfe->wBitsPerSample == 32) {
+                        for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
+                            mixS32(mask, channels, src, dst);
                         }
                     }
-                } else if (fPCM && wfe->wBitsPerSample == 24) {
-                    for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix<int, INT64, INT24_MIN, INT24_MAX>(mask, channels, bps, src, dst);
-                    }
-                } else if (fPCM && wfe->wBitsPerSample == 32) {
-                    for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix<int, __int64, INT_MIN, INT_MAX>(mask, channels, bps, src, dst);
-                    }
-                } else if (fFloat && wfe->wBitsPerSample == 32) {
-                    for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix < float, double, -1, 1 > (mask, channels, bps, src, dst);
-                    }
-                } else if (fFloat && wfe->wBitsPerSample == 64) {
-                    for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
-                        mix < double, double, -1, 1 > (mask, channels, bps, src, dst);
+                } else if (fFloat) {
+                    if (wfe->wBitsPerSample == 32) {
+                        for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
+                            mixF(mask, channels, src, dst);
+                        }
+                    } else if (wfe->wBitsPerSample == 64) {
+                        for (int k = 0; k < len; k++, src += srcstep, dst += dststep) {
+                            mixD(mask, channels, src, dst);
+                        }
                     }
                 }
             }
@@ -365,21 +422,35 @@ HRESULT CAudioSwitcherFilter::Transform(IMediaSample* pIn, IMediaSample* pOut)
         int samples = lenout * wfeout->nChannels;
 
         if (double* buff = DEBUG_NEW double[samples]) {
-            for (int i = 0; i < samples; i++) {
-                if (fPCM && wfe->wBitsPerSample == 8) {
-                    buff[i] = (double)((BYTE*)pDataOut)[i] / UCHAR_MAX;
-                } else if (fPCM && wfe->wBitsPerSample == 16) {
-                    buff[i] = (double)((short*)pDataOut)[i] / SHRT_MAX;
-                } else if (fPCM && wfe->wBitsPerSample == 24) {
-                    int tmp;
-                    memcpy(((BYTE*)&tmp) + 1, &pDataOut[i * 3], 3);
-                    buff[i] = (float)(tmp >> 8) / ((1 << 23) - 1);
-                } else if (fPCM && wfe->wBitsPerSample == 32) {
-                    buff[i] = (double)((int*)pDataOut)[i] / INT_MAX;
-                } else if (fFloat && wfe->wBitsPerSample == 32) {
-                    buff[i] = (double)((float*)pDataOut)[i];
-                } else if (fFloat && wfe->wBitsPerSample == 64) {
-                    buff[i] = ((double*)pDataOut)[i];
+            for (int i = 0; i < samples; ++i) {
+                if (fPCM) {
+                    if (wfe->wBitsPerSample == 8) {// unsigned format
+                        buff[i] = static_cast<double>(pDataOut[i]) / (MAXUINT8 * 0.5) - 1.0;// offset to interval [-1, 1], as the operations are signed
+                    } else if (wfe->wBitsPerSample == 16) {
+                        buff[i] = static_cast<double>(reinterpret_cast<__int16*>(pDataOut)[i]) / MAXINT16;
+                    } else if (wfe->wBitsPerSample == 24) {
+                        // generate aligned reads
+                        __int32 tmp;
+                        if (i & 1) {// pointer to odd
+                            unsigned __int8 tmp8 = pDataOut[3 * i];// low
+                            unsigned __int16 tmp16 = *reinterpret_cast<unsigned  __int16*>(pDataOut + 3 * i + 1);// high
+                            tmp = (tmp8 << 8) | (tmp16 << 16);// to the higher 3 bytes of the register
+                        } else {// pointer to even
+                            unsigned __int16 tmp16 = *reinterpret_cast<unsigned __int16*>(pDataOut + 3 * i);// low
+                            unsigned __int8 tmp8 = pDataOut[3 * i + 2];// high
+                            tmp = (tmp8 << 24) | (tmp16 << 8);// to the higher 3 bytes of the register
+                        }
+
+                        buff[i] = static_cast<double>(tmp >> 8) / INT24_MAX;// shift arithmetic right here
+                    } else if (wfe->wBitsPerSample == 32) {
+                        buff[i] = static_cast<double>(reinterpret_cast<__int32*>(pDataOut)[i]) / MAXINT32;
+                    }
+                } else if (fFloat) {
+                    if (wfe->wBitsPerSample == 32) {
+                        buff[i] = static_cast<double>(reinterpret_cast<float*>(pDataOut)[i]);
+                    } else if (wfe->wBitsPerSample == 64) {
+                        buff[i] = reinterpret_cast<double*>(pDataOut)[i];
+                    }
                 }
             }
 
@@ -422,19 +493,54 @@ HRESULT CAudioSwitcherFilter::Transform(IMediaSample* pIn, IMediaSample* pOut)
             for (int i = 0; i < samples; i++) {
                 double s = buff[i] * sample_mul;
 
-                if (fPCM && wfe->wBitsPerSample == 8) {
-                    ((BYTE*)pDataOut)[i] = clamp<BYTE>(s, 0, UCHAR_MAX);
-                } else if (fPCM && wfe->wBitsPerSample == 16) {
-                    ((short*)pDataOut)[i] = clamp<short>(s, SHRT_MIN, SHRT_MAX);
-                } else if (fPCM && wfe->wBitsPerSample == 24)  {
-                    int tmp = clamp<int>(s, -1 << 23, (1 << 23) - 1);
-                    memcpy(&pDataOut[i * 3], &tmp, 3);
-                } else if (fPCM && wfe->wBitsPerSample == 32) {
-                    ((int*)pDataOut)[i] = clamp<int>(s, INT_MIN, INT_MAX);
-                } else if (fFloat && wfe->wBitsPerSample == 32) {
-                    ((float*)pDataOut)[i] = clamp<float>(s, -1, +1);
-                } else if (fFloat && wfe->wBitsPerSample == 64) {
-                    ((double*)pDataOut)[i] = clamp<double>(s, -1, +1);
+                if (fPCM) {
+                    if (wfe->wBitsPerSample == 8) {
+                        unsigned __int8 os = 0;// special case for the unsigned format
+                        if (s >= 1.0) {
+                            os = MAXINT8;
+                        } else if (s > -1.0) {
+                            os = static_cast<unsigned __int8>((s + 1.0) * MAXUINT8 * 0.5);
+                        }
+                        pDataOut[i] = os;
+                    } else if (wfe->wBitsPerSample == 16) {
+                        __int16 os = MININT16;
+                        if (s >= 1.0) {
+                            os = MAXINT16;
+                        } else if (s > -1.0) {
+                            os = static_cast<__int16>(s * MAXINT16);
+                        }
+                        reinterpret_cast<__int16*>(pDataOut)[i] = os;
+                    } else if (wfe->wBitsPerSample == 24)  {
+                        __int32 os = INT24_MIN;
+                        if (s >= 1.0) {
+                            os = INT24_MAX;
+                        } else if (s > -1.0) {
+                            os = static_cast<__int32>(s * INT24_MAX);
+                        }
+
+                        // generate aligned writes
+                        if (i & 1) {// pointer to odd
+                            pDataOut[3 * i] = static_cast<__int8>(os);// low
+                            *reinterpret_cast<__int16*>(pDataOut + 3 * i + 1) = static_cast<__int16>(static_cast<unsigned __int32>(os) >> 8);// high
+                        } else {// pointer to even
+                            *reinterpret_cast<unsigned __int16*>(pDataOut + 3 * i) = static_cast<__int16>(os);// low
+                            pDataOut[3 * i + 2] = static_cast<__int8>(static_cast<unsigned __int32>(os) >> 16);// high
+                        }
+                    } else if (wfe->wBitsPerSample == 32) {
+                        __int32 os = MININT32;
+                        if (s >= 1.0) {
+                            os = MAXINT32;
+                        } else if (s > -1.0) {
+                            os = static_cast<__int32>(s * MAXINT32);
+                        }
+                        reinterpret_cast<__int32*>(pDataOut)[i] = os;
+                    }
+                } else if (fFloat) {
+                    if (wfe->wBitsPerSample == 32) {// no clamping on floating-points
+                        reinterpret_cast<float*>(pDataOut)[i] = static_cast<float>(s);
+                    } else if (wfe->wBitsPerSample == 64) {
+                        reinterpret_cast<double*>(pDataOut)[i] = s;
+                    }
                 }
             }
 
@@ -460,9 +566,8 @@ CMediaType CAudioSwitcherFilter::CreateNewOutputMediaType(CMediaType mt, long& c
     if (m_fCustomChannelMapping && wfe->nChannels <= AS_MAX_CHANNELS) {
         m_chs[wfe->nChannels - 1].RemoveAll();
 
-        DWORD mask = DWORD((__int64(1) << wfe->nChannels) - 1);
         for (int i = 0; i < AS_MAX_CHANNELS; i++) {
-            if (m_pSpeakerToChannelMap[wfe->nChannels - 1][i]&mask) {
+            if (m_pSpeakerToChannelMap[wfe->nChannels - 1][i]) {
                 ChMap cm = {1 << i, m_pSpeakerToChannelMap[wfe->nChannels - 1][i]};
                 m_chs[wfe->nChannels - 1].Add(cm);
             }

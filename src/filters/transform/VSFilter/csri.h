@@ -73,7 +73,10 @@ enum csri_pixfmt {
     CSRI_F_YUY2 = 0x1100,
 
     CSRI_F_YV12A = 0x2011,      /**< planar YUV 2x2 + alpha plane */
-    CSRI_F_YV12 = 0x2111        /**< planar YUV 2x2 */
+    CSRI_F_YV12 = 0x2111,       /**< planar YUV 2x2 */
+
+    CSRI_F_NV21 = 0x2112,
+    CSRI_F_NV12 = 0x2113
 };
 
 #define csri_is_rgb(x) ((x) < 0x1000)

@@ -24,7 +24,7 @@
 interface __declspec(uuid("EE6F2741-7DB4-4AAD-A3CB-545208EE4C0A"))
 IBaseMuxerRelatedPin :
 public IUnknown {
-    STDMETHOD(SetRelatedPin)(CBasePin * pPin) = 0;
+    STDMETHOD_(void, SetRelatedPin)(CBasePin * pPin, bool bRawOutputPin) = 0;
     STDMETHOD_(CBasePin*, GetRelatedPin)() = 0;
 };
 
@@ -33,11 +33,12 @@ class CBaseMuxerRelatedPin : public IBaseMuxerRelatedPin
     CBasePin* m_pRelatedPin; // should not hold a reference because it would be circular
 
 public:
+    bool m_bRawOutputPin;
     CBaseMuxerRelatedPin();
     virtual ~CBaseMuxerRelatedPin();
 
     // IBaseMuxerRelatedPin
 
-    STDMETHODIMP SetRelatedPin(CBasePin* pPin);
+    STDMETHODIMP_(void) SetRelatedPin(CBasePin* pPin, bool bRawOutputPin);
     STDMETHODIMP_(CBasePin*) GetRelatedPin();
 };

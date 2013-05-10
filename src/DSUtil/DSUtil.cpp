@@ -27,7 +27,7 @@
 #include "Mpeg2Def.h"
 #include "vd.h"
 #include "moreuuids.h"
-#include <emmintrin.h>
+#include <intrin.h>
 #include <math.h>
 #include <InitGuid.h>
 #include <d3d9types.h>
@@ -586,18 +586,17 @@ void ExtractMediaTypes(IPin* pPin, CAtlArray<GUID>& types)
     types.RemoveAll();
 
     BeginEnumMediaTypes(pPin, pEM, pmt) {
-        bool fFound = false;
-
-        for (ptrdiff_t i = 0; !fFound && i < (int)types.GetCount(); i += 2) {
+        size_t count = types.GetCount();
+        for (size_t i = 0; i < count; i += 2) {
             if (types[i] == pmt->majortype && types[i + 1] == pmt->subtype) {
-                fFound = true;
+                goto FoundExistngType;
             }
         }
+        types.Add(pmt->majortype);
+        types.Add(pmt->subtype);
 
-        if (!fFound) {
-            types.Add(pmt->majortype);
-            types.Add(pmt->subtype);
-        }
+FoundExistngType:
+        ;
     }
     EndEnumMediaTypes(pmt);
 }
@@ -607,19 +606,17 @@ void ExtractMediaTypes(IPin* pPin, CAtlList<CMediaType>& mts)
     mts.RemoveAll();
 
     BeginEnumMediaTypes(pPin, pEM, pmt) {
-        bool fFound = false;
-
         POSITION pos = mts.GetHeadPosition();
-        while (!fFound && pos) {
+        while (pos) {
             CMediaType& mt = mts.GetNext(pos);
             if (mt.majortype == pmt->majortype && mt.subtype == pmt->subtype) {
-                fFound = true;
+                goto FoundExistngType;
             }
         }
+        mts.AddTail(CMediaType(*pmt));
 
-        if (!fFound) {
-            mts.AddTail(CMediaType(*pmt));
-        }
+FoundExistngType:
+        ;
     }
     EndEnumMediaTypes(pmt);
 }
@@ -786,7 +783,7 @@ CString BinToCString(const BYTE* ptr, size_t len)
     return ret;
 }
 
-static void FindFiles(CString fn, CAtlList<CString>& files)
+static void FindFiles(CString const& fn, CAtlList<CString>& files)
 {
     CString path = fn;
     path.Replace('/', '\\');
@@ -803,46 +800,48 @@ static void FindFiles(CString fn, CAtlList<CString>& files)
     }
 }
 
-cdrom_t GetCDROMType(TCHAR drive, CAtlList<CString>& files)
+cdrom_t GetCDROMType(CString const& path, CAtlList<CString>& files)
 {
+    // warning: the path needs to include _T('\\') at the end
     files.RemoveAll();
 
-    CString path;
-    path.Format(_T("%c:"), drive);
-
-    if (GetDriveType(path + _T("\\")) == DRIVE_CDROM) {
+    if (GetDriveType(path) == DRIVE_CDROM) {
         // CDROM_VideoCD
-        FindFiles(path + _T("\\mpegav\\avseq??.dat"), files);
-        FindFiles(path + _T("\\mpegav\\avseq??.mpg"), files);
-        FindFiles(path + _T("\\mpeg2\\avseq??.dat"), files);
-        FindFiles(path + _T("\\mpeg2\\avseq??.mpg"), files);
-        FindFiles(path + _T("\\mpegav\\music??.dat"), files);
-        FindFiles(path + _T("\\mpegav\\music??.mpg"), files);
-        FindFiles(path + _T("\\mpeg2\\music??.dat"), files);
-        FindFiles(path + _T("\\mpeg2\\music??.mpg"), files);
+        FindFiles(path + _T("mpegav\\avseq??.dat"), files);
+        FindFiles(path + _T("mpegav\\avseq??.mpg"), files);
+        FindFiles(path + _T("mpeg2\\avseq??.dat"), files);
+        FindFiles(path + _T("mpeg2\\avseq??.mpg"), files);
+        FindFiles(path + _T("avseq??.dat"), files);
+        FindFiles(path + _T("avseq??.mpg"), files);
+        FindFiles(path + _T("mpegav\\music??.dat"), files);
+        FindFiles(path + _T("mpegav\\music??.mpg"), files);
+        FindFiles(path + _T("mpeg2\\music??.dat"), files);
+        FindFiles(path + _T("mpeg2\\music??.mpg"), files);
+        FindFiles(path + _T("music??.dat"), files);
+        FindFiles(path + _T("music??.mpg"), files);
         if (files.GetCount() > 0) {
             return CDROM_VideoCD;
         }
 
         // CDROM_DVDVideo
-        FindFiles(path + _T("\\VIDEO_TS\\video_ts.ifo"), files);
+        FindFiles(path + _T("VIDEO_TS\\video_ts.ifo"), files);
+        FindFiles(path + _T("video_ts.ifo"), files);
         if (files.GetCount() > 0) {
             return CDROM_DVDVideo;
         }
 
         // CDROM_Audio
-        HANDLE hDrive = CreateFile(CString(_T("\\\\.\\")) + path, GENERIC_READ, FILE_SHARE_READ, nullptr,
-                                   OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, (HANDLE)nullptr);
+        HANDLE hDrive = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
         if (hDrive != INVALID_HANDLE_VALUE) {
             DWORD BytesReturned;
             CDROM_TOC TOC;
             if (DeviceIoControl(hDrive, IOCTL_CDROM_READ_TOC, nullptr, 0, &TOC, sizeof(TOC), &BytesReturned, 0)) {
-                for (ptrdiff_t i = TOC.FirstTrack; i <= TOC.LastTrack; i++) {
+                for (UCHAR i = TOC.FirstTrack; i <= TOC.LastTrack; ++i) {
                     // MMC-3 Draft Revision 10g: Table 222 - Q Sub-channel control field
                     TOC.TrackData[i - 1].Control &= 5;
                     if (TOC.TrackData[i - 1].Control == 0 || TOC.TrackData[i - 1].Control == 1) {
                         CString fn;
-                        fn.Format(_T("%s\\track%02d.cda"), path, i);
+                        fn.Format(_T("%s\\track%02hu.cda"), path, static_cast<unsigned short>(i));
                         files.AddTail(fn);
                     }
                 }
@@ -861,20 +860,16 @@ cdrom_t GetCDROMType(TCHAR drive, CAtlList<CString>& files)
     return CDROM_NotFound;
 }
 
-CString GetDriveLabel(TCHAR drive)
+CString GetDriveLabel(CString const& path)
 {
+    // warning: the path needs to include _T('\\') at the end
     CString label;
-
-    CString path;
-    path.Format(_T("%c:\\"), drive);
-    TCHAR VolumeNameBuffer[MAX_PATH], FileSystemNameBuffer[MAX_PATH];
-    DWORD VolumeSerialNumber, MaximumComponentLength, FileSystemFlags;
-    if (GetVolumeInformation(path,
-                             VolumeNameBuffer, MAX_PATH, &VolumeSerialNumber, &MaximumComponentLength,
-                             &FileSystemFlags, FileSystemNameBuffer, MAX_PATH)) {
-        label = VolumeNameBuffer;
+    LPTSTR szLabel = label.GetBufferSetLength(MAX_PATH);// the location MAX_PATH + 1 is guaranteed a trailing zero
+    if (GetVolumeInformation(path, szLabel, MAX_PATH + 1, nullptr, nullptr, nullptr, nullptr, 0)) {
+        label.ReleaseBuffer();
+    } else {
+        label.Empty();
     }
-
     return label;
 }
 
@@ -953,11 +948,13 @@ DVD_HMSF_TIMECODE RT2HMS_r(REFERENCE_TIME rt) // use only for information (for d
 
 REFERENCE_TIME HMSF2RT(DVD_HMSF_TIMECODE hmsf, double fps)
 {
-    if (fps == 0) {
-        hmsf.bFrames = 0;
-        fps = 1;
+    // only the 1 s to 100 ns factor 10000000 can go past the 32-bit boundary
+    REFERENCE_TIME time = __emulu(static_cast<unsigned __int32>(hmsf.bHours) * 3600 + static_cast<unsigned __int32>(hmsf.bMinutes) * 60 + static_cast<unsigned __int32>(hmsf.bSeconds), 10000000);
+    if (fps) {
+        double rate = 10000000.0 / fps;
+        time += static_cast<REFERENCE_TIME>(static_cast<double>(hmsf.bFrames) * rate + 0.5);
     }
-    return (REFERENCE_TIME)((((REFERENCE_TIME)hmsf.bHours * 60 + hmsf.bMinutes) * 60 + hmsf.bSeconds) * 1000 + 1.0 * hmsf.bFrames * 1000 / fps) * 10000;
+    return time;
 }
 
 void memsetd(void* dst, unsigned int c, size_t nbytes)
@@ -1416,27 +1413,42 @@ void UnloadExternalObjects()
     s_extobjs.RemoveAll();
 }
 
-CString MakeFullPath(LPCTSTR path)
+CString MakeFullPath(CString const& path)
 {
-    CString full(path);
-    full.Replace('/', '\\');
+    CPath c(path);
+    // only PathAllocCanonicalize() can properly canonicalize names over the MAX_PATH length, and it's only available on Windows 8 and newer
+    // this issue can only be solved by writing our own canonicalization routine for this, but for now we just don't process names prefixed with two backslashes at all
+    if (path[0] != _T('\\') || path[1] != _T('\\')) {
+        c.m_strPath.Replace(_T('/'), _T('\\'));
 
-    CString fn;
-    fn.ReleaseBuffer(GetModuleFileName(AfxGetInstanceHandle(), fn.GetBuffer(MAX_PATH), MAX_PATH));
-    CPath p(fn);
-
-    if (full.GetLength() >= 2 && full[0] == '\\' && full[1] != '\\') {
-        p.StripToRoot();
-        full = CString(p) + full.Mid(1);
-    } else if (full.Find(_T(":\\")) < 0) {
-        p.RemoveFileSpec();
-        p.AddBackslash();
-        full = CString(p) + full;
+        // this function can handle paths over the MAX_PATH limitation
+        CString p;
+        LPTSTR szPath = p.GetBufferSetLength(32767);
+        if (szPath) {
+            DWORD dwLength = ::GetModuleFileName(nullptr, szPath, 32767);
+            if (dwLength) {
+                p.Truncate(dwLength);
+                if (c.m_strPath.GetLength() >= 2 && c.m_strPath[0] == _T('\\')) {
+                    int root = p.Find(_T(":\\"));
+                    if (root > 0) {
+                        p.Truncate(root + 1);// truncate string right after the _T(':')
+                        c.m_strPath = p + c.m_strPath;
+                    }
+                } else if (c.m_strPath.Find(_T(":\\")) < 0) {
+                    DWORD i = dwLength - 6;// the last five characters (_T("x.exe")) are skipped in this loop
+                    while (szPath[i] != _T('\\')) {
+                        --i;
+                    }
+                    p.Truncate(i + 1);// truncate string right after the _T('\\')
+                    c.m_strPath = p + c.m_strPath;
+                }
+            }
+        }
+        if (c.m_strPath.GetLength() <= MAX_PATH) {
+            c.Canonicalize();// warning: can only handle up to the MAX_PATH limit, anything bigger will fail
+        }
     }
-
-    CPath c(full);
-    c.Canonicalize();
-    return CString(c);
+    return c.m_strPath;
 }
 
 //
@@ -1577,7 +1589,7 @@ CStringW LocalToStringW(const char* S)
 static struct {
     LPCSTR name, iso6392, iso6391;
     LCID lcid;
-} s_isolangs[] = {  // TODO : fill LCID !!!
+} const s_isolangs[] = {  // TODO : fill LCID !!!
     {"Abkhazian", "abk", "ab"},
     {"Achinese", "ace", ""},
     {"Acoli", "ach", ""},
@@ -2409,84 +2421,150 @@ void UnRegisterSourceFilter(const GUID& subtype)
     DeleteRegKey(_T("Media Type\\") + CStringFromGUID(MEDIATYPE_Stream), CStringFromGUID(subtype));
 }
 
-typedef struct {
-    const GUID*   Guid;
-    const LPCTSTR Description;
-} DXVA2_DECODER;
+// note: CMainFrame::OnUpdatePlayerStatus() dereferences the strings taking an alignment guarantee of 8
+static _declspec(align(8)) TCHAR const kszUnknown[] = _T("Unknown"),
+        kszNotDXVA[]                          = _T("Not using DXVA"),
+                kszDXVA_Intel_H264_ClearVideo[]       = _T("H.264 bitstream decoder, ClearVideo(tm)"), // Intel ClearVideo H264 bitstream decoder
+                        kszDXVA_Intel_VC1_ClearVideo[]        = _T("VC-1 bitstream decoder, ClearVideo(tm)"),  // Intel ClearVideo VC-1 bitstream decoder
+                                kszDXVA_Intel_VC1_ClearVideo_2[]      = _T("VC-1 bitstream decoder 2, ClearVideo(tm)"),// Intel ClearVideo VC-1 bitstream decoder 2
+                                        kszDXVA_MPEG4_ASP[]                   = _T("MPEG-4 ASP bitstream decoder"),            // Nvidia MPEG-4 ASP bitstream decoder
+                                                kszDXVA_ModeNone[]                    = _T("Mode none"),
+                                                        kszDXVA_ModeH261_A[]                  = _T("H.261 A, post processing"),
+                                                                kszDXVA_ModeH261_B[]                  = _T("H.261 B, deblocking"),
+                                                                        kszDXVA_ModeH263_A[]                  = _T("H.263 A, motion compensation, no FGT"),
+                                                                                kszDXVA_ModeH263_B[]                  = _T("H.263 B, motion compensation, FGT"),
+                                                                                        kszDXVA_ModeH263_C[]                  = _T("H.263 C, IDCT, no FGT"),
+                                                                                                kszDXVA_ModeH263_D[]                  = _T("H.263 D, IDCT, FGT"),
+                                                                                                        kszDXVA_ModeH263_E[]                  = _T("H.263 E, bitstream decoder, no FGT"),
+                                                                                                                kszDXVA_ModeH263_F[]                  = _T("H.263 F, bitstream decoder, FGT"),
+                                                                                                                        kszDXVA_ModeMPEG1_A[]                 = _T("MPEG-1 A, post processing"),
+                                                                                                                                kszDXVA_ModeMPEG2_A[]                 = _T("MPEG-2 A, motion compensation"),
+                                                                                                                                        kszDXVA_ModeMPEG2_B[]                 = _T("MPEG-2 B, motion compensation + blending"),
+                                                                                                                                                kszDXVA_ModeMPEG2_C[]                 = _T("MPEG-2 C, IDCT"),
+                                                                                                                                                        kszDXVA_ModeMPEG2_D[]                 = _T("MPEG-2 D, IDCT + blending"),
+                                                                                                                                                                kszDXVA_ModeH264_A[]                  = _T("H.264 A, motion compensation, no FGT"),
+                                                                                                                                                                        kszDXVA_ModeH264_B[]                  = _T("H.264 B, motion compensation, FGT"),
+                                                                                                                                                                                kszDXVA_ModeH264_C[]                  = _T("H.264 C, IDCT, no FGT"),
+                                                                                                                                                                                        kszDXVA_ModeH264_D[]                  = _T("H.264 D, IDCT, FGT"),
+                                                                                                                                                                                                kszDXVA_ModeH264_E[]                  = _T("H.264 E, bitstream decoder, no FGT"),
+                                                                                                                                                                                                        kszDXVA_ModeH264_F[]                  = _T("H.264 F, bitstream decoder, FGT"),
+                                                                                                                                                                                                                kszDXVA_ModeWMV8_A[]                  = _T("WMV8 A, post processing"),
+                                                                                                                                                                                                                        kszDXVA_ModeWMV8_B[]                  = _T("WMV8 B, motion compensation"),
+                                                                                                                                                                                                                                kszDXVA_ModeWMV9_A[]                  = _T("WMV9 A, post processing"),
+                                                                                                                                                                                                                                        kszDXVA_ModeWMV9_B[]                  = _T("WMV9 B, motion compensation"),
+                                                                                                                                                                                                                                                kszDXVA_ModeWMV9_C[]                  = _T("WMV9 C, IDCT"),
+                                                                                                                                                                                                                                                        kszDXVA_ModeVC1_A[]                   = _T("VC-1 A, post processing"),
+                                                                                                                                                                                                                                                                kszDXVA_ModeVC1_B[]                   = _T("VC-1 B, motion compensation"),
+                                                                                                                                                                                                                                                                        kszDXVA_ModeVC1_C[]                   = _T("VC-1 C, IDCT"),
+                                                                                                                                                                                                                                                                                kszDXVA_ModeVC1_D[]                   = _T("VC-1 D, bitstream decoder"),
+                                                                                                                                                                                                                                                                                        kszDXVA_NoEncrypt[]                   = _T("No encryption"),
+                                                                                                                                                                                                                                                                                                kszDXVA2_ModeMPEG2_MoComp[]           = _T("MPEG-2 motion compensation"),
+                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeMPEG2_IDCT[]             = _T("MPEG-2 IDCT"),
+                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeMPEG2_VLD[]              = _T("MPEG-2 variable-length decoder"),
+                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeH264_A[]                 = _T("H.264 A, motion compensation, no FGT"),
+                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeH264_B[]                 = _T("H.264 B, motion compensation, FGT"),
+                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeH264_C[]                 = _T("H.264 C, IDCT, no FGT"),
+                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeH264_D[]                 = _T("H.264 D, IDCT, FGT"),
+                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeH264_E[]                 = _T("H.264 E, bitstream decoder, no FGT"),
+                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeH264_F[]                 = _T("H.264 F, bitstream decoder, FGT"),
+                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeWMV8_A[]                 = _T("WMV8 A, post processing"),
+                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeWMV8_B[]                 = _T("WMV8 B, motion compensation"),
+                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeWMV9_A[]                 = _T("WMV9 A, post processing"),
+                                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeWMV9_B[]                 = _T("WMV9 B, motion compensation"),
+                                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeWMV9_C[]                 = _T("WMV9 C, IDCT"),
+                                                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeVC1_A[]                  = _T("VC-1 A, post processing"),
+                                                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeVC1_B[]                  = _T("VC-1 B, motion compensation"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_ModeVC1_C[]                  = _T("VC-1 C, IDCT"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_ModeVC1_D[]                  = _T("VC-1 D, bitstream decoder"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_NoEncrypt[]                  = _T("No encryption"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_VideoProcProgressiveDevice[] = _T("Progressive scan"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                kszDXVA2_VideoProcBobDevice[]         = _T("Bob deinterlacing"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                        kszDXVA2_VideoProcSoftwareDevice[]    = _T("Software processing");
 
-static const DXVA2_DECODER DXVA2Decoder[] = {
-    {&GUID_NULL,                        _T("Unknown")},
-    {&GUID_NULL,                        _T("Not using DXVA")},
-    {&DXVA_Intel_H264_ClearVideo,       _T("H.264 bitstream decoder, ClearVideo(tm)")},  // Intel ClearVideo H264 bitstream decoder
-    {&DXVA_Intel_VC1_ClearVideo,        _T("VC-1 bitstream decoder, ClearVideo(tm)")},   // Intel ClearVideo VC-1 bitstream decoder
-    {&DXVA_Intel_VC1_ClearVideo_2,      _T("VC-1 bitstream decoder 2, ClearVideo(tm)")}, // Intel ClearVideo VC-1 bitstream decoder 2
-    {&DXVA_MPEG4_ASP,                   _T("MPEG-4 ASP bitstream decoder")},             // Nvidia MPEG-4 ASP bitstream decoder
-    {&DXVA_ModeNone,                    _T("Mode none")},
-    {&DXVA_ModeH261_A,                  _T("H.261 A, post processing")},
-    {&DXVA_ModeH261_B,                  _T("H.261 B, deblocking")},
-    {&DXVA_ModeH263_A,                  _T("H.263 A, motion compensation, no FGT")},
-    {&DXVA_ModeH263_B,                  _T("H.263 B, motion compensation, FGT")},
-    {&DXVA_ModeH263_C,                  _T("H.263 C, IDCT, no FGT")},
-    {&DXVA_ModeH263_D,                  _T("H.263 D, IDCT, FGT")},
-    {&DXVA_ModeH263_E,                  _T("H.263 E, bitstream decoder, no FGT")},
-    {&DXVA_ModeH263_F,                  _T("H.263 F, bitstream decoder, FGT")},
-    {&DXVA_ModeMPEG1_A,                 _T("MPEG-1 A, post processing")},
-    {&DXVA_ModeMPEG2_A,                 _T("MPEG-2 A, motion compensation")},
-    {&DXVA_ModeMPEG2_B,                 _T("MPEG-2 B, motion compensation + blending")},
-    {&DXVA_ModeMPEG2_C,                 _T("MPEG-2 C, IDCT")},
-    {&DXVA_ModeMPEG2_D,                 _T("MPEG-2 D, IDCT + blending")},
-    {&DXVA_ModeH264_A,                  _T("H.264 A, motion compensation, no FGT")},
-    {&DXVA_ModeH264_B,                  _T("H.264 B, motion compensation, FGT")},
-    {&DXVA_ModeH264_C,                  _T("H.264 C, IDCT, no FGT")},
-    {&DXVA_ModeH264_D,                  _T("H.264 D, IDCT, FGT")},
-    {&DXVA_ModeH264_E,                  _T("H.264 E, bitstream decoder, no FGT")},
-    {&DXVA_ModeH264_F,                  _T("H.264 F, bitstream decoder, FGT")},
-    {&DXVA_ModeWMV8_A,                  _T("WMV8 A, post processing")},
-    {&DXVA_ModeWMV8_B,                  _T("WMV8 B, motion compensation")},
-    {&DXVA_ModeWMV9_A,                  _T("WMV9 A, post processing")},
-    {&DXVA_ModeWMV9_B,                  _T("WMV9 B, motion compensation")},
-    {&DXVA_ModeWMV9_C,                  _T("WMV9 C, IDCT")},
-    {&DXVA_ModeVC1_A,                   _T("VC-1 A, post processing")},
-    {&DXVA_ModeVC1_B,                   _T("VC-1 B, motion compensation")},
-    {&DXVA_ModeVC1_C,                   _T("VC-1 C, IDCT")},
-    {&DXVA_ModeVC1_D,                   _T("VC-1 D, bitstream decoder")},
-    {&DXVA_NoEncrypt,                   _T("No encryption")},
-    {&DXVA2_ModeMPEG2_MoComp,           _T("MPEG-2 motion compensation")},
-    {&DXVA2_ModeMPEG2_IDCT,             _T("MPEG-2 IDCT")},
-    {&DXVA2_ModeMPEG2_VLD,              _T("MPEG-2 variable-length decoder")},
-    {&DXVA2_ModeH264_A,                 _T("H.264 A, motion compensation, no FGT")},
-    {&DXVA2_ModeH264_B,                 _T("H.264 B, motion compensation, FGT")},
-    {&DXVA2_ModeH264_C,                 _T("H.264 C, IDCT, no FGT")},
-    {&DXVA2_ModeH264_D,                 _T("H.264 D, IDCT, FGT")},
-    {&DXVA2_ModeH264_E,                 _T("H.264 E, bitstream decoder, no FGT")},
-    {&DXVA2_ModeH264_F,                 _T("H.264 F, bitstream decoder, FGT")},
-    {&DXVA2_ModeWMV8_A,                 _T("WMV8 A, post processing")},
-    {&DXVA2_ModeWMV8_B,                 _T("WMV8 B, motion compensation")},
-    {&DXVA2_ModeWMV9_A,                 _T("WMV9 A, post processing")},
-    {&DXVA2_ModeWMV9_B,                 _T("WMV9 B, motion compensation")},
-    {&DXVA2_ModeWMV9_C,                 _T("WMV9 C, IDCT")},
-    {&DXVA2_ModeVC1_A,                  _T("VC-1 A, post processing")},
-    {&DXVA2_ModeVC1_B,                  _T("VC-1 B, motion compensation")},
-    {&DXVA2_ModeVC1_C,                  _T("VC-1 C, IDCT")},
-    {&DXVA2_ModeVC1_D,                  _T("VC-1 D, bitstream decoder")},
-    {&DXVA2_NoEncrypt,                  _T("No encryption")},
-    {&DXVA2_VideoProcProgressiveDevice, _T("Progressive scan")},
-    {&DXVA2_VideoProcBobDevice,         _T("Bob deinterlacing")},
-    {&DXVA2_VideoProcSoftwareDevice,    _T("Software processing")}
+static struct DXVA2_DECODER {
+    GUID const* Guid;
+    LPCTSTR Description;
+    size_t StringLength;
+} const DXVA2Decoder[] = {
+    {&GUID_NULL,                        kszNotDXVA, _countof(kszNotDXVA) - 1},// rather common, so it's first on the list
+    {&DXVA_Intel_H264_ClearVideo,       kszDXVA_Intel_H264_ClearVideo, _countof(kszDXVA_Intel_H264_ClearVideo) - 1},  // Intel ClearVideo H264 bitstream decoder
+    {&DXVA_Intel_VC1_ClearVideo,        kszDXVA_Intel_VC1_ClearVideo, _countof(kszDXVA_Intel_VC1_ClearVideo) - 1},    // Intel ClearVideo VC-1 bitstream decoder
+    {&DXVA_Intel_VC1_ClearVideo_2,      kszDXVA_Intel_VC1_ClearVideo_2, _countof(kszDXVA_Intel_VC1_ClearVideo_2) - 1},// Intel ClearVideo VC-1 bitstream decoder 2
+    {&DXVA_MPEG4_ASP,                   kszDXVA_MPEG4_ASP, _countof(kszDXVA_MPEG4_ASP) - 1},                          // Nvidia MPEG-4 ASP bitstream decoder
+    {&DXVA_ModeNone,                    kszDXVA_ModeNone, _countof(kszDXVA_ModeNone) - 1},
+    {&DXVA_ModeH261_A,                  kszDXVA_ModeH261_A, _countof(kszDXVA_ModeH261_A) - 1},
+    {&DXVA_ModeH261_B,                  kszDXVA_ModeH261_B, _countof(kszDXVA_ModeH261_B) - 1},
+    {&DXVA_ModeH263_A,                  kszDXVA_ModeH263_A, _countof(kszDXVA_ModeH263_A) - 1},
+    {&DXVA_ModeH263_B,                  kszDXVA_ModeH263_B, _countof(kszDXVA_ModeH263_B) - 1},
+    {&DXVA_ModeH263_C,                  kszDXVA_ModeH263_C, _countof(kszDXVA_ModeH263_C) - 1},
+    {&DXVA_ModeH263_D,                  kszDXVA_ModeH263_D, _countof(kszDXVA_ModeH263_D) - 1},
+    {&DXVA_ModeH263_E,                  kszDXVA_ModeH263_E, _countof(kszDXVA_ModeH263_E) - 1},
+    {&DXVA_ModeH263_F,                  kszDXVA_ModeH263_F, _countof(kszDXVA_ModeH263_F) - 1},
+    {&DXVA_ModeMPEG1_A,                 kszDXVA_ModeMPEG1_A, _countof(kszDXVA_ModeMPEG1_A) - 1},
+    {&DXVA_ModeMPEG2_A,                 kszDXVA_ModeMPEG2_A, _countof(kszDXVA_ModeMPEG2_A) - 1},
+    {&DXVA_ModeMPEG2_B,                 kszDXVA_ModeMPEG2_B, _countof(kszDXVA_ModeMPEG2_B) - 1},
+    {&DXVA_ModeMPEG2_C,                 kszDXVA_ModeMPEG2_C, _countof(kszDXVA_ModeMPEG2_C) - 1},
+    {&DXVA_ModeMPEG2_D,                 kszDXVA_ModeMPEG2_D, _countof(kszDXVA_ModeMPEG2_D) - 1},
+    {&DXVA_ModeH264_A,                  kszDXVA_ModeH264_A, _countof(kszDXVA_ModeH264_A) - 1},
+    {&DXVA_ModeH264_B,                  kszDXVA_ModeH264_B, _countof(kszDXVA_ModeH264_B) - 1},
+    {&DXVA_ModeH264_C,                  kszDXVA_ModeH264_C, _countof(kszDXVA_ModeH264_C) - 1},
+    {&DXVA_ModeH264_D,                  kszDXVA_ModeH264_D, _countof(kszDXVA_ModeH264_D) - 1},
+    {&DXVA_ModeH264_E,                  kszDXVA_ModeH264_E, _countof(kszDXVA_ModeH264_E) - 1},
+    {&DXVA_ModeH264_F,                  kszDXVA_ModeH264_F, _countof(kszDXVA_ModeH264_F) - 1},
+    {&DXVA_ModeWMV8_A,                  kszDXVA_ModeWMV8_A, _countof(kszDXVA_ModeWMV8_A) - 1},
+    {&DXVA_ModeWMV8_B,                  kszDXVA_ModeWMV8_B, _countof(kszDXVA_ModeWMV8_B) - 1},
+    {&DXVA_ModeWMV9_A,                  kszDXVA_ModeWMV9_A, _countof(kszDXVA_ModeWMV9_A) - 1},
+    {&DXVA_ModeWMV9_B,                  kszDXVA_ModeWMV9_B, _countof(kszDXVA_ModeWMV9_B) - 1},
+    {&DXVA_ModeWMV9_C,                  kszDXVA_ModeWMV9_C, _countof(kszDXVA_ModeWMV9_C) - 1},
+    {&DXVA_ModeVC1_A,                   kszDXVA_ModeVC1_A, _countof(kszDXVA_ModeVC1_A) - 1},
+    {&DXVA_ModeVC1_B,                   kszDXVA_ModeVC1_B, _countof(kszDXVA_ModeVC1_B) - 1},
+    {&DXVA_ModeVC1_C,                   kszDXVA_ModeVC1_C, _countof(kszDXVA_ModeVC1_C) - 1},
+    {&DXVA_ModeVC1_D,                   kszDXVA_ModeVC1_D, _countof(kszDXVA_ModeVC1_D) - 1},
+    {&DXVA_NoEncrypt,                   kszDXVA_NoEncrypt, _countof(kszDXVA_NoEncrypt) - 1},
+    {&DXVA2_ModeMPEG2_MoComp,           kszDXVA2_ModeMPEG2_MoComp, _countof(kszDXVA2_ModeMPEG2_MoComp) - 1},
+    {&DXVA2_ModeMPEG2_IDCT,             kszDXVA2_ModeMPEG2_IDCT, _countof(kszDXVA2_ModeMPEG2_IDCT) - 1},
+    {&DXVA2_ModeMPEG2_VLD,              kszDXVA2_ModeMPEG2_VLD, _countof(kszDXVA2_ModeMPEG2_VLD) - 1},
+    {&DXVA2_ModeH264_A,                 kszDXVA2_ModeH264_A, _countof(kszDXVA2_ModeH264_A) - 1},
+    {&DXVA2_ModeH264_B,                 kszDXVA2_ModeH264_B, _countof(kszDXVA2_ModeH264_B) - 1},
+    {&DXVA2_ModeH264_C,                 kszDXVA2_ModeH264_C, _countof(kszDXVA2_ModeH264_C) - 1},
+    {&DXVA2_ModeH264_D,                 kszDXVA2_ModeH264_D, _countof(kszDXVA2_ModeH264_D) - 1},
+    {&DXVA2_ModeH264_E,                 kszDXVA2_ModeH264_E, _countof(kszDXVA2_ModeH264_E) - 1},
+    {&DXVA2_ModeH264_F,                 kszDXVA2_ModeH264_F, _countof(kszDXVA2_ModeH264_F) - 1},
+    {&DXVA2_ModeWMV8_A,                 kszDXVA2_ModeWMV8_A, _countof(kszDXVA2_ModeWMV8_A) - 1},
+    {&DXVA2_ModeWMV8_B,                 kszDXVA2_ModeWMV8_B, _countof(kszDXVA2_ModeWMV8_B) - 1},
+    {&DXVA2_ModeWMV9_A,                 kszDXVA2_ModeWMV9_A, _countof(kszDXVA2_ModeWMV9_A) - 1},
+    {&DXVA2_ModeWMV9_B,                 kszDXVA2_ModeWMV9_B, _countof(kszDXVA2_ModeWMV9_B) - 1},
+    {&DXVA2_ModeWMV9_C,                 kszDXVA2_ModeWMV9_C, _countof(kszDXVA2_ModeWMV9_C) - 1},
+    {&DXVA2_ModeVC1_A,                  kszDXVA2_ModeVC1_A, _countof(kszDXVA2_ModeVC1_A) - 1},
+    {&DXVA2_ModeVC1_B,                  kszDXVA2_ModeVC1_B, _countof(kszDXVA2_ModeVC1_B) - 1},
+    {&DXVA2_ModeVC1_C,                  kszDXVA2_ModeVC1_C, _countof(kszDXVA2_ModeVC1_C) - 1},
+    {&DXVA2_ModeVC1_D,                  kszDXVA2_ModeVC1_D, _countof(kszDXVA2_ModeVC1_D) - 1},
+    {&DXVA2_NoEncrypt,                  kszDXVA2_NoEncrypt, _countof(kszDXVA2_NoEncrypt) - 1},
+    {&DXVA2_VideoProcProgressiveDevice, kszDXVA2_VideoProcProgressiveDevice, _countof(kszDXVA2_VideoProcProgressiveDevice) - 1},
+    {&DXVA2_VideoProcBobDevice,         kszDXVA2_VideoProcBobDevice, _countof(kszDXVA2_VideoProcBobDevice) - 1},
+    {&DXVA2_VideoProcSoftwareDevice,    kszDXVA2_VideoProcSoftwareDevice, _countof(kszDXVA2_VideoProcSoftwareDevice) - 1},
+    {&GUID_NULL,                        kszUnknown, _countof(kszUnknown) - 1}
 };
 
-LPCTSTR GetDXVAMode(const GUID* guidDecoder)
+LPCTSTR GetDXVAMode(GUID const* pkGuidDecoder, size_t* pupStringLength)
 {
-    int nPos = 0;
+    ASSERT(pkGuidDecoder);
+    ASSERT(pupStringLength);
 
-    for (int i = 1; i < _countof(DXVA2Decoder); i++) {
-        if (*guidDecoder == *DXVA2Decoder[i].Guid) {
-            nPos = i;
+    __int64 lo = reinterpret_cast<__int64 const*>(pkGuidDecoder)[0], hi = reinterpret_cast<__int64 const*>(pkGuidDecoder)[1];
+    // start at the first, iterate towards the last in the array: Unknown
+    DXVA2_DECODER const* pDecoder = DXVA2Decoder;
+    unsigned __int8 i = _countof(DXVA2Decoder) - 1;// one less than the total; the last item isn't used in the loop itself
+    do {
+        __int64 const* pGuid = reinterpret_cast<__int64 const*>(pDecoder->Guid);
+        if ((pGuid[0] == lo) && (pGuid[1] == hi)) {
             break;
         }
-    }
+        ++pDecoder;
+    } while (--i);// will point at Unknown if the loop breaks at this point
 
-    return DXVA2Decoder[nPos].Description;
+    *pupStringLength = pDecoder->StringLength;
+    return pDecoder->Description;
 }
 
 void DumpBuffer(BYTE* pBuffer, int nSize)

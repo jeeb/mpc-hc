@@ -1,5 +1,5 @@
 /*
- * (C) 2011-2012 see Authors.txt
+ * (C) 2011-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -22,14 +22,9 @@
 
 #include <Windows.h>
 
-struct IDirect3D9;
-
-
 bool SetPrivilege(LPCTSTR privilege, bool bEnable = true);
 
 bool ExportRegistryKey(CStdioFile& file, HKEY hKeyRoot, CString keyName = _T(""));
-
-UINT GetAdapter(IDirect3D9* pD3D, HWND hWnd);
 
 void GetMessageFont(LOGFONT* lf);
 void GetStatusFont(LOGFONT* lf);
@@ -40,4 +35,4 @@ bool ExploreToFile(LPCTSTR path);
 
 bool FileExists(LPCTSTR fileName);
 
-CString GetProgramPath(bool bWithExecutableName = false);
+CString GetProgramPath(bool bWithExecutableName = false);// this function can handle paths over the MAX_PATH limitation

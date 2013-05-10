@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -22,22 +22,32 @@
 #pragma once
 
 class CMacrovisionKicker
-    : public CUnknown
-    , public IKsPropertySet
+    : public IKsPropertySet
 {
-    CComPtr<IUnknown> m_pInner;
+    __declspec(nothrow noalias) __forceinline ~CMacrovisionKicker() {
+        if (m_pInner) {
+            m_pInner->Release();
+        }
+    }
 
+    IUnknown* m_pInner;
+    ULONG volatile mv_ulReferenceCount;
 public:
-    CMacrovisionKicker(const TCHAR* pName, LPUNKNOWN pUnk);
-    virtual ~CMacrovisionKicker();
+    __declspec(nothrow noalias) __forceinline CMacrovisionKicker()
+        : m_pInner(nullptr)
+        , mv_ulReferenceCount(1) {}
+    __declspec(nothrow noalias) __forceinline void SetInner(IUnknown* pUnk) {
+        m_pInner = pUnk;
+        pUnk->AddRef();
+    }
 
-    void SetInner(IUnknown* pUnk);
-
-    DECLARE_IUNKNOWN;
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
+    // IUnknown
+    __declspec(nothrow noalias) STDMETHODIMP QueryInterface(REFIID riid, __deref_out void** ppv);
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) AddRef();
+    __declspec(nothrow noalias) STDMETHODIMP_(ULONG) Release();
 
     // IKsPropertySet
-    STDMETHODIMP Set(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength);
-    STDMETHODIMP Get(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength, ULONG* pBytesReturned);
-    STDMETHODIMP QuerySupported(REFGUID PropSet, ULONG Id, ULONG* pTypeSupport);
+    __declspec(nothrow noalias) STDMETHODIMP Set(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength);
+    __declspec(nothrow noalias) STDMETHODIMP Get(REFGUID PropSet, ULONG Id, LPVOID pInstanceData, ULONG InstanceLength, LPVOID pPropertyData, ULONG DataLength, ULONG* pBytesReturned);
+    __declspec(nothrow noalias) STDMETHODIMP QuerySupported(REFGUID PropSet, ULONG Id, ULONG* pTypeSupport);
 };

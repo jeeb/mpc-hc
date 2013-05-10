@@ -118,8 +118,6 @@ class CMPlayerCApp : public CWinApp
     UINT GetVKFromAppCommand(UINT nAppCommand);
 
     COLORPROPERTY_RANGE     m_ColorControl[4];
-    VMR9ProcAmpControlRange m_VMR9ColorControl[4];
-    DXVA2_ValueRange        m_EVRColorControl[4];
 
     static UINT GetRemoteControlCodeMicrosoft(UINT nInputcode, HRAWINPUT hRawInput);
     static UINT GetRemoteControlCodeSRM7500(UINT nInputcode, HRAWINPUT hRawInput);
@@ -163,6 +161,9 @@ public:
     CString     m_strVersion;
     CString     m_AudioRendererDisplayName_CL;
 
+    VMR9ProcAmpControlRange m_VMR9ColorControl[4];
+    DXVA2_ValueRange        m_EVRColorControl[4];
+
     CAppSettings m_s;
 
     typedef UINT(*PTR_GetRemoteControlCode)(UINT nInputcode, HRAWINPUT hRawInput);
@@ -171,8 +172,6 @@ public:
     COLORPROPERTY_RANGE*        GetColorControl(ControlType nFlag);
     void                        ResetColorControlRange();
     void                        UpdateColorControlRange(bool isEVR);
-    VMR9ProcAmpControlRange*    GetVMR9ColorControl(ControlType nFlag);
-    DXVA2_ValueRange*           GetEVRColorControl(ControlType nFlag);
 
     static const LanguageResource languageResources[];
     static const size_t languageResourcesCount;

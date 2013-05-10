@@ -40,7 +40,6 @@ int CGraphThread::ExitInstance()
 
 BEGIN_MESSAGE_MAP(CGraphThread, CWinThread)
     ON_THREAD_MESSAGE(TM_CLOSE, OnClose)
-    ON_THREAD_MESSAGE(TM_DISPLAY_CHANGE, OnDisplayChange)
     ON_THREAD_MESSAGE(TM_EXIT, OnExit)
     ON_THREAD_MESSAGE(TM_OPEN, OnOpen)
     ON_THREAD_MESSAGE(TM_RESET, OnReset)
@@ -54,13 +53,6 @@ void CGraphThread::OnClose(WPARAM wParam, LPARAM lParam)
     }
     if (CAMEvent* e = (CAMEvent*)lParam) {
         e->Set();
-    }
-}
-
-void CGraphThread::OnDisplayChange(WPARAM wParam, LPARAM lParam)
-{
-    if (m_pMainFrame) {
-        m_pMainFrame->DisplayChange();
     }
 }
 
@@ -84,14 +76,7 @@ void CGraphThread::OnOpen(WPARAM wParam, LPARAM lParam)
 void CGraphThread::OnReset(WPARAM wParam, LPARAM lParam)
 {
     if (m_pMainFrame) {
-        BOOL* b = (BOOL*)wParam;
-        BOOL bResult = m_pMainFrame->ResetDevice();
-        if (b) {
-            *b = bResult;
-        }
-    }
-    if (CAMEvent* e = (CAMEvent*)lParam) {
-        e->Set();
+        m_pMainFrame->ResetDevice();
     }
 }
 

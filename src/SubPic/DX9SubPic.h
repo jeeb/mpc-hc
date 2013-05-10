@@ -21,95 +21,70 @@
 
 #pragma once
 
-#include "SubPicImpl.h"
-#include "SubPicAllocatorPresenterImpl.h"
+#include "ISubPic.h"
 #include <d3d9.h>
-
-// CDX9SubPic
-
-class CVirtualLock
-{
-public:
-    virtual void Lock() = 0;
-    virtual void Unlock() = 0;
-};
-
-typedef void (FLock)(void* _pLock);
-
-class CScopeLock
-{
-    void* m_pLock;
-    FLock* m_pUnlockFunc;
-public:
-    CScopeLock(): m_pLock(NULL), m_pUnlockFunc(NULL) {};
-
-    template <typename t_Lock>
-    class TCLocker
-    {
-    public:
-        static void fs_Locker(void* _pLock) {
-            ((t_Lock*)_pLock)->Unlock();
-        }
-    };
-
-    template <typename t_Lock>
-    CScopeLock(t_Lock& _Lock) {
-        _Lock.Lock();
-        m_pLock = &_Lock;
-        m_pUnlockFunc = TCLocker<t_Lock>::fs_Locker;
-    }
-
-    ~CScopeLock() {
-        m_pUnlockFunc(m_pLock);
-    }
-};
-
-
-class CDX9SubPicAllocator;
-class CDX9SubPic : public CSubPicImpl
-{
-    CComPtr<IDirect3DSurface9> m_pSurface;
-
-protected:
-    STDMETHODIMP_(void*) GetObject(); // returns IDirect3DTexture9*
-
-public:
-    CDX9SubPicAllocator* m_pAllocator;
-    bool m_bExternalRenderer;
-    CDX9SubPic(IDirect3DSurface9* pSurface, CDX9SubPicAllocator* pAllocator, bool bExternalRenderer);
-    ~CDX9SubPic();
-
-    // ISubPic
-    STDMETHODIMP GetDesc(SubPicDesc& spd);
-    STDMETHODIMP CopyTo(ISubPic* pSubPic);
-    STDMETHODIMP ClearDirtyRect(DWORD color);
-    STDMETHODIMP Lock(SubPicDesc& spd);
-    STDMETHODIMP Unlock(RECT* pDirtyRect);
-    STDMETHODIMP AlphaBlt(RECT* pSrc, RECT* pDst, SubPicDesc* pTarget);
-};
 
 // CDX9SubPicAllocator
 
-class CDX9SubPicAllocator : public CSubPicAllocatorImpl, public CCritSec
+class CDX9SubPicAllocator : public CSubPicAllocatorImpl
 {
-    CComPtr<IDirect3DDevice9> m_pD3DDev;
-    CSize m_maxsize;
-    bool m_bExternalRenderer;
+    IDirect3DDevice9* m_pD3DDev;// doesn't hold a reference
 
-    bool Alloc(bool fStatic, ISubPic** ppSubPic);
+    // CSubPicAllocatorImpl
+    __declspec(nothrow noalias restrict) CBSubPic* Alloc(__in bool fStatic) const;
 
 public:
-    static CCritSec ms_SurfaceQueueLock;
-    CAtlList<CComPtr<IDirect3DSurface9>> m_FreeSurfaces;
-    CAtlList<CDX9SubPic*> m_AllocatedSurfaces;
+    __declspec(nothrow noalias) __forceinline CDX9SubPicAllocator(__in unsigned __int32 u32Width, __in unsigned __int32 u32Height, __inout IDirect3DDevice9* pD3DDev)
+        : CSubPicAllocatorImpl(u32Width, u32Height, true)
+        , m_pD3DDev(pD3DDev) {
+        ASSERT(pD3DDev);
+    }
+    __declspec(nothrow noalias) void SetDevice(__inout IDirect3DDevice9* pD3DDev) {
+        m_pD3DDev = pD3DDev;
+    }
+};
 
-    void GetStats(int& _nFree, int& _nAlloc);
+// CDX9SubPic
 
-    CDX9SubPicAllocator(IDirect3DDevice9* pD3DDev, SIZE maxsize, bool fPow2Textures, bool bExternalRenderer);
-    ~CDX9SubPicAllocator();
-    void ClearCache();
+class CDX9SubPic : public CBSubPic
+{
+    __declspec(nothrow noalias) __forceinline ~CDX9SubPic() {
+        if (m_pSurface) {
+            m_pSurface->Release();
+        }
+        if (m_pTexture) {
+            m_pTexture->Release();
+        }
+    }
 
-    // ISubPicAllocator
-    STDMETHODIMP ChangeDevice(IUnknown* pDev);
-    STDMETHODIMP SetMaxTextureSize(SIZE MaxTextureSize);
+    IDirect3DSurface9* m_pSurface;
+public:
+    IDirect3DTexture9* m_pTexture;
+    IDirect3DDevice9* m_pD3DDev;// doesn't hold a reference
+
+    // CBSubPic
+    __declspec(nothrow noalias) void GetDesc(__out SubPicDesc* pTarget) const;
+    __declspec(nothrow noalias) HRESULT CopyTo(__out_opt CBSubPic* pSubPic) const;
+    __declspec(nothrow noalias) HRESULT LockAndClearDirtyRect(__out_opt SubPicDesc* pTarget);
+    __declspec(nothrow noalias) void Unlock(__in RECT const rDirtyRect);
+
+    // CPU memory texture holder
+    __declspec(nothrow noalias) __forceinline CDX9SubPic(__in unsigned __int32 u32Width, __in unsigned __int32 u32Height, __inout IDirect3DTexture9* pTexture)
+        : CBSubPic(u32Width, u32Height)
+        , m_pTexture(pTexture)
+        , m_pD3DDev(nullptr) {
+        ASSERT(pTexture);
+
+        // no AddRef on m_pTexture here, the incoming texture has one reference which this class directly gains ownership of
+        HRESULT hr;
+        EXECUTE_ASSERT(SUCCEEDED(hr = m_pTexture->GetSurfaceLevel(0, &m_pSurface)));
+    }
+    // GPU memory texture holder
+    __declspec(nothrow noalias) __forceinline CDX9SubPic(__in unsigned __int32 u32Width, __in unsigned __int32 u32Height, __inout IDirect3DDevice9* pD3DDev)
+        : CBSubPic(u32Width, u32Height)
+        , m_pSurface(nullptr)
+        , m_pTexture(nullptr)
+        , m_pD3DDev(pD3DDev) {
+        ASSERT(pD3DDev);
+    }
 };

@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2012 see Authors.txt
+ * (C) 2006-2013 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -21,33 +21,32 @@
 
 #pragma once
 
-#include "ISubPic.h"
+#include "SubPicImpl.h"
 
-class CSubPicProviderImpl : public CUnknown, public ISubPicProvider
+class __declspec(uuid("D62B9A1A-879A-42DB-AB04-88AA8F243CFD") novtable) CSubPicProviderImpl
+    : public IUnknown
 {
+    // polymorphic class not implementing IUnknown, so no virtual destructor required
 protected:
     CCritSec* m_pLock;
+    ULONG volatile mv_ulReferenceCount;
 
 public:
-    CSubPicProviderImpl(CCritSec* pLock);
-    virtual ~CSubPicProviderImpl();
+    virtual __declspec(nothrow noalias restrict) POSITION GetStartPosition(__in __int64 i64Time, __in double fps) = 0;
+    virtual __declspec(nothrow noalias restrict) POSITION GetNext(__in POSITION pos) const = 0;
+    virtual __declspec(nothrow noalias) __int64 GetStart(__in POSITION pos, __in double fps) const = 0;
+    virtual __declspec(nothrow noalias) __int64 GetStop(__in POSITION pos, __in double fps) const = 0;
+    virtual __declspec(nothrow noalias) bool IsAnimated(__in POSITION pos) const = 0;
+    virtual __declspec(nothrow noalias) HRESULT Render(__inout SubPicDesc& spd, __in __int64 i64Time, __in double fps, __out_opt RECT& bbox) = 0;// __out_opt used for when rendering fails, and HRESULT returns FAILED
+    virtual __declspec(nothrow noalias) unsigned __int64 GetTextureSize(__in POSITION pos) const {// width in the low 32 bits, height in the high 32 bits
+        return 0;// only implemented in CHdmvSub and CDVBSub though their IBaseSub part
+    }
 
-    DECLARE_IUNKNOWN;
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv);
-
-    // ISubPicProvider
-
-    STDMETHODIMP Lock();
-    STDMETHODIMP Unlock();
-
-    STDMETHODIMP_(POSITION) GetStartPosition(REFERENCE_TIME rt, double fps) = 0;
-    STDMETHODIMP_(POSITION) GetNext(POSITION pos) = 0;
-
-    STDMETHODIMP_(REFERENCE_TIME) GetStart(POSITION pos, double fps) = 0;
-    STDMETHODIMP_(REFERENCE_TIME) GetStop(POSITION pos, double fps) = 0;
-
-    STDMETHODIMP Render(SubPicDesc& spd, REFERENCE_TIME rt, double fps, RECT& bbox) = 0;
-    STDMETHODIMP GetTextureSize(POSITION pos, SIZE& MaxTextureSize, SIZE& VirtualSize, POINT& VirtualTopLeft) {
-        return E_NOTIMPL;
-    };
+    __declspec(nothrow noalias) __forceinline CSubPicProviderImpl(__in CCritSec* pLock)
+        : m_pLock(pLock)
+        , mv_ulReferenceCount(0) {
+        ASSERT(pLock);
+    }
+    __declspec(nothrow noalias) __forceinline void Lock() { m_pLock->Lock(); }
+    __declspec(nothrow noalias) __forceinline void Unlock() { m_pLock->Unlock(); }
 };

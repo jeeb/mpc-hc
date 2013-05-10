@@ -21,7 +21,6 @@
 
 #include "stdafx.h"
 #include "mplayerc.h"
-#include "PixelShaderCompiler.h"
 #include "ShaderEditorDlg.h"
 #include "MainFrm.h"
 
@@ -209,7 +208,7 @@ void CShaderEdit::OnTimer(UINT_PTR nIDEvent)
 CShaderEditorDlg::CShaderEditorDlg()
     : CResizableDialog(CShaderEditorDlg::IDD, nullptr)
     , m_fSplitterGrabbed(false)
-    , m_pPSC(nullptr)
+    , m_hD3DCompiler(nullptr)
     , m_pShader(nullptr)
     , m_nIDEventShader(0)
 {
@@ -217,7 +216,9 @@ CShaderEditorDlg::CShaderEditorDlg()
 
 CShaderEditorDlg::~CShaderEditorDlg()
 {
-    delete m_pPSC;
+    if (m_hD3DCompiler) {
+        FreeLibrary(m_hD3DCompiler);
+    }
 }
 
 BOOL CShaderEditorDlg::Create(CWnd* pParent)
@@ -236,16 +237,15 @@ BOOL CShaderEditorDlg::Create(CWnd* pParent)
 
     SetMinTrackSize(CSize(250, 40));
 
-    m_targets.AddString(_T("ps_2_0"));
-    m_targets.AddString(_T("ps_2_a"));
-    m_targets.AddString(_T("ps_2_sw"));
-    m_targets.AddString(_T("ps_3_0"));
-    m_targets.AddString(_T("ps_3_sw"));
+    m_targets.AddString(L"ps_2_0");
+    m_targets.AddString(L"ps_2_a");
+    m_targets.AddString(L"ps_2_b");
+    m_targets.AddString(L"ps_3_0");
 
     const CAppSettings& s = AfxGetAppSettings();
     POSITION pos = s.m_shaders.GetHeadPosition();
     while (pos) {
-        const CAppSettings::Shader& shader = s.m_shaders.GetNext(pos);
+        Shader const& shader = s.m_shaders.GetNext(pos);
         m_labels.SetItemDataPtr(m_labels.AddString(shader.label), (void*)&shader);
     }
     CorrectComboListWidth(m_labels);
@@ -293,21 +293,24 @@ END_MESSAGE_MAP()
 
 BOOL CShaderEditorDlg::PreTranslateMessage(MSG* pMsg)
 {
-    if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_RETURN
-            && pMsg->hwnd == m_labels.m_edit.GetSafeHwnd()) {
-        OnCbnSelchangeCombo1();
-
-        return TRUE;
-    } else if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_TAB
-               && pMsg->hwnd == m_srcdata.GetSafeHwnd()) {
-        int nStartChar, nEndChar;
-        m_srcdata.GetSel(nStartChar, nEndChar);
-        if (nStartChar == nEndChar) {
-            m_srcdata.ReplaceSel(_T("\t"));
+    if (pMsg->message == WM_KEYDOWN) {
+        if (pMsg->wParam == VK_RETURN) {
+            if (pMsg->hwnd == m_labels.m_edit.GetSafeHwnd()) {
+                OnCbnSelchangeCombo1();
+                return TRUE;
+            }
+        } else if (pMsg->wParam == VK_TAB) {
+            if (pMsg->hwnd == m_srcdata.GetSafeHwnd()) {
+                int nStartChar, nEndChar;
+                m_srcdata.GetSel(nStartChar, nEndChar);
+                if (nStartChar == nEndChar) {
+                    m_srcdata.ReplaceSel(_T("\t"));
+                }
+                return TRUE;
+            }
+        } else if (pMsg->wParam == VK_ESCAPE) {
+            return GetParent()->PreTranslateMessage(pMsg);
         }
-        return TRUE;
-    } else if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_ESCAPE) {
-        return GetParent()->PreTranslateMessage(pMsg);
     }
 
     return __super::PreTranslateMessage(pMsg);
@@ -318,39 +321,36 @@ void CShaderEditorDlg::OnCbnSelchangeCombo1()
     int i = m_labels.GetCurSel();
 
     if (i < 0) {
-        CString label;
-        m_labels.GetWindowText(label);
-        label.Trim();
+        Shader ss;
 
-        if (label.IsEmpty()) {
-            return;
-        }
+        m_labels.GetWindowTextW(ss.label);
+        ss.label.Trim();
+
+        if (ss.label.IsEmpty()) { return; }
 
         CStringA srcdata;
-        if (!LoadResource(IDF_SHADER_EMPTY, srcdata, _T("SHADER"))) {
+        if (!LoadResource(IDF_SHADER_EMPTY, srcdata, L"SHADER")) {
             return;
         }
-
-        CAppSettings::Shader shader;
-        shader.label = label;
-        shader.target = _T("ps_2_0");
-        shader.srcdata = CString(srcdata);
+        ss.srcdata = srcdata;
+        ss.target = L"ps_2_0";
 
         CAppSettings& s = AfxGetAppSettings();
-        POSITION pos = s.m_shaders.AddTail(shader);
+        POSITION pos = s.m_shaders.AddTail(ss);
 
-        i = m_labels.AddString(shader.label);
+        i = m_labels.AddString(ss.label);
         m_labels.SetCurSel(i);
         m_labels.SetItemDataPtr(i, (void*)&s.m_shaders.GetAt(pos));
     }
 
-    m_pShader = (CAppSettings::Shader*)m_labels.GetItemDataPtr(i);
+    m_pShader = (Shader*)m_labels.GetItemDataPtr(i);
 
-    m_targets.SetWindowText(m_pShader->target);
+    CStringW target = m_pShader->target;
+    m_targets.SetWindowTextW(target);
 
-    CString srcdata = m_pShader->srcdata;
-    srcdata.Replace(_T("\n"), _T("\r\n"));
-    m_srcdata.SetWindowText(srcdata);
+    CStringW srcdata = m_pShader->srcdata;
+    srcdata.Replace(L"\n", L"\r\n");
+    m_srcdata.SetWindowTextW(srcdata);
 
     ((CMainFrame*)AfxGetMainWnd())->UpdateShaders(m_pShader->label);
 }
@@ -388,42 +388,115 @@ void CShaderEditorDlg::OnBnClickedButton2()
 void CShaderEditorDlg::OnTimer(UINT_PTR nIDEvent)
 {
     if (nIDEvent == m_nIDEventShader && IsWindowVisible() && m_pShader) {
-        CString srcdata;
-        m_srcdata.GetWindowText(srcdata);
-        srcdata.Replace(_T("\r"), _T(""));
+        CStringW srcdata;
+        m_srcdata.GetWindowTextW(srcdata);
+        srcdata.Replace(L"\r", L"");
         srcdata.Trim();
 
-        CString target;
-        m_targets.GetWindowText(target);
+        CStringW target;
+        m_targets.GetWindowTextW(target);
         target.Trim();
 
+        // TODO: autosave
         if (!srcdata.IsEmpty() && !target.IsEmpty() && (m_pShader->srcdata != srcdata || m_pShader->target != target)) {
             KillTimer(m_nIDEventShader);
 
             m_pShader->srcdata = srcdata;
             m_pShader->target = target;
 
-            if (!m_pPSC) {
-                m_pPSC = DEBUG_NEW CPixelShaderCompiler(nullptr);
+#if D3DX_SDK_VERSION != 43
+#error DirectX SDK June 2010 (v43) is required to build this, if the DirectX SDK has been updated, add loading functions to this part of the code and the class initializer
+#endif// this code has duplicates in ShaderEditorDlg.cpp, DX9AllocatorPresenter.cpp and SyncRenderer.cpp
+            if (!m_hD3DCompiler) {// load latest compatible version of the DLL that is available, and only once it is needed
+                HMODULE hD3DCompiler = LoadLibraryW(L"D3DCompiler_43.dll");
+                if (!hD3DCompiler) {
+                    ASSERT(0);
+                    m_output.SetWindowTextW(L"The installed DirectX End-User Runtime is outdated. Please download and install the June 2010 release or newer in order for MPC-HC to function properly.\n");// this text is a duplicate, the compiler will properly take care of it
+                    goto FunctionEnd;
+                }
+                m_hD3DCompiler = hD3DCompiler;
+                {
+                    // import functions from D3DCompiler_43.dll
+                    uintptr_t pModule = reinterpret_cast<uintptr_t>(m_hD3DCompiler);// just a named alias
+                    IMAGE_DOS_HEADER const* pDOSHeader = reinterpret_cast<IMAGE_DOS_HEADER const*>(pModule);
+                    IMAGE_NT_HEADERS const* pNTHeader = reinterpret_cast<IMAGE_NT_HEADERS const*>(pModule + static_cast<size_t>(static_cast<ULONG>(pDOSHeader->e_lfanew)));
+                    IMAGE_EXPORT_DIRECTORY const* pEAT = reinterpret_cast<IMAGE_EXPORT_DIRECTORY const*>(pModule + static_cast<size_t>(pNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress));
+                    uintptr_t pAONbase = pModule + static_cast<size_t>(pEAT->AddressOfNames);
+                    uintptr_t pAONObase = pModule + static_cast<size_t>(pEAT->AddressOfNameOrdinals);
+                    uintptr_t pAOFbase = pModule + static_cast<size_t>(pEAT->AddressOfFunctions);
+                    DWORD dwLoopCount = pEAT->NumberOfNames - 1;
+                    {
+                        __declspec(align(8)) static char const kszFunc[] = "D3DCompile";// 8-byte alignment used to facititate optimal 8-byte comparisons for the memcmp() intrinsic
+                        ptrdiff_t i = static_cast<size_t>(dwLoopCount);// convert to signed for the loop system and pointer-sized for the pointer operations
+                        for (;;) {
+                            unsigned __int32 u32AON = *reinterpret_cast<unsigned __int32 const*>(pAONbase + i * 4);// table of four-byte elements
+                            char const* kszName = reinterpret_cast<char const*>(pModule + static_cast<size_t>(u32AON));
+                            if (*reinterpret_cast<__int64 __unaligned const*>(kszName) == *reinterpret_cast<__int64 const*>(kszFunc)
+                                    && *reinterpret_cast<__int16 __unaligned const*>(kszName + 8) == *reinterpret_cast<__int16 const*>(kszFunc + 8)
+                                    && kszName[10] == kszFunc[10]) {// note that this part must compare zero end inclusive
+                                // if (!memcmp(reinterpret_cast<char const*>(pModule + static_cast<size_t>(u32AON)), kszFunc, sizeof(kszFunc))) { assembly checked; inlining failed
+                                break;
+                            } else if (--i < 0) {
+                                ASSERT(0);
+                                goto d3dc_43EHandling;
+                            }
+                        }
+                        unsigned __int16 u16AONO = *reinterpret_cast<unsigned __int16 const*>(pAONObase + i * 2);// table of two-byte elements
+                        unsigned __int32 u32AOF = *reinterpret_cast<unsigned __int32 const*>(pAOFbase + static_cast<size_t>(u16AONO) * 4);// table of four-byte elements
+                        m_fnD3DCompile = reinterpret_cast<D3DCompilePtr>(pModule + static_cast<size_t>(u32AOF));
+                    }
+                    {
+                        __declspec(align(8)) static char const kszFunc[] = "D3DDisassemble";// 8-byte alignment used to facititate optimal 8-byte comparisons for the memcmp() intrinsic
+                        ptrdiff_t i = static_cast<size_t>(dwLoopCount);// convert to signed for the loop system and pointer-sized for the pointer operations
+                        for (;;) {
+                            unsigned __int32 u32AON = *reinterpret_cast<unsigned __int32 const*>(pAONbase + i * 4);// table of four-byte elements
+                            char const* kszName = reinterpret_cast<char const*>(pModule + static_cast<size_t>(u32AON));
+                            if (*reinterpret_cast<__int64 __unaligned const*>(kszName) == *reinterpret_cast<__int64 const*>(kszFunc)
+                                    && *reinterpret_cast<__int32 __unaligned const*>(kszName + 8) == *reinterpret_cast<__int32 const*>(kszFunc + 8)
+                                    && *reinterpret_cast<__int16 __unaligned const*>(kszName + 12) == *reinterpret_cast<__int16 const*>(kszFunc + 12)
+                                    && kszName[14] == kszFunc[14]) {// note that this part must compare zero end inclusive
+                                // if (!memcmp(reinterpret_cast<char const*>(pModule + static_cast<size_t>(u32AON)), kszFunc, sizeof(kszFunc))) { assembly checked; inlining failed
+                                break;
+                            } else if (--i < 0) {
+                                ASSERT(0);
+                                goto d3dc_43EHandling;
+                            }
+                        }
+                        unsigned __int16 u16AONO = *reinterpret_cast<unsigned __int16 const*>(pAONObase + i * 2);// table of two-byte elements
+                        unsigned __int32 u32AOF = *reinterpret_cast<unsigned __int32 const*>(pAOFbase + static_cast<size_t>(u16AONO) * 4);// table of four-byte elements
+                        m_fnD3DDisassemble = reinterpret_cast<D3DDisassemblePtr>(pModule + static_cast<size_t>(u32AOF));
+                    }
+                    goto Skipd3dc_43EHandling;
+d3dc_43EHandling:
+                    m_output.SetWindowTextW(L"Could not read data from D3DCompiler_43.dll.\n");
+                    goto FunctionEnd;
+                }
             }
+Skipd3dc_43EHandling:
 
-            CString disasm, errmsg;
-            HRESULT hr = m_pPSC->CompileShader(CStringA(srcdata), "main", CStringA(target), D3DXSHADER_DEBUG, nullptr, &disasm, &errmsg);
+            {
+                // to scope FunctionEnd properly
+                CStringA errmsg = "D3DCompile failed\n";
+                ID3DBlob* pShaderBin, *pMessages;
+                if (SUCCEEDED(m_fnD3DCompile(CStringA(srcdata), srcdata.GetLength(), NULL, NULL, NULL, "main", CStringA(target), D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &pShaderBin, &pMessages))) {
+                    errmsg = "D3DCompile succeeded\n";
+                    if (pMessages) {// non-critical debug warnings, note that this can be NULL if there are no warnings
+                        errmsg.Append(reinterpret_cast<const char*>(pMessages->GetBufferPointer()), pMessages->GetBufferSize());
+                        pMessages->Release();
+                    }
+                    m_fnD3DDisassemble(pShaderBin->GetBufferPointer(), pShaderBin->GetBufferSize(), 0, NULL, &pMessages);
+                    pShaderBin->Release();
+                    static_cast<CMainFrame*>(AfxGetMainWnd())->UpdateShaders(m_pShader->label);
+                }
+                if (pMessages) {// eiter critical failure errors or disassembly text
+                    errmsg.Append(reinterpret_cast<const char*>(pMessages->GetBufferPointer()), pMessages->GetBufferSize());
+                    pMessages->Release();
+                }
 
-            if (SUCCEEDED(hr)) {
-                errmsg = _T("D3DXCompileShader succeeded\n");
-                errmsg += _T("\n");
-                errmsg += disasm;
-
-                ((CMainFrame*)AfxGetMainWnd())->UpdateShaders(m_pShader->label);
+                errmsg.Replace("\n", "\r\n");
+                m_output.SetWindowTextW(CStringW(errmsg));
             }
-
-            errmsg.Replace(_T("\n"), _T("\r\n"));
-
-            m_output.SetWindowText(errmsg);
-
-            // TODO: autosave
-
+FunctionEnd:
             m_nIDEventShader = SetTimer(1, 1000, nullptr);
         }
     }

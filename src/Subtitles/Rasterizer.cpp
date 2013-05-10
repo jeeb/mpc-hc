@@ -35,9 +35,6 @@
 #define _MAX    (std::max)
 #endif
 
-#define MAX_DIMENSION 4000 // Maximum width or height supported
-#define SUBPIXEL_MULTIPLIER 8
-
 // Statics constants for use by alpha_blend_sse2
 static __m128i low_mask = _mm_set1_epi16(0xFF);
 static __m128i red_mask = _mm_set1_epi32(0xFF);
@@ -62,8 +59,6 @@ Rasterizer::Rasterizer() :
     mOverlayWidth = mOverlayHeight = 0;
     mPathOffsetX = mPathOffsetY = 0;
     mOffsetX = mOffsetY = 0;
-    // CPUID from VDub
-    fSSE2 = !!(g_cpuid.m_flags & CCpuID::sse2);
 }
 
 Rasterizer::~Rasterizer()
@@ -440,16 +435,6 @@ bool Rasterizer::ScanConvert()
 
     mWidth  = maxx + 1 - minx;
     mHeight = maxy + 1 - miny;
-
-    // Check that the size isn't completely crazy.
-    // Note that mWidth and mHeight are in 1/8 pixels.
-    if (mWidth > MAX_DIMENSION * SUBPIXEL_MULTIPLIER
-            || mHeight > MAX_DIMENSION * SUBPIXEL_MULTIPLIER) {
-        TRACE(_T("Error in Rasterizer::ScanConvert: size (%dx%d) is too big"),
-              mWidth / SUBPIXEL_MULTIPLIER, mHeight / SUBPIXEL_MULTIPLIER);
-        return false;
-    }
-
     mPathOffsetX = minx;
     mPathOffsetY = miny;
 
@@ -726,8 +711,10 @@ bool Rasterizer::CreateWidenedRegion(int rx, int ry)
     if (ry > 0) {
         // Do a half circle.
         // _OverlapRegion mirrors this so both halves are done.
-        for (int y = -ry; y <= ry; ++y) {
-            int x = (int)(0.5 + sqrt(float(ry * ry - y * y)) * float(rx) / float(ry));
+        double qx = static_cast<double>(rx);
+        double qy = static_cast<double>(ry);
+        for (double y = -qy; y <= qy; ++y) {
+            int x = static_cast<int>(0.5 + sqrt(qy * qy - y * y) * qx / qy);
 
             _OverlapRegion(mWideOutline, mOutline, x, y);
         }
@@ -792,12 +779,31 @@ bool Rasterizer::Rasterize(int xsub, int ysub, int fBlur, double fGaussianBlur)
     // fixed image height
     mOverlayHeight = ((height + 14) >> 3) + 1;
 
-    mpOverlayBuffer = (byte*)_aligned_malloc(2 * mOverlayWidth * mOverlayHeight, 16);
+    size_t uByteCount = (mOverlayWidth * mOverlayHeight) << 1; // shifted 1 left, so this number is always even
+    mpOverlayBuffer = reinterpret_cast<byte*>(_aligned_malloc(uByteCount, 128)); // to make sure that the memory is cache line aligned
     if (!mpOverlayBuffer) {
         return false;
     }
 
-    memset(mpOverlayBuffer, 0, 2 * mOverlayWidth * mOverlayHeight);
+    // initialize to zero
+    __m128 mZero = _mm_setzero_ps();// only a command to set a register to zero, this should not add constant value to the assembly
+    uintptr_t pDest = reinterpret_cast<uintptr_t>(mpOverlayBuffer);
+    if (size_t uErease = uByteCount >> 4) do {
+            _mm_store_ps(reinterpret_cast<float*>(pDest), mZero); // zero-fills target, will use caches as we expect the values to be read soon afterwards
+            pDest += 16;
+        } while (--uErease); // 16 aligned bytes are written every time
+    // zero the last bytes, sorted for aligned access
+    if (uByteCount & 8) {
+        *reinterpret_cast<__int64*>(pDest) = 0;
+        pDest += 8;
+    }
+    if (uByteCount & 4) {
+        *reinterpret_cast<__int32*>(pDest) = 0;
+        pDest += 4;
+    }
+    if (uByteCount & 2) {
+        *reinterpret_cast<__int16*>(pDest) = 0;
+    } // no address increment for the last possible value, least significant bit will be 0 for even numbers
 
     // Are we doing a border?
 
@@ -1054,17 +1060,7 @@ static __forceinline void pixmix2_sse2(DWORD* dst, DWORD color, DWORD shapealpha
 // Calculate a - b clamping to 0 instead of underflowing
 static __forceinline DWORD safe_subtract(DWORD a, DWORD b)
 {
-#ifndef _WIN64
-    __m64 ap = _mm_cvtsi32_si64(a);
-    __m64 bp = _mm_cvtsi32_si64(b);
-    __m64 rp = _mm_subs_pu16(ap, bp);
-    DWORD r = (DWORD)_mm_cvtsi64_si32(rp);
-    _mm_empty();
-    return r;
-#else
-    // For whatever reason Microsoft's x64 compiler doesn't support MMX intrinsics
     return (b > a) ? 0 : a - b;
-#endif
 }
 
 static __forceinline DWORD safe_subtract_sse2(DWORD a, DWORD b)
@@ -1524,106 +1520,124 @@ CRect Rasterizer::Draw(SubPicDesc& spd, CRect& clipRect, byte* pAlphaMask, int x
     // The complex "vector clip mask" I think.
     rnfo.am = pAlphaMask + spd.w * y + x;
     // Every remaining line in the bitmap to be rendered...
-    // Basic case of no complex clipping mask
-    if (!pAlphaMask) {
-        // If the first colour switching coordinate is at "infinite" we're
-        // never switching and can use some simpler code.
-        // ??? Is this optimisation really worth the extra readability issues it adds?
-        if (switchpts[1] == 0xFFFFFFFF) {
-            // fBody is true if we're rendering a fill or a shadow.
-            if (fBody) {
-                if (fSSE2) {
+
+#if _M_IX86_FP == 1// inverse of: SSE2 code, don't use on SSE builds, works correctly for x64
+    if (g_cpuid.m_flags & CCpuID::sse2) {// SSE2-level functions
+#endif
+        // Basic case of no complex clipping mask
+        if (!pAlphaMask) {
+            // If the first colour switching coordinate is at "infinite" we're
+            // never switching and can use some simpler code.
+            // ??? Is this optimisation really worth the extra readability issues it adds?
+            if (switchpts[1] == 0xFFFFFFFF) {
+                // fBody is true if we're rendering a fill or a shadow.
+                if (fBody) {
                     Draw_noAlpha_spFF_Body_sse2(rnfo);
-                } else {
-                    Draw_noAlpha_spFF_Body_0(rnfo);
+                } else {// Not painting body, ie. painting border without fill in it
+                    Draw_noAlpha_spFF_noBody_sse2(rnfo);
                 }
             }
-            // Not painting body, ie. painting border without fill in it
+            // not (switchpts[1] == 0xFFFFFFFF)
             else {
-                if (fSSE2) {
-                    Draw_noAlpha_spFF_noBody_sse2(rnfo);
+                // switchpts plays an important rule here
+                //const long *sw = switchpts;
+
+                if (fBody) {
+                    Draw_noAlpha_sp_Body_sse2(rnfo);
                 } else {
-                    Draw_noAlpha_spFF_noBody_0(rnfo);
+                    Draw_noAlpha_sp_noBody_sse2(rnfo);
+                }
+            }
+        } else {// Here we *do* have an alpha mask
+            if (switchpts[1] == 0xFFFFFFFF) {
+                if (fBody) {
+                    Draw_Alpha_spFF_Body_sse2(rnfo);
+                } else {
+                    Draw_Alpha_spFF_noBody_sse2(rnfo);
+                }
+            } else {
+                //const long *sw = switchpts;
+
+                if (fBody) {
+                    Draw_Alpha_sp_Body_sse2(rnfo);
+                } else {
+                    Draw_Alpha_sp_noBody_sse2(rnfo);
                 }
             }
         }
-        // not (switchpts[1] == 0xFFFFFFFF)
-        else {
-            // switchpts plays an important rule here
-            //const long *sw = switchpts;
-
-            if (fBody) {
-                if (fSSE2) {
-                    Draw_noAlpha_sp_Body_sse2(rnfo);
-                } else {
-                    Draw_noAlpha_sp_Body_0(rnfo);
+#if _M_IX86_FP == 1// inverse of: SSE2 code, don't use on SSE builds, works correctly for x64
+    } else {// SSE-level functions
+        // Basic case of no complex clipping mask
+        if (!pAlphaMask) {
+            // If the first colour switching coordinate is at "infinite" we're
+            // never switching and can use some simpler code.
+            // ??? Is this optimisation really worth the extra readability issues it adds?
+            if (switchpts[1] == 0xFFFFFFFF) {
+                // fBody is true if we're rendering a fill or a shadow.
+                if (fBody) {
+                    Draw_noAlpha_spFF_Body_0(rnfo);
+                } else {// Not painting body, ie. painting border without fill in it
+                    Draw_noAlpha_spFF_noBody_0(rnfo);
                 }
             }
-            // Not body
+            // not (switchpts[1] == 0xFFFFFFFF)
             else {
-                if (fSSE2) {
-                    Draw_noAlpha_sp_noBody_sse2(rnfo);
+                // switchpts plays an important rule here
+                //const long *sw = switchpts;
+
+                if (fBody) {
+                    Draw_noAlpha_sp_Body_0(rnfo);
                 } else {
                     Draw_noAlpha_sp_noBody_0(rnfo);
                 }
             }
         }
-    }
-    // Here we *do* have an alpha mask
-    else {
-        if (switchpts[1] == 0xFFFFFFFF) {
-            if (fBody) {
-                if (fSSE2) {
-                    Draw_Alpha_spFF_Body_sse2(rnfo);
-                } else {
+        // Here we *do* have an alpha mask
+        else {
+            if (switchpts[1] == 0xFFFFFFFF) {
+                if (fBody) {
                     Draw_Alpha_spFF_Body_0(rnfo);
-                }
-            } else {
-                if (fSSE2) {
-                    Draw_Alpha_spFF_noBody_sse2(rnfo);
                 } else {
                     Draw_Alpha_spFF_noBody_0(rnfo);
                 }
-            }
-        } else {
-            //const long *sw = switchpts;
-
-            if (fBody) {
-                if (fSSE2) {
-                    Draw_Alpha_sp_Body_sse2(rnfo);
-                } else {
-                    Draw_Alpha_sp_Body_0(rnfo);
-                }
             } else {
-                if (fSSE2) {
-                    Draw_Alpha_sp_noBody_sse2(rnfo);
+                //const long *sw = switchpts;
+
+                if (fBody) {
+                    Draw_Alpha_sp_Body_0(rnfo);
                 } else {
                     Draw_Alpha_sp_noBody_0(rnfo);
                 }
             }
         }
     }
-    // Remember to EMMS!
-    // Rendering fails in funny ways if we don't do this.
-#ifndef _WIN64
-    _mm_empty();
 #endif
+    //_m_empty(); 2012-02-15; as far as I know, I deleted all the MMX code in the entire subtitle renderer, emptying the FPU register state is both useless and costly
 
     return bbox;
 }
 
 void Rasterizer::FillSolidRect(SubPicDesc& spd, int x, int y, int nWidth, int nHeight, DWORD lColor)
 {
-    for (int wy = y; wy < y + nHeight; wy++) {
-        DWORD* dst = (DWORD*)((BYTE*)spd.bits + spd.pitch * wy) + x;
-        for (int wt = 0; wt < nWidth; ++wt) {
-            if (fSSE2) {
+#if _M_IX86_FP == 1// inverse of: SSE2 code, don't use on SSE builds, works correctly for x64
+    if (g_cpuid.m_flags & CCpuID::sse2) {
+#endif
+        for (size_t wy = y; wy < y + nHeight; ++wy) {
+            DWORD* dst = (DWORD*)((BYTE*)spd.bits + spd.pitch * wy) + x;
+            for (size_t wt = 0; wt < nWidth; ++wt) {
                 pixmix_sse2(&dst[wt], lColor, 0x40); // 0x40 because >> 6 in pixmix (to preserve tranparency)
-            } else {
+            }
+        }
+#if _M_IX86_FP == 1
+    } else {
+        for (size_t wy = y; wy < y + nHeight; ++wy) {
+            DWORD* dst = (DWORD*)((BYTE*)spd.bits + spd.pitch * wy) + x;
+            for (size_t wt = 0; wt < nWidth; ++wt) {
                 pixmix(&dst[wt], lColor, 0x40);
             }
         }
     }
+#endif
 }
 
 RasterizerNfo::RasterizerNfo()
