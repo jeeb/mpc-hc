@@ -51,7 +51,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "cpu_detect.h"
 #include "STTypes.h"
 
 using namespace soundtouch;
@@ -141,7 +140,8 @@ double TDStretchSSE::calcCrossCorr(const float *pV1, const float *pV2) const
 
     // return value = vSum[0] + vSum[1] + vSum[2] + vSum[3]
     float *pvNorm = (float*)&vNorm;
-    double norm = sqrt(pvNorm[0] + pvNorm[1] + pvNorm[2] + pvNorm[3]);
+// edited: the internal static cast solves a little bug
+    double norm = sqrt(static_cast<double>(pvNorm[0] + pvNorm[1] + pvNorm[2] + pvNorm[3]));
     if (norm < 1e-9) norm = 1.0;    // to avoid div by zero
 
     float *pvSum = (float*)&vSum;
