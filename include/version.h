@@ -114,7 +114,7 @@
 
 
 #if MPC_NIGHTLY_RELEASE
-#define MPC_VERSION_NIGHTLY     _T("Nightly")
+#define MPC_VERSION_NIGHTLY     _T("CCCP Build")
 #endif
 
 #ifdef _WIN64
