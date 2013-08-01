@@ -89,7 +89,7 @@
 
 
 #if MPC_BETA_RELEASE
-#define MPC_VERSION_BETA        _T("Beta")
+#define MPC_VERSION_BETA        _T("CCCP Build")
 #endif
 
 #ifdef _WIN64
