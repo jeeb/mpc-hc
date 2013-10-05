@@ -1170,8 +1170,6 @@ void CMainFrame::Dump(CDumpContext& dc) const
 // CMainFrame message handlers
 void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 {
-    SetAlwaysOnTop(AfxGetAppSettings().iOnTop);
-
     // forward focus to the view window
     if (IsWindow(m_wndView.m_hWnd)) {
         m_wndView.SetFocus();
@@ -1531,6 +1529,7 @@ void CMainFrame::OnActivateApp(BOOL bActive, DWORD dwThreadID)
     __super::OnActivateApp(bActive, dwThreadID);
 
     if (AfxGetAppSettings().iOnTop) {
+        SetAlwaysOnTop(AfxGetAppSettings().iOnTop);
         return;
     }
 
