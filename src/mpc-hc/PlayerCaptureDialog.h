@@ -355,6 +355,8 @@ class CPlayerCaptureDialog : public CResizableDialog //CDialog
 {
     //DECLARE_DYNAMIC(CPlayerCaptureDialog)
 
+    bool m_bInitialized;
+
     // video input
     CStringW m_VidDisplayName;
     CComPtr<IAMStreamConfig> m_pAMVSC;
@@ -444,6 +446,8 @@ public:
     CComPtr<IBaseFilter> m_pVidBuffer, m_pAudBuffer;
 
 public:
+    void InitControls();
+
     void SetupVideoControls(CStringW DisplayName, IAMStreamConfig* pAMSC, IAMCrossbar* pAMXB, IAMTVTuner* pAMTuner);
     void SetupVideoControls(CStringW DisplayName, IAMStreamConfig* pAMSC, IAMVfwCaptureDialogs* pAMVfwCD);
     void SetupAudioControls(CStringW DisplayName, IAMStreamConfig* pAMSC, const CInterfaceArray<IAMAudioInputMixer>& pAMAIM);
