@@ -35,9 +35,6 @@
 #define _MAX    (std::max)
 #endif
 
-#define MAX_DIMENSION 4000 // Maximum width or height supported
-#define SUBPIXEL_MULTIPLIER 8
-
 // Statics constants for use by alpha_blend_sse2
 static __m128i low_mask = _mm_set1_epi16(0xFF);
 static __m128i red_mask = _mm_set1_epi32(0xFF);
@@ -441,15 +438,6 @@ bool Rasterizer::ScanConvert()
     m_outlineData.mWidth  = maxx + 1 - minx;
     m_outlineData.mHeight = maxy + 1 - miny;
 
-    // Check that the size isn't completely crazy.
-    // Note that mWidth and mHeight are in 1/8 pixels.
-    if (m_outlineData.mWidth > MAX_DIMENSION * SUBPIXEL_MULTIPLIER
-            || m_outlineData.mHeight > MAX_DIMENSION * SUBPIXEL_MULTIPLIER) {
-        TRACE(_T("Error in Rasterizer::ScanConvert: size (%dx%d) is too big"),
-              m_outlineData.mWidth / SUBPIXEL_MULTIPLIER, m_outlineData.mHeight / SUBPIXEL_MULTIPLIER);
-        return false;
-    }
-
     m_outlineData.mPathOffsetX = minx;
     m_outlineData.mPathOffsetY = miny;
 
@@ -465,7 +453,7 @@ bool Rasterizer::ScanConvert()
 
     // Initialize scanline list.
 
-    mpScanBuffer = DEBUG_NEW unsigned int[m_outlineData.mHeight];
+    mpScanBuffer = DEBUG_NEW (std::nothrow) unsigned int[m_outlineData.mHeight];
     if (!mpScanBuffer) {
         TRACE(_T("Error in Rasterizer::ScanConvert: mpScanBuffer is NULL"));
         return false;
