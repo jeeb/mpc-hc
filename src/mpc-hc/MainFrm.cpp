@@ -2685,6 +2685,7 @@ LRESULT CMainFrame::OnGraphNotify(WPARAM wParam, LPARAM lParam)
                 REFERENCE_TIME rtDur = 0;
                 m_pMS->GetDuration(&rtDur);
                 m_wndPlaylistBar.SetCurTime(rtDur);
+                LoadKeyFrames();
             }
             break;
             case EC_BG_AUDIO_CHANGED:
@@ -10663,20 +10664,7 @@ void CMainFrame::OpenFile(OpenFileData* pOFD)
 
     SetupChapters();
 
-    CComQIPtr<IKeyFrameInfo> pKFI;
-    BeginEnumFilters(m_pGB, pEF, pBF);
-    if (pKFI = pBF) {
-        break;
-    }
-    EndEnumFilters;
-    UINT nKFs = 0;
-    if (pKFI && S_OK == pKFI->GetKeyFrameCount(nKFs) && nKFs > 0) {
-        UINT k = nKFs;
-        m_kfs.resize(k);
-        if (FAILED(pKFI->GetKeyFrames(&TIME_FORMAT_MEDIA_TIME, m_kfs.data(), k)) || k != nKFs) {
-            m_kfs.clear();
-        }
-    }
+    LoadKeyFrames();
 
     SetPlaybackMode(PM_FILE);
 }
@@ -14030,6 +14018,25 @@ bool CMainFrame::GetNeighbouringKeyFrames(REFERENCE_TIME rtTarget, std::pair<REF
     }
     keyframes = std::make_pair(rtLower, rtUpper);
     return ret;
+}
+
+void CMainFrame::LoadKeyFrames()
+{
+    CComQIPtr<IKeyFrameInfo> pKFI;
+    BeginEnumFilters(m_pGB, pEF, pBF);
+    if (pKFI = pBF) {
+        break;
+    }
+    EndEnumFilters;
+    UINT nKFs = 0;
+    m_kfs.clear();
+    if (pKFI && S_OK == pKFI->GetKeyFrameCount(nKFs) && nKFs > 0) {
+        UINT k = nKFs;
+        m_kfs.resize(k);
+        if (FAILED(pKFI->GetKeyFrames(&TIME_FORMAT_MEDIA_TIME, m_kfs.data(), k)) || k != nKFs) {
+            m_kfs.clear();
+        }
+    }
 }
 
 REFERENCE_TIME CMainFrame::GetClosestKeyFrame(REFERENCE_TIME rtTarget) const

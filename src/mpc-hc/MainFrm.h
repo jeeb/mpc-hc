@@ -426,6 +426,7 @@ protected:
     CGraphThread* m_pGraphThread;
     bool m_bOpenedThruThread;
 
+    void LoadKeyFrames();
     std::vector<REFERENCE_TIME> m_kfs;
 
     bool m_fOpeningAborted;
