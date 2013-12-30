@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2013 see Authors.txt
+ * (C) 2006-2014 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -6713,18 +6713,16 @@ void CMainFrame::OnPlayPlay()
         return;
     }
 
-    if (GetLoadState() == MLS::LOADED && GetMediaState() == State_Stopped) {
-        MoveVideoWindow(false, true);
-    }
-
-    if (m_eMediaLoadState == MLS::LOADED) {
+    if (GetLoadState() == MLS::LOADED) {
         if (GetMediaState() == State_Stopped) {
+            MoveVideoWindow(false, true);
             m_dSpeedRate = 1.0;
         }
 
         if (GetPlaybackMode() == PM_FILE) {
             if (m_fEndOfStream) {
                 SendMessage(WM_COMMAND, ID_PLAY_STOP);
+                MoveVideoWindow(false, true);
             }
             m_pMS->SetRate(m_dSpeedRate);
             m_pMC->Run();
