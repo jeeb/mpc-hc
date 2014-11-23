@@ -47,7 +47,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 else
   # Get information about the current version
   describe=$(git describe --long)
-  counter=$(git log --simplify-by-decoration --pretty='%H' master -1 | xargs -n1 git describe --long --tags 2>/dev/null)
+  counter=$(git log --simplify-by-decoration --pretty='%H' develop -1 | xargs -n1 git describe --long --tags 2>/dev/null)
   echo "Describe:  $describe"
 
   # Get the abbreviated hash of the current changeset
