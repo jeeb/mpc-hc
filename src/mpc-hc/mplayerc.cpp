@@ -729,7 +729,7 @@ bool CMPlayerCApp::StoreSettingsToRegistry()
     free((void*)m_pszRegistryKey);
     m_pszRegistryKey = nullptr;
 
-    SetRegistryKey(_T("MPC-HC"));
+    SetRegistryKey(MPC_ROOT_REGISTRY_KEY);
 
     return true;
 }
@@ -1713,7 +1713,7 @@ BOOL CMPlayerCApp::InitInstance()
 
     if (!IsIniValid()) {
         CRegKey key;
-        if (ERROR_SUCCESS == key.Create(HKEY_CURRENT_USER, _T("Software\\MPC-HC\\MPC-HC"))) {
+        if (ERROR_SUCCESS == key.Create(HKEY_CURRENT_USER, L"Software\\" MPC_ROOT_REGISTRY_KEY L"\\MPC-HC")) {
             if (RegQueryValueEx(key, _T("ExePath"), 0, nullptr, nullptr, nullptr) != ERROR_SUCCESS) { // First launch
                 // Move registry settings from the old to the new location
                 CRegKey oldKey;
