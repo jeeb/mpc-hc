@@ -40,6 +40,12 @@
 
 #define MPC_WND_CLASS_NAME L"MediaPlayerClassicW"
 
+#ifndef _WIN64
+#define MPC_ROOT_REGISTRY_KEY L"MPC-HC"
+#else
+#define MPC_ROOT_REGISTRY_KEY L"MPC-HC64"
+#endif
+
 // define the default logo we use
 #define DEF_LOGO IDF_LOGO3
 
