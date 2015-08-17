@@ -31,8 +31,10 @@
 //       avoid possible risks of conflict with the old MPC (non HC version).
 #ifdef _WIN64
 #define PROGID _T("mplayerc64")
+#define MPC_HC_APP_NAME _T("MPC-HC 64-bit")
 #else
 #define PROGID _T("mplayerc")
+#define MPC_HC_APP_NAME _T("MPC-HC")
 #endif // _WIN64
 
 CFileAssoc::IconLib::IconLib(GetIconIndexFunc fnGetIconIndex, GetIconLibVersionFunc fnGetIconLibVersion, HMODULE hLib)
@@ -65,10 +67,10 @@ void CFileAssoc::IconLib::SaveVersion() const
 
 CFileAssoc::CFileAssoc()
     : m_iconLibPath(PathUtils::CombinePaths(PathUtils::GetProgramPath(), _T("mpciconlib.dll")))
-    , m_strRegisteredAppName(_T("Media Player Classic"))
+    , m_strRegisteredAppName(MPC_HC_APP_NAME)
     , m_strOldAssocKey(_T("PreviousRegistration"))
-    , m_strRegisteredAppKey(_T("Software\\Clients\\Media\\Media Player Classic\\Capabilities"))
-    , m_strRegAppFileAssocKey(_T("Software\\Clients\\Media\\Media Player Classic\\Capabilities\\FileAssociations"))
+    , m_strRegisteredAppKey(_T("Software\\Clients\\Media\\")  MPC_HC_APP_NAME  _T("\\Capabilities"))
+    , m_strRegAppFileAssocKey(_T("Software\\Clients\\Media\\") MPC_HC_APP_NAME _T("\\Capabilities\\FileAssociations"))
     , m_strOpenCommand(_T("\"") + PathUtils::GetProgramPath(true) + _T("\" \"%1\""))
     , m_strEnqueueCommand(_T("\"") + PathUtils::GetProgramPath(true) + _T("\" /add \"%1\""))
     , m_bNoRecentDocs(false)
@@ -143,7 +145,7 @@ bool CFileAssoc::RegisterApp()
         CRegKey key;
 
         if (ERROR_SUCCESS == key.Open(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\RegisteredApplications"))) {
-            key.SetStringValue(_T("Media Player Classic"), m_strRegisteredAppKey);
+            key.SetStringValue(MPC_HC_APP_NAME, m_strRegisteredAppKey);
 
             if (ERROR_SUCCESS == key.Create(HKEY_LOCAL_MACHINE, m_strRegisteredAppKey)) {
                 // ==>>  TODO icon !!!
@@ -604,7 +606,7 @@ bool CFileAssoc::RegisterAutoPlay(autoplay_t ap, bool bRegister)
             return false;
         }
         key.SetStringValue(_T("Action"), ResStr(m_handlers[i].action));
-        key.SetStringValue(_T("Provider"), _T("Media Player Classic"));
+        key.SetStringValue(_T("Provider"), MPC_HC_APP_NAME);
         key.SetStringValue(_T("InvokeProgID"), _T("MediaPlayerClassic.Autorun"));
         key.SetStringValue(_T("InvokeVerb"), _T("Play") + m_handlers[i].verb);
         key.SetStringValue(_T("DefaultIcon"), exe + _T(",0"));
